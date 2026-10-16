@@ -937,13 +937,19 @@ export async function revokeCard(cardId: string, actor: Actor) {
   return { ok: true, actor };
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function publicVerify(token: string) {
   const supabase = db();
-  const { data: card } = await supabase
-    .from("card_studio_cards")
-    .select("card_uuid, card_number, member_name, membership_type, status, expiration_at, issued_at")
-    .or(`card_uuid.eq.${token},card_number.eq.${token}`)
-    .maybeSingle();
+  // Never interpolate the public token into a PostgREST .or() filter: commas and
+  // parentheses in it would add arbitrary filter clauses (card enumeration).
+  const byColumn = (column: "card_uuid" | "card_number") =>
+    supabase
+      .from("card_studio_cards")
+      .select("card_uuid, card_number, member_name, membership_type, status, expiration_at, issued_at")
+      .eq(column, token)
+      .maybeSingle();
+  const card = (UUID_PATTERN.test(token) ? (await byColumn("card_uuid")).data : null) ?? (await byColumn("card_number")).data;
   if (!card) {
     const { data: byToken } = await supabase.from("card_studio_verification_tokens").select("card_id, revoked_at").eq("token", token).maybeSingle();
     if (!byToken) return null;

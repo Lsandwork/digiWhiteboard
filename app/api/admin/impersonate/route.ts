@@ -8,6 +8,9 @@ import {
 } from "@/lib/admin/session";
 import { isDemoSession } from "@/lib/demo/session";
 import { getAdminUserById, isAdminOrManagementRole, isFullAdminRole } from "@/lib/admin/users";
+import { hasAnyRole, isSuperAdminAccess, isSuperAdminLegacyRole } from "@/lib/admin/permissions";
+import { targetIsSuperAdmin } from "@/lib/admin/super-admin-guards";
+import { getUserAccess } from "@/lib/admin/user-access";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -57,8 +60,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "That employee's login is disabled." }, { status: 400 });
     }
 
+    // Resolved RBAC access, not just the legacy role: additional roles can also make an account an admin.
+    const [actorAccess, targetAccess] = await Promise.all([
+      session.adminUserId ? getUserAccess(supabase, session.adminUserId, session.role, session.email) : null,
+      getUserAccess(supabase, target.id, target.role, target.email)
+    ]);
+    const actorIsSuperAdmin = isSuperAdminLegacyRole(session.role) || isSuperAdminAccess(actorAccess);
+    if (targetIsSuperAdmin(target.role, targetAccess) && !actorIsSuperAdmin) {
+      return NextResponse.json({ error: "Only Super Admin can log in as a Super Admin account." }, { status: 403 });
+    }
+
     // Management (non-full-admin) may not impersonate Super Admin / Admin accounts.
-    if (!isFullAdminRole(session.role) && isFullAdminRole(target.role)) {
+    const targetIsAdmin = isFullAdminRole(target.role) || hasAnyRole(targetAccess, ["super_admin", "admin"]);
+    if (!isFullAdminRole(session.role) && targetIsAdmin) {
       return NextResponse.json(
         { error: "Management cannot log in as a Super Admin or Admin account." },
         { status: 403 }

@@ -70,6 +70,7 @@ async function sessionFromRequestCookies(request: NextRequest) {
 void getSessionSecret();
 void process.env.ADMIN_SESSION_SECRET;
 void process.env.ADMIN_PASSWORD;
+void process.env.RUFFOPS_DEMO_MODE;
 
 export async function middleware(request: NextRequest) {
   try {

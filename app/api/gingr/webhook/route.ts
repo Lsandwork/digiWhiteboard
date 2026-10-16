@@ -46,6 +46,16 @@ function isCheckoutCompletion(webhookType: string) {
 
 const NO_EVENT_ID = "00000000-0000-0000-0000-000000000000";
 
+/**
+ * live_transition_dogs is readable by display clients (realtime). The Gingr HMAC only covers
+ * webhook_type + entity_id + entity_type, so a leaked signature lets anyone replay that event
+ * with forged entity_data. The audit row in gingr_webhook_events keeps it.
+ */
+function boardRawPayload(payload: GingrWebhookPayload, extra: Record<string, unknown> = {}) {
+  const { signature: _signature, ...rest } = payload;
+  return { ...rest, ...extra };
+}
+
 async function recordWebhookEvent(
   supabase: ReturnType<typeof getServiceSupabase>,
   payload: GingrWebhookPayload,
@@ -192,7 +202,7 @@ export async function POST(request: Request) {
             ? resolveActiveCheckoutDisplayUntil(statusStartedAt, existingUntil, nowDate)
             : resolveActiveCheckinDisplayUntil(statusStartedAt, existingUntil, nowDate),
         last_seen_from_gingr_at: now,
-        raw_payload: { ...payload, source: "gingr_webhook" },
+        raw_payload: boardRawPayload(payload, { source: "gingr_webhook" }),
         updated_at: now
       };
 
@@ -350,7 +360,7 @@ export async function POST(request: Request) {
           animal_name: dog.animal_name,
           owner_name: dog.owner_name,
           last_seen_from_gingr_at: now,
-          raw_payload: payload,
+          raw_payload: boardRawPayload(payload),
           updated_at: now
         };
         if (dog.photo_url) {
@@ -407,7 +417,7 @@ export async function POST(request: Request) {
             completed_at: now,
             display_until: displayUntil,
             last_seen_from_gingr_at: now,
-            raw_payload: { ...payload, source: "gingr_webhook" },
+            raw_payload: boardRawPayload(payload, { source: "gingr_webhook" }),
             updated_at: now
           })
           .eq("id", existing.id);

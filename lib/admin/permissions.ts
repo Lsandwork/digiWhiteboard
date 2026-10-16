@@ -1179,12 +1179,12 @@ export function canChangeAdminUserPassword(
 ): boolean {
   if (actorUserId && actorUserId === targetUserId) return true;
   if (hasPermission(actorAccess, "reset_user_password")) return true;
-  return actorLegacyRole === "owner_admin" || actorLegacyRole === "manager_admin" || !actorLegacyRole;
+  return actorLegacyRole === "owner_admin" || actorLegacyRole === "manager_admin";
 }
 
 export function canManageAdminUsers(actorAccess: UserAccess | null, actorLegacyRole?: string | null): boolean {
   if (hasPermission(actorAccess, "manage_staff_users")) return true;
-  return actorLegacyRole === "owner_admin" || actorLegacyRole === "manager_admin" || !actorLegacyRole;
+  return actorLegacyRole === "owner_admin" || actorLegacyRole === "manager_admin";
 }
 
 /** Lobby board chrome (switcher, cast refresh) — full admins only. */
@@ -1192,6 +1192,20 @@ export function isStaffPanelLimitedAccess(access: UserAccess | null | undefined,
   if (canManageAdminUsers(access ?? null, legacyRole)) return false;
   if (hasPermission(access, "configure_integrations")) return false;
   return true;
+}
+
+/** Lobby board content (settings, promotions, events) — same audience as the lobby admin tabs. */
+export function canManageLobbyContent(access: UserAccess | null | undefined, legacyRole?: string | null): boolean {
+  return (
+    canManageAdminUsers(access ?? null, legacyRole) ||
+    hasPermission(access, "manage_lobby_board") ||
+    hasAnyPermission(access, ["configure_integrations", "view_integrations", "manage_staff_whiteboard"])
+  );
+}
+
+/** Global admin settings (password policy, HR AI prompt, display toggles) — same audience as the Settings page. */
+export function canEditGlobalAdminSettings(access: UserAccess | null | undefined, legacyRole?: string | null): boolean {
+  return !isStaffPanelLimitedAccess(access, legacyRole) || hasPermission(access, "manage_system_settings");
 }
 
 const LOBBY_ONLY_TABS = new Set([
@@ -1863,11 +1877,7 @@ export function canAccessAdminTab(
   }
 
   if (LOBBY_ONLY_TABS.has(tab)) {
-    return (
-      canManageAdminUsers(effective, legacyRole) ||
-      hasPermission(effective, "manage_lobby_board") ||
-      hasAnyPermission(effective, ["configure_integrations", "view_integrations", "manage_staff_whiteboard"])
-    );
+    return canManageLobbyContent(effective, legacyRole);
   }
 
   const required = TAB_PERMISSIONS[tab];

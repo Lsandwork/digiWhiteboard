@@ -7,6 +7,7 @@ import { FitdogBlogFooter } from "@/components/blog/public/FitdogBlogFooter";
 import { FitdogBlogHeader } from "@/components/blog/public/FitdogBlogHeader";
 import { NewsletterForm } from "@/components/blog/public/NewsletterForm";
 import { FITDOG_PUBLIC_URLS } from "@/lib/blog/brand";
+import { serializeJsonLd } from "@/lib/json-ld";
 import {
   getPublicArticle,
   listPublicArticles,
@@ -147,8 +148,8 @@ export default async function BlogArticlePage({ params }: Props) {
   return (
     <>
       <FitdogBlogHeader active="Blog" />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbLd) }} />
 
       <article className="mx-auto max-w-3xl px-4 py-8 md:px-6" itemScope itemType="https://schema.org/BlogPosting">
         <meta itemProp="headline" content={article.title} />

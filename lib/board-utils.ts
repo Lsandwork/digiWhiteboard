@@ -2,7 +2,7 @@ import type { LiveDog } from "@/lib/types";
 
 type UnknownRecord = Record<string, unknown>;
 
-const photoKeys = [
+export const photoKeys = [
   "image",
   "image_url",
   "photo",

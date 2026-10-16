@@ -5,7 +5,8 @@ import {
   getGingrAnimalPhotoUrlCandidates,
   invalidateGingrAnimalPhoto
 } from "@/lib/gingr-animal-photo";
-import { isAllowedGingrPhotoHost, isLegacyGingrPhotoUrl } from "@/lib/gingr-photo-display";
+import { isAllowedGingrPhotoUrl, isLegacyGingrPhotoUrl } from "@/lib/gingr-photo-display";
+import { PROXY_IMAGE_HEADERS, createFreshLookupGate, fetchProxiedImage } from "@/lib/gingr-photo-proxy";
 import { resolveTlGingrApiKey } from "@/lib/tl-digi-board/gingr-auth";
 import { normalizePhotoUrl } from "@/lib/board-utils";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -23,43 +24,23 @@ function allowedAnimalId(value: string) {
   return /^[A-Za-z0-9_-]+$/.test(value);
 }
 
+const allowFreshGingrLookup = createFreshLookupGate({ cooldownMs: 5 * 60_000, perMinute: 30 });
+
 function resolveRequestedSrc(raw: string | null) {
   const trimmed = raw?.trim() || "";
   if (!trimmed) return null;
   const normalized = normalizePhotoUrl(trimmed);
   try {
     const url = new URL(normalized);
-    if (!isAllowedGingrPhotoHost(url.hostname)) return null;
+    if (!isAllowedGingrPhotoUrl(url)) return null;
     return url.toString();
   } catch {
     return null;
   }
 }
 
-async function fetchImageBytes(url: string) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const response = await fetch(url, {
-      cache: "force-cache",
-      redirect: "follow",
-      signal: controller.signal,
-      headers: {
-        Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-        Referer: ""
-      }
-    });
-    if (!response.ok) return null;
-    const contentType = response.headers.get("content-type") ?? "";
-    if (contentType && !contentType.toLowerCase().startsWith("image/")) return null;
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (!buffer.length || buffer.length > MAX_IMAGE_BYTES) return null;
-    return { buffer, contentType: contentType || "image/jpeg" };
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
+function fetchImageBytes(url: string) {
+  return fetchProxiedImage(url, { maxBytes: MAX_IMAGE_BYTES, timeoutMs: FETCH_TIMEOUT_MS });
 }
 
 async function loadStoredUrl(animalId: string) {
@@ -117,18 +98,14 @@ export async function GET(request: Request) {
     if (image) {
       return new NextResponse(image.buffer, {
         status: 200,
-        headers: {
-          "Content-Type": image.contentType,
-          "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
-          "X-Content-Type-Options": "nosniff"
-        }
+        headers: { "Content-Type": image.contentType, ...PROXY_IMAGE_HEADERS }
       });
     }
   }
 
   // Everything known is stale or missing — re-resolve from Gingr and persist
   // whichever URL actually downloads.
-  if (animalId) {
+  if (animalId && allowFreshGingrLookup(animalId)) {
     for (const fresh of await lookupFreshGingrUrls(animalId)) {
       if (candidates.includes(fresh)) continue;
       const image = await fetchImageBytes(fresh);
@@ -142,11 +119,7 @@ export async function GET(request: Request) {
       });
       return new NextResponse(image.buffer, {
         status: 200,
-        headers: {
-          "Content-Type": image.contentType,
-          "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
-          "X-Content-Type-Options": "nosniff"
-        }
+        headers: { "Content-Type": image.contentType, ...PROXY_IMAGE_HEADERS }
       });
     }
   }

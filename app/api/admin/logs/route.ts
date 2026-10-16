@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
+import { hasAnyPermission } from "@/lib/admin/permissions";
+import { getAdminSessionFromRequest } from "@/lib/admin/session";
+import { getUserAccess } from "@/lib/admin/user-access";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
+
+  const session = getAdminSessionFromRequest(request);
+  const access = await getUserAccess(getServiceSupabase(), session?.adminUserId, session?.role, session?.email);
+  if (!hasAnyPermission(access, ["view_admin_logs", "configure_integrations"])) {
+    return NextResponse.json({ error: "You do not have permission to view admin logs." }, { status: 403 });
+  }
 
   const url = new URL(request.url);
   const action = url.searchParams.get("action");

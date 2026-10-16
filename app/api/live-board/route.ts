@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { enrichStaffBoardAnimalPhotos, fillAndPersistMissingAnimalPhotos, collectMissingPhotoAnimalIds } from "@/lib/board-animal-photos";
 import { applyStoredAnimalPhotos } from "@/lib/animal-photo-store";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
+import { toPublicLiveBoardResponse } from "@/lib/board-public-dog";
 import {
   buildGingrCheckoutKeySet,
   includePromptedCheckoutInBoard,
@@ -449,7 +450,7 @@ export async function GET(request: Request) {
       checkingIn: response.checking_in.length,
       checkingOut: response.checking_out.length
     });
-    return NextResponse.json(response, {
+    return NextResponse.json(toPublicLiveBoardResponse(response), {
       headers: { "cache-control": "private, no-store, max-age=0" }
     });
   } catch (error) {
@@ -459,7 +460,7 @@ export async function GET(request: Request) {
     debugBoardLog(debugBoard, "live-board failed", { error: message, hasLastGood: Boolean(lastGood) });
     if (lastGood) {
       return NextResponse.json(
-        { ...lastGood, stale: true, error: message },
+        { ...toPublicLiveBoardResponse(lastGood), stale: true, error: message },
         { status: 200, headers: { "cache-control": "private, max-age=1" } }
       );
     }

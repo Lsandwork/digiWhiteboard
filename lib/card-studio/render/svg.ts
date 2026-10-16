@@ -1,5 +1,6 @@
 import { resolveTemplateString } from "@/lib/card-studio/dynamic-fields";
 import { fitFontSize } from "@/lib/card-studio/render/text-fit";
+import { safeSvgMarkup } from "@/lib/card-studio/safe-markup";
 import type { CardElement, CardSideDesign, MemberCardContext } from "@/lib/card-studio/types";
 import { publicVerificationPath } from "@/lib/card-studio/verify";
 
@@ -84,7 +85,7 @@ function renderElement(
       return `<rect width="${el.width}" height="${el.height}" fill="#fff" /><text x="8" y="${el.height / 2}" font-size="10" fill="#0b1b2b">BARCODE</text>`;
     case "svg":
     case "icon": {
-      const markup = String(el.properties.markup ?? "");
+      const markup = safeSvgMarkup(el.properties.markup);
       if (markup) return markup;
       const src = resolveTemplateString(String(el.properties.src ?? ""), member);
       if (!src) return "";

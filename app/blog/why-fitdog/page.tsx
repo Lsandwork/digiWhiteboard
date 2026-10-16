@@ -6,6 +6,7 @@ import { WhyFitdogHeader } from "@/components/blog/why-fitdog/WhyFitdogHeader";
 import { WhyFitdogLeadForm } from "@/components/blog/why-fitdog/WhyFitdogLeadForm";
 import { absoluteBlogUrl } from "@/lib/blog/site-url";
 import { publicBlogHref } from "@/lib/blog/public-path";
+import { serializeJsonLd } from "@/lib/json-ld";
 import {
   FITDOG_BUSINESS,
   WHY_FITDOG_CONVENIENCE,
@@ -179,8 +180,8 @@ function faqJsonLd() {
 export default function WhyFitdogPage() {
   return (
     <div className="fitdog-blog why-fitdog-page">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJsonLd()) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd()) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(localBusinessJsonLd()) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd()) }} />
 
       <WhyFitdogHeader />
 

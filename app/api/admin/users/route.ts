@@ -6,7 +6,7 @@ import { validatePasswordStrength } from "@/lib/admin/password";
 import { canManageAdminUsers } from "@/lib/admin/permissions";
 import { legacyRoleToRoleKey, type DepartmentKey, type RoleKey } from "@/lib/admin/permissions";
 import { assertUserMutationAllowed } from "@/lib/admin/super-admin-guards";
-import { canAssignPrimaryRole, canCreateAdminUsers } from "@/lib/admin/user-creation-access";
+import { canAssignPrimaryRole, canCreateAdminUsers, roleAssignmentError } from "@/lib/admin/user-creation-access";
 import { loadAdminSettings } from "@/lib/admin/settings";
 import {
   getUserAccess,
@@ -46,6 +46,12 @@ export async function GET(request: Request) {
 
   const session = getAdminSessionFromRequest(request);
   const supabase = getServiceSupabase({ timeoutMs: 8_000 });
+  const viewerAccess = session?.adminUserId
+    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
+    : null;
+  if (!canManageAdminUsers(viewerAccess, session?.role) && !canCreateAdminUsers(viewerAccess, session?.role)) {
+    return NextResponse.json({ error: "You do not have permission to view users." }, { status: 403 });
+  }
   after(() => {
     void migrateLegacyUserAccess(supabase).catch(() => undefined);
   });
@@ -66,7 +72,7 @@ export async function GET(request: Request) {
     currentUser: {
       email: session?.email ?? null,
       adminUserId: session?.adminUserId ?? null,
-      role: session?.role ?? "owner_admin",
+      role: session?.role ?? null,
       access: actorAccess
     }
   });
@@ -123,6 +129,15 @@ export async function POST(request: Request) {
 
   if (!canAssignPrimaryRole(actorAccess, session?.role, primaryRoleKey)) {
     return NextResponse.json({ error: "You cannot assign that role." }, { status: 403 });
+  }
+
+  const additionalRolesError = roleAssignmentError(
+    actorAccess,
+    session?.role,
+    Array.isArray(body.additional_roles) ? body.additional_roles : []
+  );
+  if (additionalRolesError) {
+    return NextResponse.json({ error: additionalRolesError }, { status: 403 });
   }
 
   if (!full_name || !email || !password) {

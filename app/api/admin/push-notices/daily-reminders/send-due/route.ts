@@ -6,13 +6,7 @@ import { isAuthorizedCron } from "@/lib/cron-auth";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  if (!isAuthorizedCron(request) && !process.env.CRON_SECRET) {
-    const legacyPassword = process.env.ADMIN_PASSWORD?.trim();
-    const headerPassword = request.headers.get("x-admin-password")?.trim();
-    if (!legacyPassword || headerPassword !== legacyPassword) {
-      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-    }
-  } else if (!isAuthorizedCron(request)) {
+  if (!isAuthorizedCron(request)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 

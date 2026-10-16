@@ -54,9 +54,18 @@ function trimValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+const SAME_ORIGIN_PROBE = "https://same-origin.invalid";
+
 export function isSafeRelativePath(value: string): boolean {
   const trimmed = value.trim();
-  return trimmed.startsWith("/") && !trimmed.startsWith("//");
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) return false;
+  // Browsers treat "\" as "/" and drop tabs/newlines, so "/\evil.com" becomes "//evil.com".
+  if (/[\\\u0000-\u001f\u007f]/.test(trimmed)) return false;
+  try {
+    return new URL(trimmed, SAME_ORIGIN_PROBE).origin === SAME_ORIGIN_PROBE;
+  } catch {
+    return false;
+  }
 }
 
 export function safeUrl(value: unknown, fallback = ""): string {

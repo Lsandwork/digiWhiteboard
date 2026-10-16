@@ -72,6 +72,29 @@ export function canAssignPrimaryRole(
   return creatablePrimaryRolesForActor(access, legacyRole).includes(primaryRole);
 }
 
+export function isAssignableRoleKey(value: string): value is RoleKey {
+  return (ALL_ASSIGNABLE_ROLE_KEYS as string[]).includes(value);
+}
+
+/**
+ * Every requested role (primary or additional) must be a known role the actor may grant.
+ * Roles the target already holds may be kept; super-admin targets are guarded separately.
+ */
+export function roleAssignmentError(
+  access: UserAccess | null | undefined,
+  legacyRole: string | null | undefined,
+  requestedRoles: unknown[],
+  alreadyHeld: RoleKey[] = []
+): string | null {
+  const allowed = creatablePrimaryRolesForActor(access, legacyRole);
+  for (const raw of requestedRoles) {
+    const role = String(raw ?? "").trim();
+    if (!isAssignableRoleKey(role)) return "Unknown role.";
+    if (!alreadyHeld.includes(role) && !allowed.includes(role)) return "You cannot assign that role.";
+  }
+  return null;
+}
+
 export function actorMayAssignSuperAdmin(access: UserAccess | null | undefined, legacyRole?: string | null) {
   return getAdminUserCreationTier(access, legacyRole) === "super_admin";
 }

@@ -1,7 +1,13 @@
 import { after, NextResponse } from "next/server";
 import { verifyAdminCredentials } from "@/lib/admin/auth";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
-import { checkLoginRateLimit, clearLoginAttempts, recordFailedLogin } from "@/lib/admin/rate-limit";
+import {
+  checkLoginThrottle,
+  clearLoginThrottle,
+  clientIpFromRequest,
+  loginThrottleKeys,
+  recordLoginFailure
+} from "@/lib/admin/rate-limit";
 import {
   createAdminSessionToken,
   setAdminSessionCookie
@@ -12,20 +18,30 @@ import { getServiceSupabase } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
 
+function throttleSupabase() {
+  try {
+    return getServiceSupabase({ timeoutMs: 1_000 });
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as { username?: string; password?: string };
     const username = String(body.username ?? "").trim();
     const password = String(body.password ?? "");
 
-    const clientKey =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      request.headers.get("x-real-ip") ||
-      "unknown";
-    const rateLimit = checkLoginRateLimit(`${clientKey}:${username.toLowerCase()}`);
+    const throttleKeys = loginThrottleKeys(clientIpFromRequest(request), username);
+    const throttleStore = throttleSupabase();
+    const rateLimit = await checkLoginThrottle(throttleStore, throttleKeys);
 
     if (!rateLimit.allowed) {
-      return NextResponse.json({ error: "Too many failed attempts. Try again in 15 minutes." }, { status: 429 });
+      const minutes = Math.max(1, Math.ceil(rateLimit.retryAfterMs / 60_000));
+      return NextResponse.json(
+        { error: `Too many failed attempts. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.` },
+        { status: 429, headers: { "retry-after": String(Math.ceil(rateLimit.retryAfterMs / 1000)) } }
+      );
     }
 
     if (!username || !password) {
@@ -40,11 +56,11 @@ export async function POST(request: Request) {
           { status: 503 }
         );
       }
-      recordFailedLogin(`${clientKey}:${username.toLowerCase()}`);
+      await recordLoginFailure(throttleStore, throttleKeys);
       return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
     }
 
-    clearLoginAttempts(`${clientKey}:${username.toLowerCase()}`);
+    after(() => clearLoginThrottle(throttleStore, throttleKeys));
 
     const adminUserId = auth.adminUserId;
     if (adminUserId) {

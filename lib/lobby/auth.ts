@@ -1,7 +1,14 @@
-import { isAdminRequest } from "@/lib/admin/api-auth";
+import { canManageLobbyContent } from "@/lib/admin/permissions";
+import { getAdminSessionFromRequest } from "@/lib/admin/session";
+import { getUserAccess } from "@/lib/admin/user-access";
+import { getServiceSupabase } from "@/lib/supabase/server";
 
-export function isLobbyAdmin(request: Request) {
-  return isAdminRequest(request);
+/** Lobby content writes — signed-in staff whose role can manage the lobby board. */
+export async function isLobbyAdmin(request: Request) {
+  const session = getAdminSessionFromRequest(request);
+  if (!session) return false;
+  const access = await getUserAccess(getServiceSupabase(), session.adminUserId, session.role, session.email);
+  return canManageLobbyContent(access, session.role);
 }
 
 export function getLobbyDisplayToken() {

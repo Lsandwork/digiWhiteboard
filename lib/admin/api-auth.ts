@@ -1,4 +1,4 @@
-import { getAdminSessionFromRequest } from "@/lib/admin/session";
+import { getAdminSessionFromRequest, getUnfilteredAdminSessionFromRequest } from "@/lib/admin/session";
 import { demoWriteBlockedMessage, isDemoSession } from "@/lib/demo/session";
 import { NextResponse } from "next/server";
 import {
@@ -37,30 +37,20 @@ import {
   isTeamLeaderRole
 } from "@/lib/admin/users";
 
-function hasValidAdminPasswordHeader(request: Request) {
-  const legacyPassword = process.env.ADMIN_PASSWORD?.trim();
-  const headerPassword = request.headers.get("x-admin-password")?.trim();
-  return Boolean(legacyPassword && headerPassword && headerPassword === legacyPassword);
-}
-
-export function isAdminRequest(request: Request) {
-  if (getAdminSessionFromRequest(request)) return true;
-  return hasValidAdminPasswordHeader(request);
-}
-
 /**
- * Role used for API permission checks.
- * Cookie session role wins. Password-header auth without a session is owner_admin.
- * Missing/blank session roles never elevate.
+ * Signed session cookie is the only API credential. The legacy `x-admin-password` header
+ * is intentionally not accepted: it bypassed login rate limiting and granted owner_admin.
  */
+export function isAdminRequest(request: Request) {
+  return Boolean(getAdminSessionFromRequest(request));
+}
+
+/** Role used for API permission checks. Missing/blank session roles never elevate. */
 export function getEffectiveAdminRole(request: Request): string | null {
   const session = getAdminSessionFromRequest(request);
-  if (session) {
-    const role = typeof session.role === "string" ? session.role.trim() : "";
-    return role || null;
-  }
-  if (hasValidAdminPasswordHeader(request)) return "owner_admin";
-  return null;
+  if (!session) return null;
+  const role = typeof session.role === "string" ? session.role.trim() : "";
+  return role || null;
 }
 
 export function unauthorizedAdminResponse(body: Record<string, unknown> = { error: "Unauthorized." }) {
@@ -69,7 +59,7 @@ export function unauthorizedAdminResponse(body: Record<string, unknown> = { erro
 
 /** Demo sessions can browse admin UI but must not mutate production settings. */
 export function blockDemoWrite(request: Request) {
-  const session = getAdminSessionFromRequest(request);
+  const session = getUnfilteredAdminSessionFromRequest(request);
   if (!isDemoSession(session)) return null;
   return NextResponse.json({ ok: true, demo: true, message: demoWriteBlockedMessage() });
 }

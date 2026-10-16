@@ -21,6 +21,12 @@ export async function POST(request: Request) {
   if (!session?.adminUserId) {
     return NextResponse.json({ error: "You must be signed in with a managed account to change your password." }, { status: 403 });
   }
+  if (session.impersonatorEmail) {
+    return NextResponse.json(
+      { error: "Passwords cannot be changed while logged in as another employee. Return to your account first." },
+      { status: 403 }
+    );
+  }
 
   const body = (await request.json()) as {
     password?: string;

@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { cookies, headers } from "next/headers";
 import type { NextResponse } from "next/server";
 import { ADMIN_SESSION_COOKIE, SESSION_TTL_MS, getSessionSecret } from "@/lib/admin/session-constants";
+import { isDemoIdentity, isDemoModeEnabled, isDemoRequestAllowed } from "@/lib/demo/policy";
 
 export { ADMIN_SESSION_COOKIE } from "@/lib/admin/session-constants";
 
@@ -67,6 +68,7 @@ export function verifyAdminSessionToken(token: string | undefined | null): Admin
 
     const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as SessionPayload;
     if (!payload.sub || !payload.exp || payload.exp < Date.now()) return null;
+    if (isDemoIdentity({ isDemo: payload.isDemo, email: payload.sub }) && !isDemoModeEnabled()) return null;
     return {
       email: payload.sub,
       adminUserId: payload.id,
@@ -240,7 +242,32 @@ export async function getAdminSession() {
   return verifyAdminSessionToken(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
 }
 
+const PASSWORD_CHANGE_PATHS = new Set(["/api/admin/change-own-password", "/api/admin/session", "/api/admin/logout"]);
+
+function requestPathname(request: Request) {
+  try {
+    return new URL(request.url).pathname;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Session for API authorization. Demo sessions are dropped for any write outside the demo
+ * sandbox and for reads of real staff/customer data, so no route can treat them as privileged.
+ */
 export function getAdminSessionFromRequest(request: Request) {
+  const session = sessionFromCookieHeader(request.headers.get("cookie") ?? "");
+  if (!session) return null;
+  const pathname = requestPathname(request);
+  if (isDemoIdentity(session) && !isDemoRequestAllowed(request.method, pathname)) return null;
+  // Temporary-password sessions may only finish the password change (middleware does not cover /api).
+  if (session.mustChangePassword && !PASSWORD_CHANGE_PATHS.has(pathname)) return null;
+  return session;
+}
+
+/** Verified session without the demo request filter — only for rendering demo "not saved" responses. */
+export function getUnfilteredAdminSessionFromRequest(request: Request) {
   return sessionFromCookieHeader(request.headers.get("cookie") ?? "");
 }
 

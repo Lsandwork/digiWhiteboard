@@ -3,6 +3,7 @@ import { timingSafeEqual } from "crypto";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { findAdminUsersForLogin, verifyAdminUserPassword, type AdminUserRecord } from "@/lib/admin/users";
 import { DEMO_PASSWORD, findDemoAccount } from "@/lib/demo/constants";
+import { isDemoIdentity, isDemoModeEnabled } from "@/lib/demo/policy";
 
 /** Canonical Super Admin identity (Lonnie Sandoval). */
 export const SUPER_ADMIN_EMAIL = "lonnie@fitdog.com";
@@ -121,7 +122,10 @@ export async function verifyAdminCredentials(username: string, password: string)
   const normalized = username.trim().toLowerCase();
 
   const demoAccount = findDemoAccount(normalized);
-  if (demoAccount && password === DEMO_PASSWORD) {
+  if (isDemoIdentity({ email: normalized }) && !isDemoModeEnabled()) {
+    return { ok: false, email: normalized, source: "demo" };
+  }
+  if (demoAccount && safeEqual(password, DEMO_PASSWORD)) {
     return {
       ok: true,
       email: demoAccount.email,
@@ -157,6 +161,9 @@ export async function verifyAdminCredentials(username: string, password: string)
   try {
     const users = await lookupLoginUsers(loginLookupEmails(normalized));
     const dbUser = pickLoginUser(users, normalized);
+    if (dbUser && isDemoIdentity({ email: dbUser.email }) && !isDemoModeEnabled()) {
+      return { ok: false, email: normalized, source: "database" };
+    }
     if (dbUser && (await verifyAdminUserPassword(dbUser, password))) {
       return resultFromDbUser(dbUser, "database");
     }

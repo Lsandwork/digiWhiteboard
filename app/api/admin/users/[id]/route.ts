@@ -5,6 +5,7 @@ import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { canManageAdminUsers } from "@/lib/admin/permissions";
 import { legacyRoleToRoleKey, type DepartmentKey, type RoleKey } from "@/lib/admin/permissions";
 import { assertUserMutationAllowed } from "@/lib/admin/super-admin-guards";
+import { roleAssignmentError } from "@/lib/admin/user-creation-access";
 import { getUserAccess, roleKeyToLegacyRole, setUserAccess } from "@/lib/admin/user-access";
 import {
   AdminUserRole,
@@ -60,6 +61,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
   const existingAccess = await getUserAccess(supabase, id, existing.role, existing.email);
   const primaryRoleKey = body.primary_role ?? (body.role ? legacyRoleToRoleKey(body.role) : legacyRoleToRoleKey(existing.role));
+  // The legacy `role` field changes the role exactly like `primary_role` and gets the same checks.
+  const roleChangeRequested = body.primary_role != null || body.role != null;
 
   try {
     await assertUserMutationAllowed({
@@ -69,12 +72,21 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       targetUserId: id,
       targetLegacyRole: existing.role,
       targetAccess: existingAccess,
-      nextPrimaryRole: body.primary_role ? primaryRoleKey : undefined,
+      nextPrimaryRole: roleChangeRequested ? primaryRoleKey : undefined,
       nextStatus: body.status,
       action: body.status === "disabled" ? "disable" : "update"
     });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Not allowed." }, { status: 403 });
+  }
+
+  const requestedRoles: unknown[] = [
+    ...(roleChangeRequested ? [primaryRoleKey] : []),
+    ...(Array.isArray(body.additional_roles) ? body.additional_roles : [])
+  ];
+  const roleError = roleAssignmentError(actorAccess, session?.role, requestedRoles, existingAccess.roles);
+  if (roleError) {
+    return NextResponse.json({ error: roleError }, { status: 403 });
   }
 
   const legacyRole = roleKeyToLegacyRole(primaryRoleKey) as AdminUserRole;

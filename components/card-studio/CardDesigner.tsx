@@ -19,6 +19,7 @@ import { emptyMemberContext } from "@/lib/card-studio/dynamic-fields";
 import { openOsPrintDialog } from "@/components/card-studio/open-os-print";
 import { pruneStackedMemberPhotos, replaceMemberPhoto } from "@/lib/card-studio/photo-slot";
 import { gingrBarcodeValue } from "@/lib/card-studio/gingr-identity";
+import { safeSvgMarkup } from "@/lib/card-studio/safe-markup";
 
 const TOOLS: { type: CardElementType; label: string }[] = [
   { type: "text", label: "Text" },
@@ -555,7 +556,7 @@ function ElementPreview({ el, member }: { el: CardElement; member: MemberCardCon
   if (el.properties.textTransform === "uppercase") text = text.toUpperCase();
   if (!text && el.properties.keepArtworkWhenEmpty && el.properties.text) return null;
   if (el.type === "svg" || el.type === "icon") {
-    const markup = String(el.properties.markup ?? "");
+    const markup = safeSvgMarkup(el.properties.markup);
     if (markup) {
       return <div style={{ width: "100%", height: "100%", overflow: "hidden" }} dangerouslySetInnerHTML={{ __html: markup }} />;
     }

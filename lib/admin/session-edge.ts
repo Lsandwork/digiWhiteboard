@@ -1,4 +1,5 @@
 import { getSessionSecret } from "@/lib/admin/session-constants";
+import { isDemoIdentity, isDemoModeEnabled } from "@/lib/demo/policy";
 
 export type SessionPayload = {
   sub: string;
@@ -76,6 +77,7 @@ export async function verifyAdminSessionTokenEdge(token: string | undefined | nu
 
     const payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as SessionPayload;
     if (!payload.sub || !payload.exp || payload.exp < Date.now()) return null;
+    if (isDemoIdentity({ isDemo: payload.isDemo, email: payload.sub }) && !isDemoModeEnabled()) return null;
     return {
       email: payload.sub,
       adminUserId: payload.id,

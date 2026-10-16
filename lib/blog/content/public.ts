@@ -1,6 +1,7 @@
 import { INITIAL_BLOG_ARTICLES, INITIAL_BLOG_CATEGORIES, type InitialBlogArticle } from "@/lib/blog/content/initial-articles";
 import { publicBlogHref } from "@/lib/blog/public-path";
 import { markdownToSimpleHtml } from "@/lib/blog/utils/markdown";
+import { safeUrl } from "@/lib/safe-url";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export type PublicBlogArticle = InitialBlogArticle & {
@@ -210,7 +211,7 @@ export async function getActivePromotion(): Promise<{
         title: String(data.title),
         subtitle: String(data.subtitle || ""),
         ctaLabel: String(data.cta_label || "Learn more"),
-        ctaUrl: String(data.cta_url || publicBlogHref()),
+        ctaUrl: safeUrl(data.cta_url, publicBlogHref()) || publicBlogHref(),
         active: true
       };
     }

@@ -6,7 +6,7 @@ import { getServiceSupabase } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
-  if (!isLobbyAdmin(request)) return unauthorizedLobbyResponse();
+  if (!(await isLobbyAdmin(request))) return unauthorizedLobbyResponse();
 
   const { id } = await context.params;
 
@@ -37,7 +37,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 }
 
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
-  if (!isLobbyAdmin(request)) return unauthorizedLobbyResponse();
+  if (!(await isLobbyAdmin(request))) return unauthorizedLobbyResponse();
 
   const { id } = await context.params;
 

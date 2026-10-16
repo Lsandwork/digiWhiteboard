@@ -5,6 +5,7 @@ import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { validatePasswordStrength } from "@/lib/admin/password";
 import { canChangeAdminUserPassword } from "@/lib/admin/permissions";
 import { loadAdminSettings } from "@/lib/admin/settings";
+import { actorCanManageTarget } from "@/lib/admin/super-admin-guards";
 import { getUserAccess } from "@/lib/admin/user-access";
 import { changeAdminUserPassword, getAdminUserById } from "@/lib/admin/users";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -47,6 +48,17 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!existing) return NextResponse.json({ error: "User not found." }, { status: 404 });
 
   const isSelf = session?.adminUserId === id;
+  if (!isSelf) {
+    if (session?.impersonatorEmail) {
+      return NextResponse.json({ error: "Return to your own account before resetting passwords." }, { status: 403 });
+    }
+    const targetAccess = await getUserAccess(supabase, id, existing.role, existing.email);
+    if (!actorCanManageTarget(session?.role, actorAccess, existing.role, targetAccess)) {
+      return NextResponse.json({ error: "Only Super Admin can change a Super Admin password." }, { status: 403 });
+    }
+  } else if (session?.impersonatorEmail) {
+    return NextResponse.json({ error: "Passwords cannot be changed while logged in as another employee." }, { status: 403 });
+  }
   await changeAdminUserPassword(supabase, id, password, isSelf ? false : (body.force_password_change ?? false));
 
   await writeAdminAuditLog({

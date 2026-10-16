@@ -11,6 +11,7 @@ import { fastCheckoutCacheTtlMs, getOrLoadFastCheckoutCache, invalidateBoardTran
 import { fillAndPersistMissingAnimalPhotos, collectMissingPhotoAnimalIds } from "@/lib/board-animal-photos";
 import { refreshGingrBoardCache } from "@/lib/gingr-board-refresh";
 import { debugBoardLog, getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
+import { toPublicBoardDogs } from "@/lib/board-public-dog";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -32,8 +33,8 @@ export async function GET(request: Request) {
       : await getOrLoadFastCheckoutCache("board-checkouts:fast", loadCheckouts);
     const durationMs = Date.now() - startedAt;
     const payload = {
-      checking_in: result.checking_in,
-      checking_out: result.checking_out,
+      checking_in: toPublicBoardDogs(result.checking_in),
+      checking_out: toPublicBoardDogs(result.checking_out),
       counts: {
         checking_in: result.checking_in.length,
         checking_out: result.checking_out.length,

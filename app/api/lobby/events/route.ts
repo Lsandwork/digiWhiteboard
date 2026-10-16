@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!isLobbyAdmin(request)) return unauthorizedLobbyResponse();
+  if (!(await isLobbyAdmin(request))) return unauthorizedLobbyResponse();
 
   try {
     const body = (await request.json()) as Record<string, unknown>;
