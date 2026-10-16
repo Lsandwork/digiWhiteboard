@@ -235,7 +235,8 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   checklist: "Personal handler checklist for daily shift tasks.",
   overview: "Live snapshot of alerts, HR, PIP, tasks, staffing, and board health.",
   my_shift: "Role-aware homepage with needs-attention, tasks, dogs, and alerts.",
-  ops_command_center: "Live Fitdog operating state for management — dogs, tasks, alerts, Gingr health.",
+  ops_command_center:
+    "Read-only operations overview from existing RuffOps data, with optional Live Floor when needed.",
   front_desk_command: "Arriving, ready for pickup, checkout, and owner contact speed lane.",
   yard_command: "Yard occupancy and next actions for Team Leads.",
   driver_mode: "Mobile next-stop workflow with offline-safe completion.",
