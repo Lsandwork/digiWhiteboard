@@ -140,6 +140,14 @@ export function openLogToWorkItem(row: CrossoverMessage): OpsWorkItem {
   };
 }
 
+/** FITDOG_NOTIFICATION rows are owner activity (uploads, cancellations), not payment problems. */
+export function splitOperationsAlerts(rows: OperationsAlert[]) {
+  return {
+    paymentAlerts: rows.filter((row) => row.alert_type !== "FITDOG_NOTIFICATION"),
+    ownerActivity: rows.filter((row) => row.alert_type === "FITDOG_NOTIFICATION")
+  };
+}
+
 export function alertToWorkItem(row: OperationsAlert): OpsWorkItem {
   const amount =
     row.amount_due != null && Number(row.amount_due) > 0 ? `$${Number(row.amount_due).toFixed(2)} due` : null;
@@ -179,7 +187,7 @@ export async function loadStaffOpsFeed(supabaseClient?: SupabaseClient) {
 
   const followUps = openFollowUps(ops?.owner_follow_ups || []);
   const issues = openIssues(ops?.active_issues || []);
-  const paymentAlerts = alerts || [];
+  const { paymentAlerts, ownerActivity } = splitOperationsAlerts(alerts || []);
 
   const followUpItems = followUps.map(followUpToWorkItem);
   const issueItems = issues.map(issueToWorkItem);
@@ -211,6 +219,7 @@ export async function loadStaffOpsFeed(supabaseClient?: SupabaseClient) {
     followUps,
     issues,
     paymentAlerts,
+    ownerActivity,
     crossoverMessages: ops?.crossover_messages || ([] as CrossoverMessage[]),
     staffDirectory: ops?.staff_directory || ([] as StaffDirectoryMember[]),
     followUpItems,
