@@ -558,6 +558,17 @@ export async function createOwnerTrackingForPlan(
   };
 }
 
+/** Tracking links are same-day operational tools; they stop resolving after the operating day (+ grace). */
+export const OWNER_TRACKING_LINK_GRACE_MS = 36 * 60 * 60_000;
+
+export function isOwnerTrackingLinkExpired(operatingDate: string | null | undefined, now = Date.now()) {
+  if (!operatingDate) return false;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(operatingDate).trim());
+  if (!match) return false;
+  const startUtc = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return now > startUtc + OWNER_TRACKING_LINK_GRACE_MS;
+}
+
 export async function getOwnerTrackingPublic(
   token: string,
   options?: { startedAtMs?: number | null }
@@ -569,6 +580,9 @@ export async function getOwnerTrackingPublic(
   const supabase = getServiceSupabase();
   const { data: row } = await supabase.from("route_owner_tracking").select("*").eq("token", token).maybeSingle();
   if (!row) return null;
+  if (isOwnerTrackingLinkExpired(row.operating_date != null ? String(row.operating_date) : null)) {
+    return null;
+  }
 
   let etaMinutes = row.last_eta_minutes == null ? null : Number(row.last_eta_minutes);
   let vehicle: OwnerTrackingPublicView["vehicle"] = null;

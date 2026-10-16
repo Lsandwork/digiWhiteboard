@@ -154,7 +154,7 @@ async function assertLockedDown(client: Client, tables: string[]) {
   await expectDenied(client, "anon", `select public.patch_admin_settings_json('k', '{}'::jsonb)`, "anon rpc");
   await expectAllowed(client, "service_role", `select public.patch_admin_settings_json('k', '{}'::jsonb)`, "service rpc");
 
-  // Untouched: realtime display table keeps its anon read policy.
+  // Untouched table SELECT: realtime display table keeps its anon read policy.
   assert.equal(await scalar(client, `select has_table_privilege('anon', 'public.live_transition_dogs', 'SELECT')`), true);
   await expectAllowed(client, "anon", `select id from public.live_transition_dogs`, "live_transition_dogs anon read");
 
@@ -175,6 +175,39 @@ async function assertLockedDown(client: Client, tables: string[]) {
   assert.equal(await scalar(client, `select has_function_privilege('service_role', 'public.zz_future_fn()', 'EXECUTE')`), true, "future fn open to service_role");
   await client.query(`drop table public.zz_future_table`);
   await client.query(`drop function public.zz_future_fn()`);
+}
+
+async function testLiveTransitionRawPayloadColumn(client: Client) {
+  const up = sql("supabase/migrations/102_security_live_transition_raw_payload.sql");
+  const down = sql("supabase/rollbacks/102_security_live_transition_raw_payload.down.sql");
+  await client.query(up);
+  await client.query(up);
+
+  assert.equal(
+    await scalar(client, `select has_column_privilege('anon', 'public.live_transition_dogs', 'raw_payload', 'SELECT')`),
+    false,
+    "anon cannot select raw_payload"
+  );
+  assert.equal(
+    await scalar(client, `select has_column_privilege('authenticated', 'public.live_transition_dogs', 'raw_payload', 'SELECT')`),
+    false,
+    "authenticated cannot select raw_payload"
+  );
+  assert.equal(
+    await scalar(client, `select has_column_privilege('service_role', 'public.live_transition_dogs', 'raw_payload', 'SELECT')`),
+    true,
+    "service_role retains raw_payload"
+  );
+  await expectAllowed(client, "anon", `select id, display_status from public.live_transition_dogs`, "anon other columns");
+  await expectDenied(client, "anon", `select raw_payload from public.live_transition_dogs`, "anon raw_payload denied");
+
+  await client.query(down);
+  assert.equal(
+    await scalar(client, `select has_column_privilege('anon', 'public.live_transition_dogs', 'raw_payload', 'SELECT')`),
+    true,
+    "rollback restores raw_payload select"
+  );
+  await client.query(up);
 }
 
 async function testLoginThrottleMigration(client: Client) {
@@ -254,9 +287,10 @@ async function main() {
     for (const file of MIGRATIONS) await client.query(sql(file));
     await assertLockedDown(client, tables);
 
+    await testLiveTransitionRawPayloadColumn(client);
     await testLoginThrottleMigration(client);
 
-    console.log("security migration tests passed (apply, rollback, re-apply, idempotent, throttle atomicity)");
+    console.log("security migration tests passed (apply, rollback, re-apply, idempotent, raw_payload column, throttle atomicity)");
   } finally {
     await client.end();
   }
