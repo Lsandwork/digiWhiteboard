@@ -765,3 +765,102 @@ html[data-theme="clear"] .admin-toast,
 html[data-theme="light"] .admin-toast {
   background: #0f172a !important;
 }
+
+/*
+ * Intentional dark islands (Live Fleet, branded dark headers, map chrome).
+ * Must come AFTER the light-canvas remaps so white / muted text stays readable
+ * on dark backgrounds in Light and Clear themes.
+ */
+html[data-theme="light"] .admin-theme .admin-on-dark,
+html[data-theme="clear"] .admin-theme .admin-on-dark {
+  --admin-muted: #cbd5e1;
+  --fitdog-text: #f8fafc;
+  --fitdog-text-secondary: #cbd5e1;
+  --crossover-text: #f8fafc;
+  --crossover-muted: #cbd5e1;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  color: #f8fafc !important;
+}
+
+html[data-theme="light"] .admin-theme .admin-on-dark :is(
+    .text-white,
+    [class*="text-white/"],
+    .admin-text-emphasis,
+    h1,
+    h2,
+    h3,
+    h4
+  ),
+html[data-theme="clear"] .admin-theme .admin-on-dark :is(
+    .text-white,
+    [class*="text-white/"],
+    .admin-text-emphasis,
+    h1,
+    h2,
+    h3,
+    h4
+  ) {
+  color: #ffffff !important;
+}
+
+html[data-theme="light"] .admin-theme .admin-on-dark :is(.text-admin-muted, .admin-muted, .admin-page-subtitle),
+html[data-theme="clear"] .admin-theme .admin-on-dark :is(.text-admin-muted, .admin-muted, .admin-page-subtitle) {
+  color: #cbd5e1 !important;
+}
+
+html[data-theme="light"] .admin-theme .admin-on-dark :is(
+    [class*="text-slate-100"],
+    [class*="text-slate-200"],
+    [class*="text-slate-300"],
+    [class*="text-gray-100"],
+    [class*="text-gray-200"],
+    [class*="text-gray-300"],
+    [class*="text-zinc-100"],
+    [class*="text-zinc-200"],
+    [class*="text-zinc-300"]
+  ),
+html[data-theme="clear"] .admin-theme .admin-on-dark :is(
+    [class*="text-slate-100"],
+    [class*="text-slate-200"],
+    [class*="text-slate-300"],
+    [class*="text-gray-100"],
+    [class*="text-gray-200"],
+    [class*="text-gray-300"],
+    [class*="text-zinc-100"],
+    [class*="text-zinc-200"],
+    [class*="text-zinc-300"]
+  ) {
+  color: #e2e8f0 !important;
+}
+
+/* Hard-coded dark map / fleet chrome stays light-on-dark even without the class. */
+html[data-theme="light"] .admin-theme :is(
+    [class*="bg-[#0b1220]"],
+    [class*="bg-[#070b14]"],
+    [class*="bg-[#0a1017]"]
+  ),
+html[data-theme="clear"] .admin-theme :is(
+    [class*="bg-[#0b1220]"],
+    [class*="bg-[#070b14]"],
+    [class*="bg-[#0a1017]"]
+  ) {
+  --admin-muted: #cbd5e1;
+  --fitdog-text: #f8fafc;
+  --text-primary: #f8fafc;
+  color: #f8fafc !important;
+}
+
+html[data-theme="light"] .admin-theme :is(
+    [class*="bg-[#0b1220]"],
+    [class*="bg-[#070b14]"],
+    [class*="bg-[#0a1017]"]
+  ) :is(.text-white, [class*="text-white/"], .admin-text-emphasis, .text-admin-muted, .admin-muted),
+html[data-theme="clear"] .admin-theme :is(
+    [class*="bg-[#0b1220]"],
+    [class*="bg-[#070b14]"],
+    [class*="bg-[#0a1017]"]
+  ) :is(.text-white, [class*="text-white/"], .admin-text-emphasis, .text-admin-muted, .admin-muted) {
+  color: #f8fafc !important;
+}

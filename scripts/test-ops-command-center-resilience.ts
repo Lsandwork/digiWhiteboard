@@ -58,9 +58,22 @@ async function testJsonReaders() {
   const route = readFileSync("app/api/admin/ops-command-center/route.ts", "utf8");
   assert.match(route, /loadOpsCommandCenterSnapshot/);
   assert.match(route, /accessFromLegacyRole/);
+  assert.match(route, /resolveSessionDisplayName/);
   assert.match(route, /maxDuration/);
   assert.doesNotMatch(route, /getUserAccess/);
   assert.doesNotMatch(route, /buildOpsCommandCenterSnapshot\(/);
+  // Greeting must use the person's name, not the account-type displayLabel.
+  assert.doesNotMatch(route, /displayName:\s*gate\.access\.displayLabel/);
+}
+
+{
+  const emptyRole = emptyOpsCommandCenterSnapshot({
+    email: "lonnie@fitdog.com",
+    displayName: "Super Admin",
+    roleKey: "super_admin",
+    roleLabel: "Super Admin"
+  });
+  assert.equal(emptyRole.greetingName, "Lonnie", "role labels must not become the greeting name");
 }
 
 {

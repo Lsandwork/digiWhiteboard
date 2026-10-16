@@ -88,8 +88,8 @@ export function FrontDeskCommandPanel({ onNavigate }: { onNavigate?: (tab: strin
 
   return (
     <section className="space-y-4">
-      <header className="rounded-2xl border border-admin-border bg-black/20 p-4">
-        <h2 className="text-xl font-semibold text-white">Front Desk Command Center</h2>
+      <header className="rounded-2xl border border-admin-border bg-admin-card p-4">
+        <h2 className="admin-text-emphasis text-xl font-semibold">Front Desk Command Center</h2>
         <p className="mt-1 text-sm text-admin-muted">
           Speed surface for arriving, ready for pickup, and checkout. Payments/packages stay in Gingr — use Open in Gingr.
         </p>
@@ -140,9 +140,9 @@ function Lane({
   onOpen: (dog: OpsDogCardModel) => void;
 }) {
   return (
-    <section className="rounded-2xl border border-admin-border bg-black/20 p-4">
+    <section className="rounded-2xl border border-admin-border bg-admin-card p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white">{title}</h3>
+        <h3 className="admin-text-emphasis text-sm font-semibold">{title}</h3>
         <span className="text-xs text-admin-muted">{dogs.length}</span>
       </div>
       <div className="space-y-2">
@@ -188,16 +188,16 @@ export function YardCommandPanel({ onNavigate }: { onNavigate?: (tab: string) =>
 
   return (
     <section className="space-y-4">
-      <header className="rounded-2xl border border-admin-border bg-black/20 p-4">
-        <h2 className="text-xl font-semibold text-white">Yard Command Center</h2>
+      <header className="rounded-2xl border border-admin-border bg-admin-card p-4">
+        <h2 className="admin-text-emphasis text-xl font-semibold">Yard Command Center</h2>
         <p className="mt-1 text-sm text-admin-muted">Prioritize overdue walks, breaks, and movement — not another report screen.</p>
       </header>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {Object.entries(groups).map(([label, list]) => (
           <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-sm font-semibold text-white">{label}</p>
-              <span className="text-lg font-semibold text-white">{list.length}</span>
+              <p className="admin-text-emphasis text-sm font-semibold">{label}</p>
+              <span className="admin-text-emphasis text-lg font-semibold">{list.length}</span>
             </div>
             <div className="space-y-2">
               {list.slice(0, 5).map((dog) => (
@@ -262,13 +262,13 @@ export function DriverModePanel() {
 
   return (
     <section className="mx-auto max-w-xl space-y-4">
-      <header className="rounded-2xl border border-admin-border bg-black/20 p-4">
-        <h2 className="text-2xl font-semibold text-white">Driver / Hiker Mode</h2>
+      <header className="rounded-2xl border border-admin-border bg-admin-card p-4">
+        <h2 className="admin-text-emphasis text-2xl font-semibold">Driver / Hiker Mode</h2>
         <p className="mt-1 text-sm text-admin-muted">Large touch targets. Complements Samsara — does not replace fleet management.</p>
       </header>
       <div className="rounded-2xl border border-sky-400/20 bg-sky-500/10 p-4">
         <p className="text-xs uppercase tracking-wide text-sky-100">Next stop</p>
-        <p className="mt-2 text-2xl font-semibold text-white">Use Route Generator + Samsara for live stop order</p>
+        <p className="admin-text-emphasis mt-2 text-2xl font-semibold">Use Route Generator + Samsara for live stop order</p>
         <p className="mt-1 text-sm text-admin-muted">Confirm arrival / load / complete here so RuffOps keeps the operational timeline.</p>
       </div>
       <textarea
@@ -334,15 +334,15 @@ export function OvernightCommandPanel() {
 
   return (
     <section className="space-y-4">
-      <header className="rounded-2xl border border-admin-border bg-black/20 p-4">
-        <h2 className="text-xl font-semibold text-white">Overnight Command Center</h2>
+      <header className="rounded-2xl border border-admin-border bg-admin-card p-4">
+        <h2 className="admin-text-emphasis text-xl font-semibold">Overnight Command Center</h2>
         <p className="mt-1 text-sm text-admin-muted">Required timestamped rounds with escalation when missed.</p>
       </header>
       {loading ? <div className="h-24 animate-pulse rounded-2xl bg-white/5" /> : null}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {rounds.map((round) => (
           <div key={String(round.id)} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-            <p className="text-lg font-semibold text-white">{String(round.round_slot)}</p>
+            <p className="admin-text-emphasis text-lg font-semibold">{String(round.round_slot)}</p>
             <div className="mt-2">
               <OpsStatusBadge status={String(round.status)} />
             </div>
@@ -374,8 +374,8 @@ export function TrainerOpsPanel({ onNavigate }: { onNavigate?: (tab: string) => 
 
   return (
     <section className="space-y-4">
-      <header className="rounded-2xl border border-admin-border bg-black/20 p-4">
-        <h2 className="text-xl font-semibold text-white">Trainer Ops</h2>
+      <header className="rounded-2xl border border-admin-border bg-admin-card p-4">
+        <h2 className="admin-text-emphasis text-xl font-semibold">Trainer Ops</h2>
         <p className="mt-1 text-sm text-admin-muted">
           Built around Gingr bookings/packages. RuffOps stores operational notes, media, homework, and timeline events.
         </p>
@@ -477,8 +477,8 @@ export function ShiftHandoffPanel() {
 
   return (
     <section className="space-y-4">
-      <header className="rounded-2xl border border-admin-border bg-black/20 p-4">
-        <h2 className="text-xl font-semibold text-white">Shift Handoff</h2>
+      <header className="rounded-2xl border border-admin-border bg-admin-card p-4">
+        <h2 className="admin-text-emphasis text-xl font-semibold">Shift Handoff</h2>
         <p className="mt-1 text-sm text-admin-muted">
           Record every item the incoming shift needs. Press Enter to add another row, then submit them together.
         </p>
@@ -515,7 +515,7 @@ export function ShiftHandoffPanel() {
           </select>
         </label>
       </div>
-      <div className="rounded-2xl border border-admin-border bg-black/20 p-4">
+      <div className="rounded-2xl border border-admin-border bg-admin-card p-4">
         <BulkEntryComposer
           rows={items}
           onChange={(next) => {
@@ -594,7 +594,7 @@ export function ShiftHandoffPanel() {
         {rows.map((row) => (
           <div key={String(row.id)} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-medium text-white">
+              <p className="admin-text-emphasis text-sm font-medium">
                 {String(row.from_shift)} → {String(row.to_shift)}
               </p>
               {row.acknowledged_at ? (
@@ -638,15 +638,15 @@ export function OpsSystemHealthPanel() {
 
   return (
     <section className="space-y-4">
-      <header className="rounded-2xl border border-admin-border bg-black/20 p-4">
-        <h2 className="text-xl font-semibold text-white">System Health</h2>
+      <header className="rounded-2xl border border-admin-border bg-admin-card p-4">
+        <h2 className="admin-text-emphasis text-xl font-semibold">System Health</h2>
         <p className="mt-1 text-sm text-admin-muted">Integration status without exposing secrets or credentials.</p>
       </header>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {integrations.map((row) => (
           <div key={row.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
             <div className="flex items-center justify-between gap-2">
-              <p className="font-semibold text-white">{row.label}</p>
+              <p className="admin-text-emphasis font-semibold">{row.label}</p>
               <OpsPriorityBadge
                 priority={
                   row.status === "operational"

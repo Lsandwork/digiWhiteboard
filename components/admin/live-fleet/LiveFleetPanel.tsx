@@ -53,7 +53,7 @@ export function LiveFleetPanel() {
   }, [selectedVanKey]);
 
   return (
-    <div className="flex h-[calc(100vh-7.5rem)] min-h-[640px] flex-col overflow-hidden rounded-2xl border border-admin-border bg-[#070b14]">
+    <div className="admin-on-dark flex h-[calc(100vh-7.5rem)] min-h-[640px] flex-col overflow-hidden rounded-2xl border border-admin-border bg-[#070b14]">
       <header className="relative z-30 flex flex-wrap items-center justify-between gap-3 border-b border-admin-border bg-[#070b14]/95 px-4 py-3 backdrop-blur">
         <div>
           <div className="flex items-center gap-2">

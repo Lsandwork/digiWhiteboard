@@ -256,10 +256,10 @@ export function OpsCommandCenterPanel({
 
   return (
     <section className="space-y-5">
-      <header className="flex flex-col gap-3 rounded-2xl border border-admin-border bg-gradient-to-br from-[#132033] via-[#101826] to-[#0b1220] p-4 sm:flex-row sm:items-end sm:justify-between">
+      <header className="flex flex-col gap-3 rounded-2xl border border-admin-border bg-admin-card p-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-admin-muted">{title}</p>
-          <h2 className="mt-1 text-2xl font-semibold text-white sm:text-3xl">
+          <h2 className="admin-text-emphasis mt-1 text-2xl font-semibold sm:text-3xl">
             Good {greetingBucket()}, {data.greetingName}
           </h2>
           <p className="mt-1 text-sm text-admin-muted">
