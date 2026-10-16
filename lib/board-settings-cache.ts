@@ -96,6 +96,34 @@ export function invalidateBoardSettingsCaches() {
   invalidateTtlCache("whiteboard-state:");
 }
 
+/**
+ * Per-instance freshness for event-driven overlay fetches. A board that
+ * receives a change broadcast asks for `fresh=1`; whichever serverless
+ * instance serves that request drops its overlay + admin-settings key
+ * caches first, so no instance can serve pre-change overlay data on the
+ * event path. Ordinary polls keep their TTL protection.
+ */
+export function invalidateBoardOverlayCaches() {
+  invalidateTtlCache("board-overlays:");
+  invalidateTtlCache("admin-settings:key:");
+}
+
+const FRESH_OVERLAY_MIN_INTERVAL_MS = 2_000;
+let lastFreshOverlayClaimAtMs = 0;
+
+/**
+ * Server-side bound on cache-bypassing overlay loads: at most one fresh
+ * (uncached) load per instance per window, no matter who asks. This keeps
+ * the public board endpoint's TTL cost protection intact against repeated
+ * `fresh=1` requests while matching the boards' own broadcast coalescing;
+ * anything coalesced is recovered by the normal poll.
+ */
+export function claimFreshOverlayLoad(nowMs = Date.now()) {
+  if (nowMs - lastFreshOverlayClaimAtMs < FRESH_OVERLAY_MIN_INTERVAL_MS) return false;
+  lastFreshOverlayClaimAtMs = nowMs;
+  return true;
+}
+
 /** Drop in-memory board snapshots after a live_transition_dogs webhook write. */
 export function invalidateBoardTransitionCaches() {
   invalidateTtlCache("board-checkouts:");

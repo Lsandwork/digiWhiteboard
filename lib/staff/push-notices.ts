@@ -456,6 +456,35 @@ async function saveNoticeState(supabase: SupabaseClient, state: StaffPushNoticeS
   throw new Error("Push Notice storage is not available.");
 }
 
+/**
+ * After durable persistence, fan out ONE lightweight change broadcast so
+ * connected staff boards refresh immediately. Persistence is the success
+ * criterion; a missed broadcast is recovered by the boards' fallback poll,
+ * so the result is logged, never thrown, and never reported as persistence.
+ */
+async function publishOverlayChangeAfterSave(kind: string) {
+  try {
+    const { publishBoardOverlayChange } = await import("@/lib/staff/board-overlay-broadcast");
+    await publishBoardOverlayChange(kind);
+  } catch (error) {
+    console.warn("[push-notices] overlay broadcast failed; board polling fallback will recover", {
+      error: error instanceof Error ? error.message : "unknown"
+    });
+  }
+}
+
+/** Shelly is a nonessential side effect — never block the push response on it. */
+function triggerShellyAlertFireAndForget(notice: StaffPushNotice) {
+  void import("@/lib/shelly-push-alerts")
+    .then(({ triggerShellyAlertForPushNotice }) => triggerShellyAlertForPushNotice(notice))
+    .catch((error) => {
+      console.warn("[push-notices] Shelly alert failed (non-blocking)", {
+        noticeId: notice.id,
+        error: error instanceof Error ? error.message : "unknown"
+      });
+    });
+}
+
 function getActiveNoticeFromState(state: StaffPushNoticeState) {
   const now = Date.now();
   return sortNotices(state.notices).find((notice) => {
@@ -628,6 +657,10 @@ export async function updateStaffPushNotice(
   await saveNoticeState(supabase, {
     notices: sortNotices(state.notices.map((notice) => (notice.id === id ? updated : notice)))
   });
+  // Only an edit to the currently displayed notice changes board output.
+  if (existing.is_active && !existing.cleared_at) {
+    await publishOverlayChangeAfterSave("staff_push_notice_updated");
+  }
   return updated;
 }
 
@@ -657,8 +690,8 @@ export async function pushStaffNoticeById(
   await saveNoticeState(supabase, {
     notices: sortNotices(state.notices.map((notice) => (notice.id === id ? updated : notice)))
   });
-  const { triggerShellyAlertForPushNotice } = await import("@/lib/shelly-push-alerts");
-  await triggerShellyAlertForPushNotice(updated);
+  await publishOverlayChangeAfterSave("staff_push_notice");
+  triggerShellyAlertFireAndForget(updated);
   const { sendUrgentAlertSmsFireAndForget } = await import("@/lib/staff/super-admin-sms");
   sendUrgentAlertSmsFireAndForget(updated, supabase);
   return updated;
@@ -688,8 +721,8 @@ export async function createAndPushStaffNotice(
     updated_at: now
   };
   await saveNoticeState(supabase, { notices: sortNotices([notice, ...state.notices]) });
-  const { triggerShellyAlertForPushNotice } = await import("@/lib/shelly-push-alerts");
-  await triggerShellyAlertForPushNotice(notice);
+  await publishOverlayChangeAfterSave("staff_push_notice");
+  triggerShellyAlertFireAndForget(notice);
   const { sendUrgentAlertSmsFireAndForget } = await import("@/lib/staff/super-admin-sms");
   sendUrgentAlertSmsFireAndForget(notice, supabase);
   return notice;
@@ -697,6 +730,7 @@ export async function createAndPushStaffNotice(
 
 export async function clearActiveStaffPushNotice(supabase: SupabaseClient, actor: string | null) {
   await saveNoticeState(supabase, clearActiveNoticesInState(await loadNoticeState(supabase), actor));
+  await publishOverlayChangeAfterSave("staff_push_notice_cleared");
   const { clearShellyAlert } = await import("@/lib/shelly-alert");
   await clearShellyAlert("push_notice_clear");
 }
@@ -704,4 +738,5 @@ export async function clearActiveStaffPushNotice(supabase: SupabaseClient, actor
 export async function deleteStaffPushNotice(supabase: SupabaseClient, id: string) {
   const state = await loadNoticeState(supabase);
   await saveNoticeState(supabase, { notices: state.notices.filter((notice) => notice.id !== id) });
+  await publishOverlayChangeAfterSave("staff_push_notice_deleted");
 }
