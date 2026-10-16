@@ -208,6 +208,11 @@ assert.match(panel, /Submit Body Check Report/);
 assert.match(panel, /Sync Now/);
 assert.match(panel, /tlDogPhotoCandidates/);
 assert.doesNotMatch(panel, /localStorage/);
+assert.match(panel, /Select an ear finding to continue/);
+const css = readFileSync(join(root, "components/admin/body-checks/body-checks.css"), "utf8");
+assert.match(css, /var\(--text-primary/);
+assert.match(css, /var\(--surface/);
+assert.doesNotMatch(css, /background:\s*#fff/);
 
 const reportsRoute = readFileSync(join(root, "app/api/admin/body-checks/reports/route.ts"), "utf8");
 assert.match(reportsRoute, /gate\.actor/);

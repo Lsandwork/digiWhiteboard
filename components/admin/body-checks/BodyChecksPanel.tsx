@@ -127,9 +127,42 @@ function DogPhoto({ name, animalId, url }: { name: string; animalId: string; url
       className="body-checks__photo"
       src={src}
       alt=""
+      loading="lazy"
+      decoding="async"
       onError={() => setIndex((current) => current + 1)}
     />
   );
+}
+
+function stepError(wizard: Wizard): string | null {
+  if (wizard.step === 0) {
+    if (!wizard.ears.length) return "Select an ear finding to continue.";
+    if (wizard.ears.includes("other") && !wizard.earOther.trim()) return "Describe the other ear finding.";
+  }
+  if (wizard.step === 1) {
+    if (!wizard.nails.length) return "Select a nail finding to continue.";
+    if (wizard.nails.includes("other") && !wizard.nailOther.trim()) return "Describe the other nail finding.";
+  }
+  if (wizard.step === 2) {
+    const body = reconcileBody(wizard.bodyGrooming, wizard.bodyPhysical);
+    if (!body.grooming.length && !body.physical.length) return "Select a coat or body finding to continue.";
+    if (body.physical.includes("other") && !wizard.bodyOther.trim()) return "Describe the other body finding.";
+  }
+  if (wizard.step === 3) {
+    if (!wizard.severity) return "Choose a severity before submitting.";
+    if ((wizard.severity === "needs_follow_up" || wizard.severity === "urgent") && !wizard.followUpKinds.length) {
+      return "Choose at least one follow-up for this severity.";
+    }
+  }
+  return null;
+}
+
+function reportBlocker(wizard: Wizard): string | null {
+  for (let step = 0; step <= 3; step += 1) {
+    const error = stepError({ ...wizard, step });
+    if (error) return error;
+  }
+  return null;
 }
 
 function emptyWizard(dog: RosterApiRow): Wizard {
@@ -195,12 +228,13 @@ export function BodyChecksPanel() {
         const response = await fetch(`/api/admin/body-checks/roster?${params.toString()}`, { cache: "no-store" });
         const payload = (await response.json()) as RosterPayload;
         if (requestId !== rosterRequest.current) return;
-        if (!response.ok && !payload.syncedAt) {
-          setRoster(payload.rows ? payload : null);
+        if (!response.ok) {
+          setRoster(payload.rows?.length ? payload : null);
           setRosterError(payload.error || "Gingr roster is unavailable.");
           return;
         }
         setRoster(payload);
+        setRosterError(null);
       } catch {
         if (requestId !== rosterRequest.current) return;
         setRosterError("Gingr roster is unavailable.");
@@ -275,6 +309,11 @@ export function BodyChecksPanel() {
 
   async function submitReport() {
     if (!wizard || submitting) return;
+    const blocker = reportBlocker(wizard);
+    if (blocker) {
+      setSubmitError(blocker);
+      return;
+    }
     setSubmitting(true);
     setSubmitError(null);
     const body = reconcileBody(wizard.bodyGrooming, wizard.bodyPhysical);
@@ -354,16 +393,16 @@ export function BodyChecksPanel() {
           <h2 className="body-checks__title">Body Checks</h2>
         </div>
         <div className="body-checks__tabs" role="tablist">
-          <button className="body-checks__tab" role="tab" aria-selected={view === "active"} onClick={() => setView("active")}>
+          <button className="body-checks__tab" role="tab" aria-selected={view === "active"} onClick={() => { if (wizard) { setSubmitError("Use Back to roster before leaving this body check."); return; } setView("active"); }}>
             Active Checks
           </button>
-          <button className="body-checks__tab" role="tab" aria-selected={view === "saved"} onClick={() => setView("saved")}>
+          <button className="body-checks__tab" role="tab" aria-selected={view === "saved"} onClick={() => { if (wizard) { setSubmitError("Use Back to roster before leaving this body check."); return; } setOpenReport(null); setView("saved"); }}>
             Saved Reports
           </button>
         </div>
       </header>
 
-      {view === "active" ? (
+      {view === "active" && !wizard ? (
         <>
           <div className="body-checks__counts">
             <Count label="Checked in" value={counts?.checkedIn} />
@@ -401,11 +440,11 @@ export function BodyChecksPanel() {
           {roster?.statsError ? <div className="body-checks__banner">{roster.statsError} Saved reports stay available from the other tab.</div> : null}
           {rosterError ? <div className="body-checks__banner body-checks__banner--error">{rosterError}</div> : null}
           {loading && !roster ? <p>Loading today’s roster…</p> : null}
-          {!loading && roster && roster.rows.length === 0 && !rosterError ? (
+          {!loading && roster && (roster.rows?.length ?? 0) === 0 && !rosterError ? (
             <div className="body-checks__card">No dogs match this date and filter. An empty list here means Gingr returned no matching reservations.</div>
           ) : null}
           <div className="body-checks__list">
-            {roster?.rows.map((row) => (
+            {(roster?.rows ?? []).map((row) => (
               <article key={row.key} className="body-checks__row">
                 <DogPhoto name={row.dogName} animalId={row.gingrAnimalId} url={row.photoUrl} />
                 <div>
@@ -422,15 +461,15 @@ export function BodyChecksPanel() {
                     {row.hasFollowUp ? <span className="admin-badge admin-badge--amber">Follow-up open</span> : null}
                   </div>
                 </div>
-                <button className="admin-btn-primary body-checks__row-button" type="button" onClick={() => setWizard(emptyWizard(row))}>
+                <button className="admin-btn-primary body-checks__row-button" type="button" onClick={() => { setSubmitError(null); setView("active"); setWizard(emptyWizard(row)); }}>
                   Start Body Check
                 </button>
               </article>
             ))}
           </div>
-          {roster?.coverageNote ? <p className="body-checks__meta">{roster.coverageNote}</p> : null}
+          <p className="body-checks__meta">Checked-in dogs and reservations for the next 7 days, one row per dog.</p>
         </>
-      ) : (
+      ) : view === "saved" && !wizard && !openReport ? (
         <>
           <div className="body-checks__toolbar">
             <input className="admin-input body-checks__search" value={savedQuery} onChange={(event) => { setSavedPage(0); setSavedQuery(event.target.value); }} placeholder="Search dog, owner, or staff" aria-label="Search saved reports" />
@@ -515,7 +554,7 @@ export function BodyChecksPanel() {
             </button>
           </div>
         </>
-      )}
+      ) : null}
 
       {wizard ? (
         <div className="body-checks__wizard" role="dialog" aria-label={`Body check for ${wizard.dog.dogName}`}>
@@ -535,7 +574,19 @@ export function BodyChecksPanel() {
           </div>
           <div className="body-checks__steps">
             {STEPS.map((label, index) => (
-              <button key={label} type="button" className="body-checks__step" aria-current={wizard.step === index ? "step" : undefined} onClick={() => setWizard({ ...wizard, step: index })}>
+              <button key={label} type="button" className="body-checks__step" aria-current={wizard.step === index ? "step" : undefined} onClick={() => {
+                if (index > wizard.step) {
+                  for (let step = wizard.step; step < index; step += 1) {
+                    const error = stepError({ ...wizard, step });
+                    if (error) {
+                      setSubmitError(error);
+                      return;
+                    }
+                  }
+                }
+                setSubmitError(null);
+                setWizard({ ...wizard, step: index });
+              }}>
                 {index + 1}. {label}
               </button>
             ))}
@@ -603,7 +654,15 @@ export function BodyChecksPanel() {
               Back
             </button>
             {wizard.step < 3 ? (
-              <button className="admin-btn-primary" type="button" onClick={() => setWizard({ ...wizard, step: wizard.step + 1 })}>
+              <button className="admin-btn-primary" type="button" onClick={() => {
+                const error = stepError(wizard);
+                if (error) {
+                  setSubmitError(error);
+                  return;
+                }
+                setSubmitError(null);
+                setWizard({ ...wizard, step: wizard.step + 1 });
+              }}>
                 Next: {STEPS[wizard.step + 1]}
               </button>
             ) : (

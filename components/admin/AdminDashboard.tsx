@@ -445,7 +445,7 @@ export function AdminDashboard() {
       return;
     }
 
-    if ((tab === "route_generator" || tab === "live_fleet" || tab === "package_commissions" || tab === "ops_system_health") && board !== "staff") {
+    if ((tab === "route_generator" || tab === "live_fleet" || tab === "package_commissions" || tab === "ops_system_health" || tab === "body_checks") && board !== "staff") {
       if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", "staff");
       goToBoardTab("staff", tab);
       return;
@@ -491,7 +491,8 @@ export function AdminDashboard() {
       nextTab === "route_generator" ||
       nextTab === "live_fleet" ||
       nextTab === "package_commissions" ||
-      nextTab === "ops_system_health";
+      nextTab === "ops_system_health" ||
+      nextTab === "body_checks";
     const nextBoard = forceStaffBoard ? "staff" : board;
     goToBoardTab(nextBoard, nextTab, extraParams);
   }

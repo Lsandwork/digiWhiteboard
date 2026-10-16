@@ -7,6 +7,7 @@ import { ROSTER_FILTERS, type RosterFilter } from "@/lib/body-checks/types";
 import { todayInLosAngeles } from "@/lib/gingr-checked-in-dogs";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   const gate = await requireBodyCheckAccess(request);

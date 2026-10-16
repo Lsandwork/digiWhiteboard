@@ -4,6 +4,7 @@ import { insertBodyCheckReport, listBodyCheckReports } from "@/lib/body-checks/s
 import { validateInspection } from "@/lib/body-checks/validation";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 export async function GET(request: Request) {
   const gate = await requireBodyCheckAccess(request);
