@@ -7,22 +7,33 @@ export type ArticleSpeechStatus = "idle" | "loading" | "playing" | "paused";
 
 type SpeechMode = "hd" | "browser";
 
+function isLikelyMobileBrowser() {
+  if (typeof navigator === "undefined") return false;
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+}
+
 export function useArticleSpeech(text: string) {
   const [status, setStatus] = useState<ArticleSpeechStatus>("idle");
   const [mode, setMode] = useState<SpeechMode>("hd");
   const [voiceLabel, setVoiceLabel] = useState<string>("Natural voice");
   const [progress, setProgress] = useState({ chunk: 0, total: 0 });
+  const [error, setError] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const chunksRef = useRef<string[]>([]);
-  const chunkIndexRef = useRef(0);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const browserPausedRef = useRef(false);
+  const unlockedAudioRef = useRef<HTMLAudioElement | null>(null);
+  const speakBrowserChunkRef = useRef<(index: number) => void>(() => undefined);
+  const playHdChunkRef = useRef<(index: number) => Promise<void>>(async () => undefined);
+  const playBrowserRef = useRef<() => void>(() => undefined);
 
   const cleanupAudio = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
+      audioRef.current.onended = null;
+      audioRef.current.onerror = null;
       audioRef.current.src = "";
       audioRef.current = null;
     }
@@ -39,7 +50,6 @@ export function useArticleSpeech(text: string) {
     }
     utteranceRef.current = null;
     browserPausedRef.current = false;
-    chunkIndexRef.current = 0;
     chunksRef.current = [];
     setProgress({ chunk: 0, total: 0 });
     setStatus("idle");
@@ -47,9 +57,32 @@ export function useArticleSpeech(text: string) {
 
   useEffect(() => () => stop(), [stop]);
 
+  const unlockAudioForGesture = useCallback(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const silent = unlockedAudioRef.current || new Audio();
+      unlockedAudioRef.current = silent;
+      silent.muted = true;
+      void silent
+        .play()
+        .then(() => {
+          silent.pause();
+          silent.muted = false;
+          silent.removeAttribute("src");
+        })
+        .catch(() => undefined);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const speakBrowserChunk = useCallback(
     (index: number) => {
-      if (typeof window === "undefined" || !window.speechSynthesis) return;
+      if (typeof window === "undefined" || !window.speechSynthesis) {
+        setError("Speech is not available in this browser.");
+        setStatus("idle");
+        return;
+      }
       const chunks = chunksRef.current;
       const chunk = chunks[index];
       if (!chunk) {
@@ -59,11 +92,7 @@ export function useArticleSpeech(text: string) {
 
       const voices = window.speechSynthesis.getVoices();
       const voice = pickBestSpeechVoice(voices);
-      if (voice) {
-        setVoiceLabel(voice.name);
-      } else {
-        setVoiceLabel("System voice");
-      }
+      setVoiceLabel(voice?.name || "System voice");
 
       const utter = new SpeechSynthesisUtterance(chunk);
       utter.lang = voice?.lang || "en-US";
@@ -75,18 +104,21 @@ export function useArticleSpeech(text: string) {
       utter.onend = () => {
         const next = index + 1;
         if (next < chunks.length) {
-          chunkIndexRef.current = next;
           setProgress({ chunk: next + 1, total: chunks.length });
-          speakBrowserChunk(next);
+          speakBrowserChunkRef.current(next);
         } else {
           stop();
         }
       };
-      utter.onerror = () => stop();
+      utter.onerror = () => {
+        setError("Playback stopped. Tap Play to try again.");
+        stop();
+      };
 
       utteranceRef.current = utter;
       window.speechSynthesis.speak(utter);
       setStatus("playing");
+      setError(null);
     },
     [stop]
   );
@@ -94,17 +126,21 @@ export function useArticleSpeech(text: string) {
   const playBrowser = useCallback(() => {
     if (typeof window === "undefined" || !window.speechSynthesis) {
       setVoiceLabel("Speech unavailable");
+      setError("Speech is not available in this browser.");
       return;
     }
 
     const chunks = chunkSpeechText(text, 2800);
-    if (!chunks.length) return;
+    if (!chunks.length) {
+      setError("Nothing to read aloud yet.");
+      return;
+    }
 
     window.speechSynthesis.cancel();
     chunksRef.current = chunks;
-    chunkIndexRef.current = 0;
     setMode("browser");
     setProgress({ chunk: 1, total: chunks.length });
+    setError(null);
     speakBrowserChunk(0);
   }, [speakBrowserChunk, text]);
 
@@ -118,14 +154,23 @@ export function useArticleSpeech(text: string) {
       }
 
       setStatus("loading");
-      const res = await fetch("/api/blog/articles/speech", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, chunkIndex: index })
-      });
+      setError(null);
+
+      let res: Response;
+      try {
+        res = await fetch("/api/blog/articles/speech", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ text, chunkIndex: index })
+        });
+      } catch {
+        playBrowserRef.current();
+        return;
+      }
 
       if (!res.ok) {
-        playBrowser();
+        playBrowserRef.current();
         return;
       }
 
@@ -142,29 +187,59 @@ export function useArticleSpeech(text: string) {
       audio.onended = () => {
         const next = index + 1;
         if (next < chunks.length) {
-          chunkIndexRef.current = next;
           setProgress({ chunk: next + 1, total: chunks.length });
-          void playHdChunk(next);
+          void playHdChunkRef.current(next);
         } else {
           stop();
         }
       };
-      audio.onerror = () => stop();
+      audio.onerror = () => {
+        setError("HD voice failed. Falling back to system voice.");
+        playBrowserRef.current();
+      };
 
-      await audio.play();
-      setStatus("playing");
+      try {
+        await audio.play();
+        setStatus("playing");
+      } catch {
+        setError("Could not start HD audio. Using system voice instead.");
+        playBrowserRef.current();
+      }
     },
-    [cleanupAudio, playBrowser, stop, text]
+    [cleanupAudio, stop, text]
   );
 
+  useEffect(() => {
+    speakBrowserChunkRef.current = speakBrowserChunk;
+  }, [speakBrowserChunk]);
+
+  useEffect(() => {
+    playBrowserRef.current = playBrowser;
+  }, [playBrowser]);
+
+  useEffect(() => {
+    playHdChunkRef.current = playHdChunk;
+  }, [playHdChunk]);
+
   const play = useCallback(async () => {
-    if (!text.trim()) return;
+    if (!text.trim()) {
+      setError("Add article text before playing.");
+      return;
+    }
+
+    setError(null);
 
     if (status === "paused") {
       if (mode === "hd" && audioRef.current) {
-        await audioRef.current.play();
-        setStatus("playing");
-        return;
+        try {
+          await audioRef.current.play();
+          setStatus("playing");
+          return;
+        } catch {
+          setError("Could not resume audio. Tap Play to restart.");
+          stop();
+          return;
+        }
       }
       if (mode === "browser" && typeof window !== "undefined" && window.speechSynthesis) {
         window.speechSynthesis.resume();
@@ -174,13 +249,21 @@ export function useArticleSpeech(text: string) {
       }
     }
 
+    unlockAudioForGesture();
+
+    // Mobile: start system speech inside the click gesture (HD fetch breaks iOS autoplay).
+    if (isLikelyMobileBrowser()) {
+      stop();
+      playBrowser();
+      return;
+    }
+
     stop();
     const chunks = chunkSpeechText(text, 3200);
     chunksRef.current = chunks;
-    chunkIndexRef.current = 0;
     setProgress({ chunk: 1, total: chunks.length });
     await playHdChunk(0);
-  }, [mode, playHdChunk, status, stop, text]);
+  }, [mode, playBrowser, playHdChunk, status, stop, text, unlockAudioForGesture]);
 
   const pause = useCallback(() => {
     if (status !== "playing") return;
@@ -215,6 +298,7 @@ export function useArticleSpeech(text: string) {
     status,
     voiceLabel,
     progress,
+    error,
     play,
     pause,
     stop,
