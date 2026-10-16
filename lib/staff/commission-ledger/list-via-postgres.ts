@@ -9,29 +9,131 @@ import { LEDGER_LIST_COLUMNS, LEDGER_SORTABLE_COLUMNS } from "./records";
 import type { CommissionListFilters, CommissionListResult, CommissionViewer } from "./types";
 
 const PROJECT_REF = "tzkocaucqtmmnrttxira";
-const CONNECT_TIMEOUT_MS = 1_200;
-const STATEMENT_TIMEOUT_MS = 4_000;
+const CONNECT_TIMEOUT_MS = 4_000;
+const STATEMENT_TIMEOUT_MS = 6_000;
+const DEFAULT_POOLER_HOST = "aws-0-us-east-1.pooler.supabase.com";
 
 const DATE_COLUMNS = new Set(["sale_date", "service_date", "created_at", "confirmed_at", "paid_at"]);
 const TEXT_CAST_COLUMNS = new Set(["sale_date", "service_date", "archived_at", "created_at", "updated_at"]);
 
-function buildDatabaseUrl(options?: { usePooler?: boolean; port?: string }): string | null {
+export type LedgerPostgresTargetMeta = {
+  mode: "password" | "connection_url" | "unconfigured";
+  host: string | null;
+  port: string | null;
+  database: string | null;
+  user: string | null;
+  passwordConfigured: boolean;
+  supabaseDbUserConfigured: boolean;
+  connectionUrlConfigured: boolean;
+};
+
+type PasswordConnectionParts = {
+  host: string;
+  port: string;
+  database: string;
+  user: string;
+  password: string;
+};
+
+function isEnvConfigured(value: string | undefined) {
+  return Boolean(value?.trim());
+}
+
+function resolvePasswordConnectionParts(options?: {
+  usePooler?: boolean;
+  port?: string;
+}): PasswordConnectionParts | null {
   const password = process.env.SUPABASE_DB_PASSWORD ?? process.env.POSTGRES_PASSWORD;
-  if (password?.trim()) {
-    const usePooler = options?.usePooler ?? true;
-    const host =
-      process.env.SUPABASE_DB_HOST ??
-      (usePooler ? "aws-0-us-east-1.pooler.supabase.com" : `db.${PROJECT_REF}.supabase.co`);
-    const port = options?.port ?? process.env.SUPABASE_DB_PORT ?? (usePooler ? "6543" : "5432");
-    const user = process.env.SUPABASE_DB_USER ?? (usePooler ? `postgres.${PROJECT_REF}` : "postgres");
-    const database = process.env.SUPABASE_DB_NAME ?? "postgres";
+  if (!password?.trim()) return null;
+
+  const usePooler = options?.usePooler ?? true;
+  const host =
+    process.env.SUPABASE_DB_HOST ??
+    (usePooler ? DEFAULT_POOLER_HOST : `db.${PROJECT_REF}.supabase.co`);
+  const port = options?.port ?? process.env.SUPABASE_DB_PORT ?? (usePooler ? "6543" : "5432");
+  const user = process.env.SUPABASE_DB_USER ?? (usePooler ? `postgres.${PROJECT_REF}` : "postgres");
+  const database = process.env.SUPABASE_DB_NAME ?? "postgres";
+  return { host, port, database, user, password: password.trim() };
+}
+
+function buildDatabaseUrl(options?: { usePooler?: boolean; port?: string }): string | null {
+  const parts = resolvePasswordConnectionParts(options);
+  if (parts) {
     // No sslmode here: pg treats `sslmode=require` as verify-full, and the
     // parsed connection string overrides the client's ssl options, which
     // rejects Supabase's pooler chain with "self-signed certificate".
-    return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password.trim())}@${host}:${port}/${database}`;
+    return `postgresql://${encodeURIComponent(parts.user)}:${encodeURIComponent(parts.password)}@${parts.host}:${parts.port}/${parts.database}`;
   }
   const direct = process.env.DATABASE_URL ?? process.env.SUPABASE_DB_URL ?? process.env.POSTGRES_URL;
   return direct?.trim() || null;
+}
+
+/** Safe target metadata for diagnostics — never includes secrets or connection strings. */
+export function getLedgerPostgresTargetMeta(options?: {
+  usePooler?: boolean;
+  port?: string;
+}): LedgerPostgresTargetMeta {
+  const passwordConfigured = isEnvConfigured(
+    process.env.SUPABASE_DB_PASSWORD ?? process.env.POSTGRES_PASSWORD
+  );
+  const supabaseDbUserConfigured = isEnvConfigured(process.env.SUPABASE_DB_USER);
+  const connectionUrlConfigured = isEnvConfigured(
+    process.env.DATABASE_URL ?? process.env.SUPABASE_DB_URL ?? process.env.POSTGRES_URL
+  );
+  const parts = resolvePasswordConnectionParts(options);
+  if (parts) {
+    return {
+      mode: "password",
+      host: parts.host,
+      port: parts.port,
+      database: parts.database,
+      user: parts.user,
+      passwordConfigured,
+      supabaseDbUserConfigured,
+      connectionUrlConfigured
+    };
+  }
+  if (connectionUrlConfigured) {
+    return {
+      mode: "connection_url",
+      host: null,
+      port: null,
+      database: null,
+      user: null,
+      passwordConfigured,
+      supabaseDbUserConfigured,
+      connectionUrlConfigured
+    };
+  }
+  return {
+    mode: "unconfigured",
+    host: null,
+    port: null,
+    database: null,
+    user: null,
+    passwordConfigured,
+    supabaseDbUserConfigured,
+    connectionUrlConfigured
+  };
+}
+
+/** Ledger diagnostics default target (same options as buildLedgerDatabaseUrl). */
+export function getLedgerPostgresDiagnosticsTargetMeta() {
+  return getLedgerPostgresTargetMeta({ usePooler: true, port: "6543" });
+}
+
+export function formatLedgerPostgresTargetDetail(meta: LedgerPostgresTargetMeta) {
+  const fields = [
+    `mode=${meta.mode}`,
+    `host=${meta.host ?? "n/a"}`,
+    `port=${meta.port ?? "n/a"}`,
+    `database=${meta.database ?? "n/a"}`,
+    `user=${meta.user ?? "n/a"}`,
+    `passwordConfigured=${meta.passwordConfigured}`,
+    `supabaseDbUserConfigured=${meta.supabaseDbUserConfigured}`,
+    `connectionUrlConfigured=${meta.connectionUrlConfigured}`
+  ];
+  return fields.join(" ");
 }
 
 export function canListCommissionsViaPostgres(): boolean {
