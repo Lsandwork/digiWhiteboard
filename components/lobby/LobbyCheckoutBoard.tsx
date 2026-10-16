@@ -18,7 +18,7 @@ import {
   BOARD_CHECKOUT_POLL_MS,
   BOARD_FAST_FETCH_TIMEOUT_MS,
   BOARD_FULL_SYNC_POLL_MS,
-  BOARD_REALTIME_DEBOUNCE_MS,
+  LOBBY_REALTIME_DEBOUNCE_MS,
   BOARD_SETTINGS_POLL_MS,
   EMPTY_BASKET_CONFIRM_POLLS,
   clampCheckoutPollMs
@@ -445,7 +445,7 @@ export function LobbyCheckoutBoard({
     // Bypass the short server cache after a DB event so the event-triggered
     // refresh cannot receive the snapshot from just before the dog appeared.
     void loadFastLobbyCheckouts({ fresh: true });
-  }, BOARD_REALTIME_DEBOUNCE_MS);
+  }, LOBBY_REALTIME_DEBOUNCE_MS);
 
   useEffect(() => {
     // Cast/remote displays need the same quick fallback as direct boards when

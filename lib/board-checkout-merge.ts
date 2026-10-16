@@ -17,6 +17,9 @@ export const BOARD_FULL_SYNC_POLL_MS = 20_000;
 export const BOARD_FULL_SYNC_POLL_LIVE_MS = 60_000;
 /** Debounce Realtime-triggered refetches so one webhook does not fan out N identical SELECTs. */
 export const BOARD_REALTIME_DEBOUNCE_MS = 400;
+/** Lobby event-first refresh: match the staff confirm window so a persisted
+ * checkout row is fetched promptly; bursts still coalesce into one fetch. */
+export const LOBBY_REALTIME_DEBOUNCE_MS = 200;
 /**
  * Bridge multi-instance TTL lag after a webhook/realtime paint so a stale
  * poll cannot wipe the dog (appear → disappear → reappear flicker).
