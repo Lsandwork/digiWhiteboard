@@ -5,6 +5,12 @@
 
 export const RUFFOPS_TAGLINE = "SMARTER OPERATIONS. HAPPIER DOGS.";
 
+/** Registered author / creator of the RuffOps platform. */
+export const RUFFOPS_AUTHOR = "Lonnie Sandoval";
+/** Legal entity that owns RuffOps. */
+export const RUFFOPS_DIVISION = "A Division of SK9 LLC";
+export const RUFFOPS_CREATOR_LINE = `${RUFFOPS_AUTHOR} · ${RUFFOPS_DIVISION}`;
+
 export const RUFFOPS_WORDMARK_ASCII = `
 ██████╗ ██╗   ██╗███████╗███████╗ ██████╗ ██████╗ ███████╗
 ██╔══██╗██║   ██║██╔════╝██╔════╝██╔═══██╗██╔══██╗██╔════╝
@@ -45,6 +51,11 @@ ${RUFFOPS_PAW_ASCII}
 
 
      RuffOps Operations Platform
+     ${RUFFOPS_DIVISION}
+
+     Author & Creator
+     ${RUFFOPS_AUTHOR}
+
      Built with obsessive attention to operations.
 
      This signature is intentional.
@@ -64,11 +75,17 @@ export const RUFFOPS_CONSOLE_LINES = [
   "◆ Operations Platform",
   "◆ Observability",
   "◆ Route Intelligence",
-  "◆ System Health"
+  "◆ System Health",
+  `◆ Author & Creator — ${RUFFOPS_AUTHOR}`,
+  `◆ ${RUFFOPS_DIVISION}`
 ] as const;
 
 export const RUFFOPS_META = {
   applicationName: "RuffOps",
   generator: "RuffOps Operations Platform",
-  platformDescription: "RuffOps Operations Platform"
+  platformDescription: "RuffOps Operations Platform",
+  author: RUFFOPS_AUTHOR,
+  creator: RUFFOPS_AUTHOR,
+  publisher: "SK9 LLC",
+  division: RUFFOPS_DIVISION
 } as const;
