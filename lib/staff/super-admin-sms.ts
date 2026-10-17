@@ -105,6 +105,40 @@ export function staffContentNeedsSuperAdminSms(input: {
   return textTriggersSuperAdminSms(input.subject, input.details, input.message, input.body);
 }
 
+/** Push-notice source used by the Gingr Fighter/Rotation check-in alerts. */
+export const FIGHTER_ROTATION_PUSH_SOURCE = "fighter_rotation";
+
+/**
+ * Fighter/Rotation icon alerts are WHITEBOARD + EMAIL ONLY — they must
+ * never SMS admin users. Matches the notice source, the exact board title
+ * ("FIGHTER / ROTATIONS"), the SMS title built from it ("URGENT: FIGHTER /
+ * ROTATIONS"), and Fighter/Rotation phrasing in the body. A generic "dog
+ * fight" incident is a different alert and is NOT matched.
+ */
+const FIGHTER_ROTATION_TEXT_PATTERN = /fighter\s*(?:\/|-|–|—|\band\b)?\s*rotations?\b/i;
+
+export function isFighterRotationAlertText(...parts: Array<string | null | undefined>): boolean {
+  const text = parts
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean)
+    .join("\n");
+  if (!text) return false;
+  return FIGHTER_ROTATION_TEXT_PATTERN.test(text);
+}
+
+export function isFighterRotationSmsBlocked(input: {
+  source?: string | null;
+  title?: string | null;
+  message?: string | null;
+  detail?: string | null;
+}): boolean {
+  if (String(input.source || "").trim().toLowerCase() === FIGHTER_ROTATION_PUSH_SOURCE) return true;
+  return isFighterRotationAlertText(input.title, input.message, input.detail);
+}
+
+export const FIGHTER_ROTATION_SMS_SUPPRESSED_REASON =
+  "Fighter/Rotation alerts are whiteboard + email only; SMS suppressed.";
+
 /** Staff whiteboard / emergency push marked Urgent. */
 export function isUrgentPushAlert(input: {
   priority?: string | null;
@@ -134,6 +168,8 @@ export function sendUrgentAlertSmsFireAndForget(
   supabase?: SupabaseClient | null
 ) {
   if (!isUrgentPushAlert(input)) return;
+  // Fighter/Rotation icon notices never SMS — they are emailed instead.
+  if (isFighterRotationSmsBlocked(input)) return;
   const baseKey = `sa-sms:urgent:push:${input.id}`;
   const idempotencyKey = input.resendId ? `${baseKey}:resend:${input.resendId}`.slice(0, 64) : baseKey.slice(0, 64);
   const isHeatAlert = String(input.source || "").trim().toLowerCase() === "heat_alert";
@@ -227,6 +263,12 @@ export async function sendSuperAdminSmsAlert(
   payload: SuperAdminSmsPayload,
   supabase?: SupabaseClient | null
 ): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
+  // Final choke point for every admin SMS kind and caller: Fighter/Rotation
+  // icon alerts can never leave as SMS, regardless of entry path.
+  if (isFighterRotationSmsBlocked({ title: payload.title, detail: payload.detail })) {
+    return { ok: false, skipped: true, error: FIGHTER_ROTATION_SMS_SUPPRESSED_REASON };
+  }
+
   if (!staffAlertSmsEnabled()) {
     return { ok: false, skipped: true, error: "Staff alert SMS disabled." };
   }

@@ -473,6 +473,26 @@ async function publishOverlayChangeAfterSave(kind: string) {
   }
 }
 
+/**
+ * Urgent-push side channel: Fighter/Rotation icon notices are emailed to
+ * contact@fitdog.com and NEVER SMS'd (also enforced at the SMS choke point
+ * in super-admin-sms). Every other urgent notice keeps the SMS path.
+ */
+async function notifyUrgentPushSideChannel(
+  notice: StaffPushNotice,
+  supabase: Parameters<typeof import("@/lib/staff/super-admin-sms").sendUrgentAlertSmsFireAndForget>[1]
+) {
+  const { isFighterRotationSmsBlocked, sendUrgentAlertSmsFireAndForget } = await import(
+    "@/lib/staff/super-admin-sms"
+  );
+  if (isFighterRotationSmsBlocked(notice)) {
+    const { sendFighterRotationNoticeEmailFireAndForget } = await import("@/lib/staff/fighter-rotation-email");
+    sendFighterRotationNoticeEmailFireAndForget(notice);
+    return;
+  }
+  sendUrgentAlertSmsFireAndForget(notice, supabase);
+}
+
 /** Shelly is a nonessential side effect — never block the push response on it. */
 function triggerShellyAlertFireAndForget(notice: StaffPushNotice) {
   void import("@/lib/shelly-push-alerts")
@@ -692,8 +712,7 @@ export async function pushStaffNoticeById(
   });
   await publishOverlayChangeAfterSave("staff_push_notice");
   triggerShellyAlertFireAndForget(updated);
-  const { sendUrgentAlertSmsFireAndForget } = await import("@/lib/staff/super-admin-sms");
-  sendUrgentAlertSmsFireAndForget(updated, supabase);
+  await notifyUrgentPushSideChannel(updated, supabase);
   return updated;
 }
 
@@ -723,8 +742,7 @@ export async function createAndPushStaffNotice(
   await saveNoticeState(supabase, { notices: sortNotices([notice, ...state.notices]) });
   await publishOverlayChangeAfterSave("staff_push_notice");
   triggerShellyAlertFireAndForget(notice);
-  const { sendUrgentAlertSmsFireAndForget } = await import("@/lib/staff/super-admin-sms");
-  sendUrgentAlertSmsFireAndForget(notice, supabase);
+  await notifyUrgentPushSideChannel(notice, supabase);
   return notice;
 }
 
