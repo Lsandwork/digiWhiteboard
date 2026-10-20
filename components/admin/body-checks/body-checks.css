@@ -162,6 +162,34 @@
   color: var(--danger-foreground, #fecaca);
 }
 
+.body-checks__banner--success {
+  background: var(--success-soft, rgba(34, 197, 94, 0.18));
+  color: var(--success-foreground, #bbf7d0);
+}
+
+.body-checks__section-title {
+  margin: 10px 0 0;
+  font-size: 1.05rem;
+}
+
+/* Keep the single submit action reachable on phone/iPad without hiding the form. */
+.body-checks__form-actions {
+  position: sticky;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 5;
+  padding: 12px;
+  border: 1px solid var(--border, #263445);
+  border-radius: 16px;
+  background: var(--surface, #152232);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.body-checks__submit {
+  flex: 1 1 240px;
+  min-height: 52px;
+  font-weight: 700;
+}
+
 .body-checks input,
 .body-checks select,
 .body-checks textarea,

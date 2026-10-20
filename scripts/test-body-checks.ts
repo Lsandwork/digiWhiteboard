@@ -309,7 +309,60 @@ assert.match(panel, /Submit Body Check Report/);
 assert.match(panel, /Sync Now/);
 assert.match(panel, /tlDogPhotoCandidates/);
 assert.doesNotMatch(panel, /localStorage/);
-assert.match(panel, /Select an ear finding to continue/);
+assert.match(panel, /Select an ear finding before submitting/);
+// Single form: every category renders at once — no wizard steps or Next navigation.
+assert.doesNotMatch(panel, /wizard\.step|stepError|Next:|STEPS/);
+assert.match(panel, /<FindingStep title="Ears"/);
+assert.match(panel, /<FindingStep title="Nails"/);
+assert.match(panel, /<FindingStep title="Coat and grooming"/);
+assert.match(panel, /<FindingStep title="Physical findings"/);
+assert.match(panel, /body-checks__form-actions/);
+// Double-submit protection and confirmed-save success messaging.
+assert.match(panel, /if \(!wizard \|\| submitting\) return/);
+assert.match(panel, /disabled=\{submitting\}/);
+assert.match(panel, /idempotencyKey: wizard\.idempotencyKey/);
+assert.match(panel, /Body check saved for/);
+assert.match(panel, /setSuccessMessage/);
+
+// Multiple findings across categories stay selected together in one form state,
+// and "no concerns" findings cannot conflict with concerns (existing rules).
+{
+  let ears = toggleFinding(EAR_FINDINGS, [], "redness");
+  ears = toggleFinding(EAR_FINDINGS, ears, "ticks");
+  let nails = toggleFinding(NAIL_FINDINGS, [], "too_long");
+  nails = toggleFinding(NAIL_FINDINGS, nails, "needs_trim");
+  const body = reconcileBody(
+    toggleFinding(BODY_GROOMING_FINDINGS, toggleFinding(BODY_GROOMING_FINDINGS, [], "needs_bath"), "matted"),
+    toggleFinding(BODY_PHYSICAL_FINDINGS, [], "puncture")
+  );
+  assert.deepEqual(ears, ["redness", "ticks"]);
+  assert.deepEqual(nails, ["too_long", "needs_trim"]);
+  assert.deepEqual(body.grooming, ["needs_bath", "matted"]);
+  assert.deepEqual(body.physical, ["puncture"]);
+  const saved = validateInspection({
+    gingrAnimalId: "dog-9",
+    dogName: "Bella",
+    ears,
+    nails,
+    bodyGrooming: body.grooming,
+    bodyPhysical: body.physical,
+    notes: "Recheck left ear tomorrow.",
+    severity: "needs_follow_up",
+    followUpKinds: ["bath", "supervisor_review"],
+    idempotencyKey: "idem-multi-category"
+  });
+  assert.equal(saved.ok, true);
+  if (saved.ok) {
+    assert.deepEqual(saved.value.ears.map((item) => item.label), ["Redness / Irritation", "Ticks"]);
+    assert.deepEqual(saved.value.nails.map((item) => item.label), ["Too Long", "Needs Trim"]);
+    assert.deepEqual(saved.value.bodyGrooming.map((item) => item.label), ["Needs Bath", "Matted Hair"]);
+    assert.deepEqual(saved.value.bodyPhysical.map((item) => item.label), ["Puncture Wound"]);
+    assert.equal(saved.value.notes, "Recheck left ear tomorrow.");
+  }
+  // "No concerns" cannot coexist with a concern in the same category.
+  assert.deepEqual(toggleFinding(EAR_FINDINGS, ["redness"], "clean_normal"), ["clean_normal"]);
+  assert.deepEqual(reconcileBody(["no_issues"], ["puncture"]).grooming, []);
+}
 const css = readFileSync(join(root, "components/admin/body-checks/body-checks.css"), "utf8");
 assert.match(css, /var\(--text-primary/);
 assert.match(css, /var\(--surface/);
