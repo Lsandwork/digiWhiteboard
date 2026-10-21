@@ -5,6 +5,7 @@ import { resolveActiveCheckoutDisplayUntil, shouldExpireCheckoutDog } from "@/li
 import { invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
 import { invalidateLatestGingrWebhookCache } from "@/lib/gingr-webhook-latest";
 import { getGingrWebhookSignatureKey } from "@/lib/env";
+import { toPublicRawPayload } from "@/lib/board-public-dog";
 import { normalizeDog, resolveActiveBoardWebhookType, verifyGingrSignature, type GingrWebhookPayload } from "@/lib/gingr";
 import { shellyCheckinAlertKey, shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
 import { upsertIncidentFromGingrWebhook } from "@/lib/staff/track-incidents";
@@ -47,13 +48,13 @@ function isCheckoutCompletion(webhookType: string) {
 const NO_EVENT_ID = "00000000-0000-0000-0000-000000000000";
 
 /**
- * live_transition_dogs is readable by display clients (realtime). The Gingr HMAC only covers
- * webhook_type + entity_id + entity_type, so a leaked signature lets anyone replay that event
- * with forged entity_data. The audit row in gingr_webhook_events keeps it.
+ * live_transition_dogs is readable by display clients (realtime + anon SELECT policy).
+ * Store only the public board schema here. Full webhook bodies (including signatures) stay in
+ * gingr_webhook_events, which has a deny-all anon policy.
  */
 function boardRawPayload(payload: GingrWebhookPayload, extra: Record<string, unknown> = {}) {
   const { signature: _signature, ...rest } = payload;
-  return { ...rest, ...extra };
+  return toPublicRawPayload({ ...rest, ...extra }) ?? { source: extra.source ?? "gingr_webhook" };
 }
 
 async function recordWebhookEvent(

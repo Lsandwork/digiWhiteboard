@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { createNewsletterUnsubscribeToken } from "@/lib/blog/newsletter-unsubscribe";
 import { getEmailProvider } from "@/lib/integrations/email/provider";
 import { notifySuperAdminOfBlogSubscriber } from "@/lib/blog/newsletter-alerts";
 import { writeBlogAudit } from "@/lib/blog/service";
+import { getPublicSiteUrl } from "@/lib/site-url";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -77,12 +79,14 @@ export async function POST(request: Request) {
   const provider = getEmailProvider();
   let emailed = false;
   if (provider.isConfigured()) {
+    const unsubToken = createNewsletterUnsubscribeToken(email);
+    const unsubUrl = `${getPublicSiteUrl().replace(/\/$/, "")}/api/blog/public/newsletter/unsubscribe?token=${encodeURIComponent(unsubToken)}`;
     const result = await provider.send({
       to: email,
       purpose: "marketing",
       subject: "You're on the Fitdog tips list",
-      html: "<p>Thanks for subscribing to Fitdog dog-care tips. You can unsubscribe anytime by replying STOP or using the unsubscribe link in future emails.</p>",
-      text: "Thanks for subscribing to Fitdog dog-care tips."
+      html: `<p>Thanks for subscribing to Fitdog dog-care tips. <a href="${unsubUrl}">Unsubscribe</a> anytime, or reply STOP.</p>`,
+      text: `Thanks for subscribing to Fitdog dog-care tips. Unsubscribe: ${unsubUrl}`
     });
     emailed = result.ok;
   }
