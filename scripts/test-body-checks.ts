@@ -367,6 +367,14 @@ const css = readFileSync(join(root, "components/admin/body-checks/body-checks.cs
 assert.match(css, /var\(--text-primary/);
 assert.match(css, /var\(--surface/);
 assert.doesNotMatch(css, /background:\s*#fff/);
+// Sticky submit must clear the admin shell's fixed bottom chrome (verified
+// by geometry measurement at 390x844 and 820x1180): phone tab bar height
+// variable + floating-dock allowance, dock-width reserve on wider screens.
+assert.match(css, /@media \(max-width: 767px\) \{[^}]*\.body-checks__form-actions \{[^}]*var\(--admin-app-tabbar-h/);
+assert.match(css, /padding-right: 14rem/);
+const globalsCss = readFileSync(join(root, "app/globals.css"), "utf8");
+assert.match(globalsCss, /--admin-app-tabbar-h: calc\(3\.65rem \+ env\(safe-area-inset-bottom/);
+assert.match(globalsCss, /\.admin-mobile-tabbar \{[^}]*position: fixed/);
 
 const reportsRoute = readFileSync(join(root, "app/api/admin/body-checks/reports/route.ts"), "utf8");
 assert.match(reportsRoute, /gate\.actor/);

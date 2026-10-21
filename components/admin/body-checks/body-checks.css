@@ -172,16 +172,29 @@
   font-size: 1.05rem;
 }
 
-/* Keep the single submit action reachable on phone/iPad without hiding the form. */
+/* Keep the single submit action reachable on phone/iPad without hiding the form.
+   The admin shell's fixed bottom chrome must never cover it:
+   - phone (≤767px): the fixed mobile tab bar (--admin-app-tabbar-h) plus the
+     floating dock stacked above it (~4rem together);
+   - wider screens: the floating dock sits bottom-right, so the bar reserves
+     its width as right padding and buttons never slide underneath it. */
 .body-checks__form-actions {
   position: sticky;
   bottom: max(10px, env(safe-area-inset-bottom));
   z-index: 5;
   padding: 12px;
+  padding-right: 14rem;
   border: 1px solid var(--border, #263445);
   border-radius: 16px;
   background: var(--surface, #152232);
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.28);
+}
+
+@media (max-width: 767px) {
+  .body-checks__form-actions {
+    bottom: calc(var(--admin-app-tabbar-h, calc(3.65rem + env(safe-area-inset-bottom, 0px))) + 4rem);
+    padding-right: 12px;
+  }
 }
 
 .body-checks__submit {
