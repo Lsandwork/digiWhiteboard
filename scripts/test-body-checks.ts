@@ -323,6 +323,9 @@ assert.match(panel, /disabled=\{submitting\}/);
 assert.match(panel, /idempotencyKey: wizard\.idempotencyKey/);
 assert.match(panel, /Body check saved for/);
 assert.match(panel, /setSuccessMessage/);
+// After a confirmed save, staff land back on Active Checks to pick the next dog.
+assert.match(panel, /setView\("active"\);\s*\n\s*await loadRoster\(true\)/);
+assert.doesNotMatch(panel, /setView\("saved"\);\s*\n\s*await loadRoster/);
 
 // Multiple findings across categories stay selected together in one form state,
 // and "no concerns" findings cannot conflict with concerns (existing rules).

@@ -353,11 +353,12 @@ export function BodyChecksPanel() {
         return;
       }
       // Only claim success after the server confirms the saved report.
+      // Return to the roster so staff can immediately pick the next dog;
+      // Saved Reports stays one tap away and loads on open.
       setSuccessMessage(`Body check saved for ${wizard.dog.dogName}.`);
       setWizard(null);
-      setView("saved");
+      setView("active");
       await loadRoster(true);
-      await loadSaved();
     } catch {
       setSubmitError("The report was not saved. Your selections are still here.");
     } finally {
@@ -410,6 +411,11 @@ export function BodyChecksPanel() {
 
       {view === "active" && !wizard ? (
         <>
+          {successMessage ? (
+            <div className="body-checks__banner body-checks__banner--success" role="status">
+              {successMessage}
+            </div>
+          ) : null}
           <div className="body-checks__counts">
             <Count label="Checked in" value={counts?.checkedIn} />
             <Count label="Coming today" value={counts?.arrivals} />
@@ -481,11 +487,6 @@ export function BodyChecksPanel() {
         </>
       ) : view === "saved" && !wizard && !openReport ? (
         <>
-          {successMessage ? (
-            <div className="body-checks__banner body-checks__banner--success" role="status">
-              {successMessage}
-            </div>
-          ) : null}
           <div className="body-checks__toolbar">
             <input className="admin-input body-checks__search" value={savedQuery} onChange={(event) => { setSavedPage(0); setSavedQuery(event.target.value); }} placeholder="Search dog, owner, or staff" aria-label="Search saved reports" />
             <select className="admin-input" value={severityFilter} onChange={(event) => { setSavedPage(0); setSeverityFilter(event.target.value); }} aria-label="Severity">
