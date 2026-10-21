@@ -41,7 +41,6 @@ type RosterPayload = {
 
 type Wizard = {
   dog: RosterApiRow;
-  step: number;
   ears: string[];
   nails: string[];
   bodyGrooming: string[];
@@ -64,8 +63,6 @@ const FILTERS: { id: RosterFilter; label: string }[] = [
   { id: "appointments", label: "Appointments" },
   { id: "follow_up", label: "Follow-ups" }
 ];
-
-const STEPS = ["Ears", "Nails", "Body", "Review"];
 
 const SEVERITY_OPTIONS: { id: BodyCheckSeverity; label: string }[] = [
   { id: "routine", label: "Routine" },
@@ -156,33 +153,18 @@ function DogPhoto({ name, animalId, url }: { name: string; animalId: string; url
   );
 }
 
-function stepError(wizard: Wizard): string | null {
-  if (wizard.step === 0) {
-    if (!wizard.ears.length) return "Select an ear finding to continue.";
-    if (wizard.ears.includes("other") && !wizard.earOther.trim()) return "Describe the other ear finding.";
-  }
-  if (wizard.step === 1) {
-    if (!wizard.nails.length) return "Select a nail finding to continue.";
-    if (wizard.nails.includes("other") && !wizard.nailOther.trim()) return "Describe the other nail finding.";
-  }
-  if (wizard.step === 2) {
-    const body = reconcileBody(wizard.bodyGrooming, wizard.bodyPhysical);
-    if (!body.grooming.length && !body.physical.length) return "Select a coat or body finding to continue.";
-    if (body.physical.includes("other") && !wizard.bodyOther.trim()) return "Describe the other body finding.";
-  }
-  if (wizard.step === 3) {
-    if (!wizard.severity) return "Choose a severity before submitting.";
-    if ((wizard.severity === "needs_follow_up" || wizard.severity === "urgent") && !wizard.followUpKinds.length) {
-      return "Choose at least one follow-up for this severity.";
-    }
-  }
-  return null;
-}
-
+/** One-form validation: same genuinely-required fields the server enforces. */
 function reportBlocker(wizard: Wizard): string | null {
-  for (let step = 0; step <= 3; step += 1) {
-    const error = stepError({ ...wizard, step });
-    if (error) return error;
+  if (!wizard.ears.length) return "Select an ear finding before submitting.";
+  if (wizard.ears.includes("other") && !wizard.earOther.trim()) return "Describe the other ear finding.";
+  if (!wizard.nails.length) return "Select a nail finding before submitting.";
+  if (wizard.nails.includes("other") && !wizard.nailOther.trim()) return "Describe the other nail finding.";
+  const body = reconcileBody(wizard.bodyGrooming, wizard.bodyPhysical);
+  if (!body.grooming.length && !body.physical.length) return "Select a coat or body finding before submitting.";
+  if (body.physical.includes("other") && !wizard.bodyOther.trim()) return "Describe the other body finding.";
+  if (!wizard.severity) return "Choose a severity before submitting.";
+  if ((wizard.severity === "needs_follow_up" || wizard.severity === "urgent") && !wizard.followUpKinds.length) {
+    return "Choose at least one follow-up for this severity.";
   }
   return null;
 }
@@ -190,7 +172,6 @@ function reportBlocker(wizard: Wizard): string | null {
 function emptyWizard(dog: RosterApiRow): Wizard {
   return {
     dog,
-    step: 0,
     ears: [],
     nails: [],
     bodyGrooming: [],
@@ -218,6 +199,7 @@ export function BodyChecksPanel() {
   const [wizard, setWizard] = useState<Wizard | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [saved, setSaved] = useState<{ reports: BodyCheckReport[]; total: number; error: string | null; loading: boolean }>({
     reports: [],
     total: 0,
@@ -370,6 +352,8 @@ export function BodyChecksPanel() {
         setSubmitError(payload.error || "The report was not saved. Your selections are still here.");
         return;
       }
+      // Only claim success after the server confirms the saved report.
+      setSuccessMessage(`Body check saved for ${wizard.dog.dogName}.`);
       setWizard(null);
       setView("saved");
       await loadRoster(true);
@@ -484,7 +468,7 @@ export function BodyChecksPanel() {
                     {row.hasFollowUp ? <span className="admin-badge admin-badge--amber">Follow-up open</span> : null}
                   </div>
                 </div>
-                <button className="admin-btn-primary body-checks__row-button" type="button" onClick={() => { setSubmitError(null); setView("active"); setWizard(emptyWizard(row)); }}>
+                <button className="admin-btn-primary body-checks__row-button" type="button" onClick={() => { setSubmitError(null); setSuccessMessage(null); setView("active"); setWizard(emptyWizard(row)); }}>
                   Start Body Check
                 </button>
               </article>
@@ -497,6 +481,11 @@ export function BodyChecksPanel() {
         </>
       ) : view === "saved" && !wizard && !openReport ? (
         <>
+          {successMessage ? (
+            <div className="body-checks__banner body-checks__banner--success" role="status">
+              {successMessage}
+            </div>
+          ) : null}
           <div className="body-checks__toolbar">
             <input className="admin-input body-checks__search" value={savedQuery} onChange={(event) => { setSavedPage(0); setSavedQuery(event.target.value); }} placeholder="Search dog, owner, or staff" aria-label="Search saved reports" />
             <select className="admin-input" value={severityFilter} onChange={(event) => { setSavedPage(0); setSeverityFilter(event.target.value); }} aria-label="Severity">
@@ -598,63 +587,36 @@ export function BodyChecksPanel() {
               Back to roster
             </button>
           </div>
-          <div className="body-checks__steps">
-            {STEPS.map((label, index) => (
-              <button key={label} type="button" className="body-checks__step" aria-current={wizard.step === index ? "step" : undefined} onClick={() => {
-                if (index > wizard.step) {
-                  for (let step = wizard.step; step < index; step += 1) {
-                    const error = stepError({ ...wizard, step });
-                    if (error) {
-                      setSubmitError(error);
-                      return;
-                    }
-                  }
-                }
-                setSubmitError(null);
-                setWizard({ ...wizard, step: index });
-              }}>
-                {index + 1}. {label}
-              </button>
-            ))}
+          <FindingStep title="Ears" hint="Check for redness, odor, discharge, ticks, or irritation." catalog={EAR_FINDINGS} selected={wizard.ears} other={wizard.earOther} onToggle={(id) => setWizard({ ...wizard, ears: toggleFinding(EAR_FINDINGS, wizard.ears, id) })} onOther={(value) => setWizard({ ...wizard, earOther: value })} />
+          <FindingStep title="Nails" hint="Check nail length and condition." catalog={NAIL_FINDINGS} selected={wizard.nails} other={wizard.nailOther} onToggle={(id) => setWizard({ ...wizard, nails: toggleFinding(NAIL_FINDINGS, wizard.nails, id) })} onOther={(value) => setWizard({ ...wizard, nailOther: value })} />
+          <div className="body-checks__list">
+            <h3 className="body-checks__section-title">Body</h3>
+            <FindingStep title="Coat and grooming" hint="Needs Bath and Matted Hair can both be selected." catalog={BODY_GROOMING_FINDINGS} selected={wizard.bodyGrooming} other="" onToggle={(id) => {
+              const next = toggleFinding(BODY_GROOMING_FINDINGS, wizard.bodyGrooming, id);
+              const reconciled = reconcileBody(next, id === "no_issues" ? [] : wizard.bodyPhysical);
+              setWizard({ ...wizard, bodyGrooming: reconciled.grooming, bodyPhysical: reconciled.physical });
+            }} onOther={() => undefined} />
+            <FindingStep title="Physical findings" hint="These are observations, not diagnoses." catalog={BODY_PHYSICAL_FINDINGS} selected={wizard.bodyPhysical} other={wizard.bodyOther} onToggle={(id) => {
+              const next = toggleFinding(BODY_PHYSICAL_FINDINGS, wizard.bodyPhysical, id);
+              const reconciled = reconcileBody(wizard.bodyGrooming, next);
+              setWizard({ ...wizard, bodyGrooming: reconciled.grooming, bodyPhysical: reconciled.physical });
+            }} onOther={(value) => setWizard({ ...wizard, bodyOther: value })} />
           </div>
-          {wizard.step === 0 ? (
-            <FindingStep title="Ears" hint="Check for redness, odor, discharge, ticks, or irritation." catalog={EAR_FINDINGS} selected={wizard.ears} other={wizard.earOther} onToggle={(id) => setWizard({ ...wizard, ears: toggleFinding(EAR_FINDINGS, wizard.ears, id) })} onOther={(value) => setWizard({ ...wizard, earOther: value })} />
-          ) : null}
-          {wizard.step === 1 ? (
-            <FindingStep title="Nails" hint="Check nail length and condition." catalog={NAIL_FINDINGS} selected={wizard.nails} other={wizard.nailOther} onToggle={(id) => setWizard({ ...wizard, nails: toggleFinding(NAIL_FINDINGS, wizard.nails, id) })} onOther={(value) => setWizard({ ...wizard, nailOther: value })} />
-          ) : null}
-          {wizard.step === 2 ? (
-            <div className="body-checks__list">
-              <FindingStep title="Coat and grooming" hint="Needs Bath and Matted Hair can both be selected." catalog={BODY_GROOMING_FINDINGS} selected={wizard.bodyGrooming} other="" onToggle={(id) => {
-                const next = toggleFinding(BODY_GROOMING_FINDINGS, wizard.bodyGrooming, id);
-                const reconciled = reconcileBody(next, id === "no_issues" ? [] : wizard.bodyPhysical);
-                setWizard({ ...wizard, bodyGrooming: reconciled.grooming, bodyPhysical: reconciled.physical });
-              }} onOther={() => undefined} />
-              <FindingStep title="Body" hint="These are observations, not diagnoses." catalog={BODY_PHYSICAL_FINDINGS} selected={wizard.bodyPhysical} other={wizard.bodyOther} onToggle={(id) => {
-                const next = toggleFinding(BODY_PHYSICAL_FINDINGS, wizard.bodyPhysical, id);
-                const reconciled = reconcileBody(wizard.bodyGrooming, next);
-                setWizard({ ...wizard, bodyGrooming: reconciled.grooming, bodyPhysical: reconciled.physical });
-              }} onOther={(value) => setWizard({ ...wizard, bodyOther: value })} />
+          <div className="body-checks__list">
+            <h3 className="body-checks__section-title">Severity</h3>
+            <div className="body-checks__tiles">
+              {SEVERITY_OPTIONS.map((item) => (
+                <button key={item.id} type="button" className="body-checks__tile" aria-pressed={wizard.severity === item.id} onClick={() => setWizard({ ...wizard, severity: item.id })}>
+                  {item.label}
+                </button>
+              ))}
             </div>
-          ) : null}
-          {wizard.step === 3 ? (
-            <div className="body-checks__list">
-              <div className="body-checks__card">
-                <strong>Findings</strong>
-                <ul>{reviewLines.map((line) => <li key={line}>{line}</li>)}</ul>
-                <p className="body-checks__meta">Observations only. This does not book a service, charge an owner, or send a message.</p>
-              </div>
-              <div className="body-checks__tiles">
-                {SEVERITY_OPTIONS.map((item) => (
-                  <button key={item.id} type="button" className="body-checks__tile" aria-pressed={wizard.severity === item.id} onClick={() => setWizard({ ...wizard, severity: item.id })}>
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-              {wizard.severity === "urgent" ? (
-                <div className="body-checks__banner">Tell a supervisor in person or record it in Team Log. Saving this report does not send an alert.</div>
-              ) : null}
-              {wizard.severity === "needs_follow_up" || wizard.severity === "urgent" ? (
+            {wizard.severity === "urgent" ? (
+              <div className="body-checks__banner">Tell a supervisor in person or record it in Team Log. Saving this report does not send an alert.</div>
+            ) : null}
+            {wizard.severity === "needs_follow_up" || wizard.severity === "urgent" ? (
+              <>
+                <h3 className="body-checks__section-title">Follow-up needed</h3>
                 <div className="body-checks__tiles">
                   {FOLLOW_UP_KINDS.map((kind) => (
                     <button key={kind} type="button" className="body-checks__tile" aria-pressed={wizard.followUpKinds.includes(kind)} onClick={() => setWizard({
@@ -667,35 +629,28 @@ export function BodyChecksPanel() {
                     </button>
                   ))}
                 </div>
-              ) : null}
-              <label>
-                Notes (optional)
-                <textarea className="admin-input" maxLength={NOTES_MAX} value={wizard.notes} onChange={(event) => setWizard({ ...wizard, notes: event.target.value })} />
-              </label>
-            </div>
-          ) : null}
-          {submitError ? <div className="body-checks__banner body-checks__banner--error">{submitError}</div> : null}
-          <div className="body-checks__actions">
-            <button className="admin-btn-secondary" type="button" disabled={wizard.step === 0 || submitting} onClick={() => setWizard({ ...wizard, step: Math.max(0, wizard.step - 1) })}>
-              Back
+              </>
+            ) : null}
+            <label>
+              Notes (optional)
+              <textarea className="admin-input" maxLength={NOTES_MAX} value={wizard.notes} onChange={(event) => setWizard({ ...wizard, notes: event.target.value })} />
+            </label>
+            {reviewLines.length ? (
+              <div className="body-checks__card">
+                <strong>Selected findings</strong>
+                <ul>{reviewLines.map((line) => <li key={line}>{line}</li>)}</ul>
+                <p className="body-checks__meta">Observations only. This does not book a service, charge an owner, or send a message.</p>
+              </div>
+            ) : null}
+          </div>
+          {submitError ? <div className="body-checks__banner body-checks__banner--error" role="alert">{submitError}</div> : null}
+          <div className="body-checks__actions body-checks__form-actions">
+            <button className="admin-btn-secondary" type="button" disabled={submitting} onClick={() => setWizard(null)}>
+              Back to roster
             </button>
-            {wizard.step < 3 ? (
-              <button className="admin-btn-primary" type="button" onClick={() => {
-                const error = stepError(wizard);
-                if (error) {
-                  setSubmitError(error);
-                  return;
-                }
-                setSubmitError(null);
-                setWizard({ ...wizard, step: wizard.step + 1 });
-              }}>
-                Next: {STEPS[wizard.step + 1]}
-              </button>
-            ) : (
-              <button className="admin-btn-primary" type="button" disabled={submitting} onClick={() => void submitReport()}>
-                {submitting ? "Saving…" : "Submit Body Check Report"}
-              </button>
-            )}
+            <button className="admin-btn-primary body-checks__submit" type="button" disabled={submitting} onClick={() => void submitReport()}>
+              {submitting ? "Saving…" : "Submit Body Check Report"}
+            </button>
           </div>
         </div>
       ) : null}
