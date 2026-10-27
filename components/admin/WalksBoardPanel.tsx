@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlarmClock,
   AlertTriangle,
-  Camera,
   CheckCircle2,
   Circle,
   Clock3,
@@ -320,10 +319,6 @@ export function WalksBoardPanel() {
                   {busy ? "Saving…" : "Mark Complete"}
                 </button>
               ) : null}
-              <a className="crossover-btn crossover-btn--outline" href="/admin?board=staff&tab=bulk_photo_upload">
-                <Camera className="h-4 w-4" />
-                Upload pictures
-              </a>
             </div>
           </div>
         </article>

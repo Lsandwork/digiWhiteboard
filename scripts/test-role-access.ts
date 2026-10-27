@@ -111,18 +111,28 @@ assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "assistant_manag
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "groomer"), "grooming_push", "groomer", "staff"), true);
 assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "groomer"), "bulk_photo_upload", "groomer", "staff"),
-  true,
-  "groomers can open Bulk Photo Upload"
+  false,
+  "groomers do not see Bulk Photo Upload on the staff whiteboard"
 );
 assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "trainer"), "bulk_photo_upload", "trainer", "staff"),
-  true,
-  "trainers can open Bulk Photo Upload"
+  false,
+  "trainers do not see Bulk Photo Upload on the staff whiteboard"
 );
 assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "viewer"), "bulk_photo_upload", "viewer", "staff"),
+  false,
+  "the staff whiteboard does not expose Bulk Photo Upload"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "owner_admin"), "bulk_photo_upload", "owner_admin", "staff"),
+  false,
+  "owners do not see Bulk Photo Upload on the staff whiteboard"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "marketing"), "bulk_photo_upload", "marketing", "marketing"),
   true,
-  "every staff panel can open Bulk Photo Upload"
+  "Marketing board still includes Bulk Photo Upload"
 );
 assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "handler_shift_entry", "daycare", "staff"),
