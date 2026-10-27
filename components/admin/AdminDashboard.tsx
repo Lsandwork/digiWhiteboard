@@ -424,7 +424,7 @@ export function AdminDashboard() {
     }
 
     if (marketingAccount && board === "staff") {
-      if (tab === "user_interactions" || tab === "crossover_communication" || tab === "bulk_photo_upload" || tab === "media_library" || tab === "help") return;
+      if (tab === "user_interactions" || tab === "crossover_communication" || tab === "media_library" || tab === "help") return;
       if (tab === "sa_apps_hub") {
         if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", "marketing");
         goToBoardTab("marketing", "sa_apps_hub");
@@ -452,6 +452,14 @@ export function AdminDashboard() {
     if (tab === "front_desk_command") {
       const fallbackTab = firstAccessibleAdminTab(access, effectiveRole, effectiveBoard, { isDemo }) as AdminTab;
       goToBoardTab(effectiveBoard, fallbackTab);
+      return;
+    }
+
+    // Bulk Photo Upload is Marketing-board only. A staff-board deep link
+    // stays on the staff whiteboard and opens the user's first staff tab.
+    if (effectiveBoard === "staff" && tab === "bulk_photo_upload") {
+      const fallbackTab = firstAccessibleAdminTab(access, effectiveRole, "staff", { isDemo }) as AdminTab;
+      goToBoardTab("staff", fallbackTab);
       return;
     }
 
@@ -1006,7 +1014,9 @@ export function AdminDashboard() {
 
         {tab === "hr_consult" ? (canAccessHrPanels ? <HrConsultPanel initialRecordId={hrConsultRecordId} /> : null) : null}
         {tab === "remote_cast" ? <RemoteCastPanel /> : null}
-        {tab === "bulk_photo_upload" ? <BulkPhotoUploadPanel onOpenMediaLibrary={() => setActiveTab("media_library")} /> : null}
+        {tab === "bulk_photo_upload" && board !== "staff" ? (
+          <BulkPhotoUploadPanel onOpenMediaLibrary={() => setActiveTab("media_library")} />
+        ) : null}
         {tab === "media_library" ? <MediaLibraryPanel /> : null}
         {tab === "write_ups" ? (
           isHandlerPanel ? (

@@ -32,6 +32,7 @@ assert.equal(canAccessAdminTab(access, "lobby_slideshow", "marketing", "lobby"),
 
 assert.equal(canAccessAdminTab(access, "sa_apps_hub", "marketing", "marketing"), true);
 assert.equal(canAccessAdminTab(access, "bulk_photo_upload", "marketing", "marketing"), true);
+assert.equal(canAccessAdminTab(access, "bulk_photo_upload", "marketing", "staff"), false);
 assert.equal(canAccessAdminTab(access, "sa_apps_hub", "marketing", "staff"), false);
 assert.equal(firstAccessibleAdminTab(access, "marketing", "lobby"), "content");
 assert.equal(firstAccessibleAdminTab(access, "marketing", "staff"), "crossover_communication");

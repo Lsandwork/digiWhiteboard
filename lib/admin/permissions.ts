@@ -1600,7 +1600,13 @@ export function canAccessAdminTab(
     return canAccessLiveFleet(access, legacyRole);
   }
 
-  // Bulk Photo Upload is on every signed-in panel (staff + CAST-TV / marketing).
+  // Bulk Photo Upload stays on the Marketing / CAST-TV board only.
+  // The staff digital whiteboard does not expose it. Lobby is unchanged.
+  if (tab === "bulk_photo_upload" && board === "staff") {
+    return false;
+  }
+
+  // Bulk Photo Upload on the Marketing board (and any non-staff, non-lobby board).
   if (tab === "bulk_photo_upload" && board !== "lobby") {
     const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
     return (
@@ -1819,7 +1825,6 @@ export function canAccessAdminTab(
       return (
         tab === "user_interactions" ||
         tab === "crossover_communication" ||
-        tab === "bulk_photo_upload" ||
         tab === "media_library" ||
         tab === "help"
       );

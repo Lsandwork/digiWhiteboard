@@ -265,12 +265,12 @@ async function runMiddleware(request: NextRequest) {
       const url = request.nextUrl.clone();
       const board = url.searchParams.get("board");
       const tab = url.searchParams.get("tab");
-      // Marketing accounts may use Team Log and Bulk Photo Upload on the staff board.
+      // Marketing accounts may use Team Log on the staff board.
+      // Bulk Photo Upload stays on the Marketing board only.
       if (
         board === "staff" &&
         (tab === "user_interactions" ||
           tab === "crossover_communication" ||
-          tab === "bulk_photo_upload" ||
           tab === "media_library" ||
           tab === "help" ||
           !tab)
