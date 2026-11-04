@@ -26,6 +26,12 @@ import { useToast } from "@/components/admin/ui/ToastProvider";
 import { SortableTh } from "@/components/admin/ui/sortable-table";
 import { trainerRatePercentForPackage } from "@/lib/staff/commission-ledger/location-rate";
 import { centsToDisplay, bpsToDisplay } from "@/lib/staff/commission-ledger/money";
+import {
+  commissionTrainerNameOptionId,
+  isCommissionTrainerUserId,
+  mergeCommissionTrainerOptions,
+  parseCommissionTrainerFilterValues
+} from "@/lib/staff/commission-ledger/trainers";
 import type { PackageCommissionRecord } from "@/lib/staff/commission-ledger/types";
 
 type TrainerOption = { id: string; full_name: string; email: string };
@@ -208,6 +214,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
   const dateFrom = searchParams.get("dateFrom") ?? "";
   const dateTo = searchParams.get("dateTo") ?? "";
   const trainerIds = searchParams.get("trainerIds") ?? "";
+  const trainerNames = searchParams.get("trainerNames") ?? "";
   const sortBy = searchParams.get("sortBy") ?? "sale_date";
   const sortDir = (searchParams.get("sortDir") === "asc" ? "asc" : "desc") as "asc" | "desc";
 
@@ -223,6 +230,27 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
   const pageRowIds = useMemo(() => (data?.rows ?? []).map((row) => row.id), [data?.rows]);
   const allPageSelected = pageRowIds.length > 0 && pageRowIds.every((id) => selected.includes(id));
   const somePageSelected = pageRowIds.some((id) => selected.includes(id)) && !allPageSelected;
+
+  const trainerFilterValues = useMemo(() => {
+    const ids = trainerIds.split(",").map((v) => v.trim()).filter(Boolean);
+    const names = trainerNames
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean)
+      .map((name) => (name.startsWith("name:") ? name : commissionTrainerNameOptionId(name)));
+    return [...ids, ...names];
+  }, [trainerIds, trainerNames]);
+
+  const trainerOptions = useMemo(() => {
+    const fromRows = (data?.rows ?? []).map((row) => ({
+      id: isCommissionTrainerUserId(row.trainer_user_id)
+        ? String(row.trainer_user_id)
+        : commissionTrainerNameOptionId(row.trainer_name || "Unknown"),
+      full_name: row.trainer_name || "Unknown",
+      email: row.trainer_email ?? ""
+    }));
+    return mergeCommissionTrainerOptions(data?.trainers, fromRows);
+  }, [data?.rows, data?.trainers]);
 
   const toggleRowSelection = useCallback(
     (rowId: string, rowIndex: number, checked: boolean, shiftKey: boolean) => {
@@ -289,8 +317,12 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
         params.set("fast", "1");
         params.set("pageSize", "25");
         params.set("page", searchParams.get("page") ?? "1");
-        const trainerIds = searchParams.get("trainerIds") ?? searchParams.get("trainer");
-        if (trainerIds) params.set("trainerIds", trainerIds);
+        const selectedTrainers = searchParams.get("trainerIds") ?? searchParams.get("trainer");
+        if (selectedTrainers) params.set("trainerIds", selectedTrainers);
+        const selectedTrainerNames = searchParams.get("trainerNames");
+        if (selectedTrainerNames) params.set("trainerNames", selectedTrainerNames);
+        const qValue = searchParams.get("q");
+        if (qValue) params.set("q", qValue);
         if (tab === "needs_review") params.set("reviewStatus", "needs_review,disputed");
         if (tab === "approval") params.set("approvalStatus", "pending");
       } else {
@@ -659,19 +691,32 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
               <label className="grid gap-1 text-xs">
                 <span className="text-admin-muted">Trainers (multi-select)</span>
                 <select
-                  className="admin-input min-h-[5.5rem]"
+                  className="admin-input min-h-[5.5rem] min-w-[14rem]"
                   multiple
-                  value={trainerIds ? trainerIds.split(",").filter(Boolean) : []}
+                  size={Math.min(8, Math.max(4, trainerOptions.length || 4))}
+                  value={trainerFilterValues}
+                  aria-label="Filter by trainers"
                   onChange={(e) => {
                     const values = Array.from(e.target.selectedOptions).map((o) => o.value);
-                    setParams({ trainerIds: values.length ? values.join(",") : null, page: "1" });
+                    const parsed = parseCommissionTrainerFilterValues(values);
+                    setParams({
+                      trainerIds: parsed.trainerIds.length ? parsed.trainerIds.join(",") : null,
+                      trainerNames: parsed.trainerNames.length ? parsed.trainerNames.join(",") : null,
+                      page: "1"
+                    });
                   }}
                 >
-                  {(data?.trainers ?? []).map((trainer) => (
-                    <option key={trainer.id} value={trainer.id}>
-                      {trainer.full_name}
+                  {trainerOptions.length ? (
+                    trainerOptions.map((trainer) => (
+                      <option key={trainer.id} value={trainer.id}>
+                        {trainer.full_name}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>
+                      {loading ? "Loading trainers…" : "No trainers found"}
                     </option>
-                  ))}
+                  )}
                 </select>
               </label>
             ) : null}
@@ -700,6 +745,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                 setParams({
                   q: null,
                   trainerIds: null,
+                  trainerNames: null,
                   dateFrom: null,
                   dateTo: null,
                   reviewStatus: null,
