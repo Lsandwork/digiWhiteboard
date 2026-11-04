@@ -8,26 +8,26 @@ import { PACKAGES, SITE } from "@/lib/ruffops-site/config";
 export const metadata: Metadata = {
   title: "Pricing — Custom Solutions for Pet Facilities",
   description:
-    "ruffOPS pricing is consultative and tailored to your facility. Explore platform, digital whiteboard, and advertising offerings — then request a solution fit for your operation.",
+    "ruffOPS pricing is consultative and scoped to your facility. Platform, digital whiteboards, and advertising — then a real recommendation, not invented monthly tiers.",
   openGraph: {
     title: `Pricing | ${SITE.name}`,
     description:
-      "Let’s build the right solution for your business — platform, whiteboards, advertising screens, or a focused operations review."
+      "We’ll scope the right mix for your business — platform, whiteboards, advertising screens, or a focused ops review."
   }
 };
 
 const faqs = [
   {
     q: "Why don’t you list monthly prices?",
-    a: "Every facility has a different mix of departments, screens, locations, and staffing models. Publishing invented tiers would not reflect how engagements are scoped. We price after understanding your operation."
+    a: "Every facility has a different mix of departments, screens, locations, and staffing. Fake tier cards would lie about how engagements are scoped. We price after we understand the operation."
   },
   {
     q: "What do most facilities start with?",
-    a: "Many begin with lobby whiteboards, the management platform, or a combined operations + display review. We recommend based on where coordination breaks down today."
+    a: "Lobby whiteboards, the management platform, or a combined ops + display review. We recommend based on where coordination currently leaks."
   },
   {
     q: "Do you support multi-location businesses?",
-    a: "Yes. We discuss single-location and multi-location needs during the intake process, including display deployment and management access patterns."
+    a: "Yes. Single-location and multi-location both come up in intake — including how displays get deployed and who gets management access."
   }
 ];
 
@@ -36,8 +36,8 @@ export default function PricingPage() {
     <>
       <PageHero
         eyebrow="Pricing"
-        title="Let’s build the right solution for your business"
-        description="ruffOPS engagements are scoped to your facility — platform modules, custom digital whiteboards, advertising screens, or a focused operations review. No invented monthly rates. Clear offerings. Real next steps."
+        title="We’ll price the facility you have, not a fantasy org chart"
+        description="ruffOPS work is scoped to your place — platform modules, custom digital whiteboards, advertising screens, or a focused ops review. No invented monthly rates. Clear offerings. A next step you can act on."
         secondaryLabel={`Call ${SITE.phoneDisplay}`}
         secondaryHref={SITE.phoneHref}
       />
@@ -74,11 +74,11 @@ export default function PricingPage() {
           <Reveal>
             <p className="eyebrow eyebrow--light">How pricing works</p>
             <h2 className="mt-4 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-              Transparent process, tailored scope
+              Clear process. Custom scope.
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-slate-600">
-              Tell us about your facility, locations, and priorities. We map the right mix of platform and display work,
-              then follow up with a clear recommendation — not a pressure pitch.
+              Tell us about the facility, locations, and what hurts. We map platform and display work, then follow up
+              with a recommendation — not a pressure pitch with a countdown timer.
             </p>
             <SiteLink href="/get-started" className="btn-primary mt-8">
               Request a Solution Fit
@@ -100,7 +100,7 @@ export default function PricingPage() {
         </div>
       </section>
 
-      <MidCta title="Ready for a tailored recommendation?" />
+      <MidCta title="Ready for a recommendation that fits the building?" />
       <FinalCta />
     </>
   );

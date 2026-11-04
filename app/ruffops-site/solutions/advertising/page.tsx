@@ -28,9 +28,9 @@ export default function AdvertisingPage() {
   return (
     <>
       <PageHero
-        eyebrow="Rental or consulting services"
+        eyebrow="Rental or consulting"
         title="Remote Digital Whiteboard Advertising"
-        description="Deploy branded display screens with remote content updates, advertising management, and setup consulting — ideal when you want premium lobby screens without building the display stack alone."
+        description="Branded lobby screens with remote content updates, ad management, and setup help — when you want the walls working without babysitting a USB stick."
         secondaryLabel="Talk With Us"
         secondaryHref="/get-started"
       />
@@ -45,7 +45,7 @@ export default function AdvertisingPage() {
         <Reveal>
           <p className="eyebrow">Service scope</p>
           <h2 className="mt-4 max-w-3xl text-3xl font-bold tracking-tight text-white sm:text-4xl">Screens that stay useful after install day</h2>
-          <p className="mt-4 max-w-2xl text-slate-400">Advertising and display support connects to the same operational DNA as ruffOPS whiteboards — content that fits a pet facility, not a generic digital signage template.</p>
+          <p className="mt-4 max-w-2xl text-slate-400">Advertising and display support shares DNA with ruffOPS whiteboards — content that fits a pet facility, not a mall directory template with a dog photo.</p>
         </Reveal>
         <div className="ro-feature-grid cols-3 mt-8">
           {offerings.map(([title, copy]) => (

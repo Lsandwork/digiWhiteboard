@@ -37,15 +37,15 @@ export default async function RuffopsHomePage({
         <div className="ro-hero-shade" />
         <div className="container-page ro-hero-grid">
           <Reveal className="ro-hero-copy">
-            <p className="eyebrow">The ultimate operations platform for pet businesses</p>
+            <p className="eyebrow">Built for dog daycares that outgrew the clipboard</p>
             <h1>
               Smarter Operations.
               <br />
               <span className="text-white">Happier Pets.</span>
             </h1>
             <p className="lede">
-              ruffOPS is the all-in-one solution that keeps your team connected, your operations running smoothly, and
-              your clients engaged — from anywhere, at any time.
+              When the front desk, the yard, and the lobby TV disagree, somebody’s dog is in the wrong place.
+              ruffOPS keeps management, staff boards, and client screens on one story — the true one.
             </p>
             <div className="ro-hero-actions">
               <SiteLink href={PRIMARY_CTA.href} className="btn-primary">
@@ -89,8 +89,8 @@ export default async function RuffopsHomePage({
       <section id="solutions" className="ro-band-light ro-section">
         <div className="container-page">
           <Reveal className="ro-section-head text-center mx-auto">
-            <p className="eyebrow eyebrow--light">Powerful solutions. One platform.</p>
-            <h2>Everything Your Business Needs</h2>
+            <p className="eyebrow eyebrow--light">Platform, boards, screens</p>
+            <h2>What we actually ship</h2>
           </Reveal>
 
           <div className="ro-solution-grid">
@@ -144,10 +144,10 @@ export default async function RuffopsHomePage({
         <div className="ro-cta-dark-shade" />
         <div className="container-page relative text-center">
           <Reveal>
-            <p className="eyebrow">Built for pet businesses. Designed for success.</p>
-            <h2 className="mx-auto mt-5">Ready to transform your operations?</h2>
+            <p className="eyebrow">Dog facilities. Real Saturday pressure.</p>
+            <h2 className="mx-auto mt-5">Show us how your rush hour actually runs</h2>
             <SiteLink href={PRIMARY_CTA.href} className="btn-primary mt-8">
-              Get Started Today
+              Get Started
               <ArrowRight className="h-4 w-4" />
             </SiteLink>
           </Reveal>
