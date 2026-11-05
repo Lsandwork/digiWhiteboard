@@ -25,6 +25,7 @@ import {
   matchOvernightLodgingArea,
   parseRunName
 } from "./lodging";
+import type { TlLodgingAreaKey } from "./constants";
 import { buildTlGingrMedicationRecords } from "./normalize";
 import { enrichTlBoardMedicationPhotos } from "./animal-photos";
 import { syncTlBoardAdditionalServices } from "./additional-services";
@@ -168,6 +169,17 @@ export function buildOvernightDogsFromReservations(
   return overnight;
 }
 
+function normalizeStoredLodgingAreaKey(
+  key: TlLodgingAreaKey | null | undefined
+): TlOvernightLodgingArea | null {
+  if (!key) return null;
+  if (key === "dens") return "den";
+  if (key === "petite_suites") return "petite_suite";
+  if (key === "suites") return "suite";
+  if (key === "den" || key === "petite_suite" || key === "suite") return key;
+  return null;
+}
+
 /** Last-known animal ids when Gingr reservations are temporarily unavailable. */
 function overnightDogsFromPreviousSnapshot(
   previous: TlDigiBoardSnapshot | null,
@@ -207,7 +219,7 @@ function overnightDogsFromPreviousSnapshot(
       reservationId: med.gingrReservationId,
       reservationTypeName: null,
       photoUrl: med.photoUrl,
-      areaKey: med.lodgingAreaKey
+      areaKey: normalizeStoredLodgingAreaKey(med.lodgingAreaKey)
     });
   }
   for (const svc of previous.additionalServices) {
@@ -217,7 +229,7 @@ function overnightDogsFromPreviousSnapshot(
       reservationId: svc.gingrReservationId,
       reservationTypeName: null,
       photoUrl: svc.photoUrl,
-      areaKey: matchOvernightLodgingArea(svc.lodgingLabel, null, config)
+      areaKey: parseRunName(svc.lodgingLabel).areaKey
     });
   }
   return overnight;
