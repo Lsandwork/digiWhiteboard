@@ -147,15 +147,25 @@ export function resolveDogPhotoUrl(dog: LiveDog) {
   return extractPhotoUrl(animal, reservation, data, record, payload);
 }
 
-export function formatBoardTime(value: string | null | undefined) {
+/** Fitdog floor clocks are always Pacific — never the browser/TV locale. */
+export const FITDOG_BOARD_TIMEZONE = "America/Los_Angeles";
+
+export function formatBoardTime(value: string | Date | null | undefined) {
   if (!value) return "--";
-  return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(value));
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "--";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: FITDOG_BOARD_TIMEZONE,
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(date);
 }
 
 export function formatBoardDateTime(date: Date) {
   return {
-    time: new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(date),
-    date: new Intl.DateTimeFormat(undefined, {
+    time: formatBoardTime(date),
+    date: new Intl.DateTimeFormat("en-US", {
+      timeZone: FITDOG_BOARD_TIMEZONE,
       weekday: "long",
       month: "long",
       day: "numeric",
@@ -164,6 +174,22 @@ export function formatBoardDateTime(date: Date) {
       .format(date)
       .toUpperCase()
   };
+}
+
+/** Clock time only — null when the timestamp is missing or invalid. */
+export function formatBoardClock(value: string | Date | null | undefined) {
+  const clock = formatBoardTime(value);
+  return clock === "--" ? null : clock;
+}
+
+export function formatBoardCheckinClockLabel(value: string | Date | null | undefined) {
+  const clock = formatBoardClock(value);
+  return clock ? `Checked in ${clock}` : null;
+}
+
+export function formatBoardCheckoutClockLabel(value: string | Date | null | undefined) {
+  const clock = formatBoardClock(value);
+  return clock ? `Checking out ${clock}` : null;
 }
 
 function titleCase(value: string) {

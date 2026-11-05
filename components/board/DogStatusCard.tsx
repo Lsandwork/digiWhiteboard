@@ -3,7 +3,12 @@
 import clsx from "clsx";
 import { MapPin, X } from "lucide-react";
 import type { LiveDog } from "@/lib/types";
-import { getDogLocationLabel, getDogStatusLabel } from "@/lib/board-utils";
+import {
+  formatBoardCheckinClockLabel,
+  formatBoardCheckoutClockLabel,
+  getDogLocationLabel,
+  getDogStatusLabel
+} from "@/lib/board-utils";
 import { DogAvatar } from "@/components/board/DogAvatar";
 import { getCheckoutDisplayMs } from "@/lib/checkout-display";
 
@@ -38,6 +43,10 @@ export function DogStatusCard({
   const locationLabel = getDogLocationLabel(dog);
   const personLabel = mode === "in" ? "Owner" : "Pickup";
   const personName = dog.owner_name;
+  const eventClock =
+    mode === "in"
+      ? formatBoardCheckinClockLabel(dog.status_started_at ?? dog.updated_at)
+      : formatBoardCheckoutClockLabel(dog.status_started_at ?? dog.updated_at);
   const remainingMs = mode === "out" && displayUntil ? Math.max(0, displayUntil - nowMs) : 0;
   const progressPercent =
     mode === "out" && displayUntil ? Math.max(0, Math.min(100, (remainingMs / getCheckoutDisplayMs()) * 100)) : 0;
@@ -93,6 +102,16 @@ export function DogStatusCard({
           {personName ? (
             <p className={clsx("board-dog-meta mt-1 text-slate-400", isSolo && "board-dog-meta--solo")}>
               {personLabel}: <span className="text-slate-200">{personName}</span>
+            </p>
+          ) : null}
+          {eventClock ? (
+            <p className={clsx("board-dog-event-time mt-1 font-bold", isSolo && "text-lg sm:text-xl")}>
+              {eventClock}
+            </p>
+          ) : null}
+          {mode === "out" ? (
+            <p className={clsx("mt-1 font-black uppercase tracking-wide text-amber-200", isSolo ? "text-sm sm:text-base" : "text-[11px] sm:text-xs")}>
+              Put in checkout box
             </p>
           ) : null}
         </div>

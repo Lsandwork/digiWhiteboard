@@ -198,7 +198,7 @@ export const GINGR_ROUTE_ACTIVITIES: GingrRouteActivityMeta[] = [
     accent: "#334155",
     accentSoft: "#F1F5F9",
     accentText: "#1E293B",
-    aliases: ["taxi", "taxi service", "door to door"]
+    aliases: ["taxi", "taxi service", "door to door", "additional taxi", "am taxi", "pm taxi"]
   }
 ];
 

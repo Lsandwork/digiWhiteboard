@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useEffect, useMemo, useState } from "react";
+import { formatBoardClock } from "@/lib/board-utils";
 import { toDisplayPhotoUrl } from "@/lib/gingr-photo-display";
 import { lobbyLightAssets } from "@/lib/lobby/assets";
 import {
@@ -108,12 +109,15 @@ function SpotlightDogPanel({ dog, dual }: { dog: LobbyCheckoutDog; dual: boolean
       }),
     [dog.dog_name, dog.gingr_animal_id]
   );
+  const checkoutClock = formatBoardClock(dog.prompted_at);
 
   return (
     <article className={`lobby-spotlight-dog ${dual ? "lobby-spotlight-dog--dual" : ""}`}>
       <SpotlightDogPhoto dog={dog} large={!dual} />
       <div className="lobby-spotlight-dog__copy">
-        <p className="lobby-spotlight-dog__status">Checked Out!</p>
+        <p className="lobby-spotlight-dog__status">
+          {checkoutClock ? `Checked Out · ${checkoutClock}` : "Checked Out!"}
+        </p>
         <h2 className="lobby-spotlight-dog__name">{dog.dog_name}</h2>
         {dog.breed ? <p className="lobby-spotlight-dog__breed">{dog.breed}</p> : null}
 

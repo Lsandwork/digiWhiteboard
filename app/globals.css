@@ -121,6 +121,14 @@ body {
     0 0 26px rgba(255, 159, 28, 0.11);
 }
 
+.board-dog-event-time {
+  color: #fde68a;
+}
+
+.board-card-in .board-dog-event-time {
+  color: #93c5fd;
+}
+
 .board-panel-cards--solo {
   justify-content: stretch;
 }
@@ -12226,6 +12234,26 @@ html.chromecast-receiver img {
 .cast-lite-dog-card__meta {
   font-size: 0.8rem;
   color: rgba(255, 255, 255, 0.55);
+}
+
+.cast-lite-dog-card__time {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #93c5fd;
+}
+
+.cast-lite-dog-card--out .cast-lite-dog-card__time {
+  color: #fde68a;
+}
+
+.cast-lite-dog-card__checkout-cue {
+  margin: 0.15rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fde68a;
 }
 
 .cast-lite-banner {

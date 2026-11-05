@@ -17,6 +17,7 @@ import {
   sortGingrRouteActivities
 } from "../lib/gingr-route-generator/activities";
 import {
+  appointmentOptionLabel,
   classifyTransportationText,
   isInternalBoardingTaxiMarker
 } from "../lib/gingr-route-generator/transportation";
@@ -1928,6 +1929,113 @@ void (async () => {
     const comboDisplays = gingrTransportDisplays(combined);
     assert.ok(comboDisplays.some((d) => d.kind === "owner_club_dropoff"));
     assert.ok(comboDisplays.some((d) => d.kind === "owner_club_pickup"));
+  }
+
+  // Sport Sign Ups: before-outing pickup vs owner drop-off, after-outing drop-off, boarding note.
+  {
+    const sportDate = "2026-10-02";
+    assert.equal(classifyTransportationText("Before Outing | Fitdog to Pick Up @ Home"), "FITDOG_HOME_PICKUP");
+    assert.equal(classifyTransportationText("Before Outing | Owner Drop Off"), "OWNER_CLUB_DROPOFF");
+    assert.equal(classifyTransportationText("After Outing | Fitdog to Drop Off @ Home"), "FITDOG_HOME_DROPOFF");
+    assert.equal(classifyTransportationText("After Outing | Owner Pick Up"), "OWNER_CLUB_PICKUP");
+    assert.equal(classifyTransportationText("After Outing | Staff Drop Off After Hike"), "FITDOG_HOME_DROPOFF");
+    assert.equal(classifyTransportationText("Taxi Service"), "TAXI");
+    assert.equal(classifyTransportationText("Additional Taxi"), "TAXI");
+    assert.equal(
+      appointmentOptionLabel("Before Outing | Fitdog to Pick Up @ Home"),
+      "Before outing · Fitdog to Pick Up @ Home"
+    );
+    assert.equal(
+      appointmentOptionLabel("After Outing | Fitdog to Drop Off @ Home"),
+      "After outing · Fitdog to Drop Off @ Home"
+    );
+
+    const sportPickup = normalizeGingrRouteReservations(
+      [
+        reservation({
+          id: "sport-before-pickup",
+          animal_id: 9601,
+          a_name: "Scout",
+          type: "Sport Sign Ups",
+          services: [{ name: "Sport Sign Ups", scheduled_at: `${sportDate}T09:00:00-07:00` }],
+          addons: [
+            { name: "Before Outing | Fitdog to Pick Up @ Home" },
+            { name: "After Outing | Fitdog to Drop Off @ Home" }
+          ],
+          owner: ownerHome()
+        })
+      ],
+      sportDate
+    ).dogs[0]!;
+    assert.equal(sportPickup.pickup, true, "before outing pickup is a home van pickup");
+    assert.equal(sportPickup.dropoff, true, "after outing drop-off is a staff home drop-off");
+    assert.ok(sportPickup.appointmentOptions.some((label) => /before outing/i.test(label)));
+    assert.ok(sportPickup.appointmentOptions.some((label) => /after outing/i.test(label)));
+
+    const sportOwner = normalizeGingrRouteReservations(
+      [
+        reservation({
+          id: "sport-owner-board",
+          animal_id: 9602,
+          a_name: "Maple",
+          reservation_type: { type: "Overnight: Suite" },
+          check_in_date: "2026-09-28T10:00:00-07:00",
+          check_out_date: "2026-10-05T18:00:00-07:00",
+          type: "Sport Sign Ups",
+          services: [{ name: "Sport Sign Ups", scheduled_at: `${sportDate}T09:00:00-07:00` }],
+          addons: [
+            { name: "Before Outing | Owner Drop Off | Fitdog Club" },
+            { name: "After Outing | Owner Pick Up | Fitdog Club" },
+            { name: "Boarding @ Fitdog Club" }
+          ],
+          owner: ownerHome()
+        })
+      ],
+      sportDate
+    ).dogs[0]!;
+    assert.equal(sportOwner.ownerClubDropoff, true);
+    assert.equal(sportOwner.ownerClubPickup, true);
+    assert.ok(sportOwner.appointmentOptions.includes("Boarding @ Fitdog Club"));
+    assert.equal(sportOwner.pickup, false);
+    assert.equal(sportOwner.dropoff, false);
+
+    const taxiOnly = normalizeGingrRouteReservations(
+      [
+        reservation({
+          id: "taxi-standalone",
+          animal_id: 9603,
+          a_name: "Cabby",
+          type: "Taxi Service",
+          services: [{ name: "Taxi Service", scheduled_at: `${sportDate}T08:15:00-07:00` }],
+          owner: ownerHome()
+        })
+      ],
+      sportDate
+    ).dogs[0]!;
+    assert.equal(taxiOnly.isTaxi, true);
+    assert.ok(taxiOnly.activities.includes("taxi"));
+    assert.ok(taxiOnly.appointmentOptions.includes("Taxi Service"));
+    assert.equal(taxiOnly.pickup, true, "Gingr taxi is added to the route as a van pickup");
+
+    const taxiAddon = normalizeGingrRouteReservations(
+      [
+        reservation({
+          id: "sport-plus-taxi",
+          animal_id: 9604,
+          a_name: "Dash",
+          type: "Sport Sign Ups",
+          services: [{ name: "Sport Sign Ups", scheduled_at: `${sportDate}T09:00:00-07:00` }],
+          addons: [{ name: "Taxi Service" }, { name: "After Outing | Staff Drop Off After Hike" }],
+          owner: ownerHome()
+        })
+      ],
+      sportDate
+    ).dogs[0]!;
+    assert.equal(taxiAddon.isTaxi, true, "Gingr taxi addon is recognized on sport sign-ups");
+    assert.ok(taxiAddon.appointmentOptions.includes("Taxi Service"));
+    assert.equal(taxiAddon.pickup, true, "taxi addon is a van pickup");
+    assert.equal(taxiAddon.dropoff, true, "staff drop-off after hike is a home drop-off");
+    assert.ok(taxiAddon.appointmentOptions.some((label) => /after outing|drop off/i.test(label)));
   }
 
   // Class with no Gingr transport data must not invent an owner pick-up badge.

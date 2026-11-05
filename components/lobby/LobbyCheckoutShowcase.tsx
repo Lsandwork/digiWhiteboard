@@ -2,6 +2,7 @@
 
 import { memo, useState } from "react";
 import { getLobbyCheckoutMergeKey } from "@/lib/lobby-display-stable";
+import { formatBoardClock } from "@/lib/board-utils";
 import { toDisplayPhotoUrl } from "@/lib/gingr-photo-display";
 import type { LobbyCheckoutDog } from "@/lib/lobby/types";
 
@@ -20,6 +21,14 @@ function CheckoutDogPortrait({ dog, featured }: { dog: LobbyCheckoutDog; feature
   const [photoFailed, setPhotoFailed] = useState(false);
   const displayUrl = toDisplayPhotoUrl(realPhotoUrl(dog.dog_photo_url), dog.gingr_animal_id);
   const showPhoto = Boolean(displayUrl) && !photoFailed;
+  const checkoutClock = formatBoardClock(dog.prompted_at);
+  const statusText = featured
+    ? checkoutClock
+      ? `Checking out now · ${checkoutClock}`
+      : "Checking out now"
+    : checkoutClock
+      ? `Checking out · ${checkoutClock}`
+      : "Checking out";
   const detail = [dog.breed, dog.checkout_status].filter(Boolean).join(" • ");
 
   return (
@@ -51,7 +60,7 @@ function CheckoutDogPortrait({ dog, featured }: { dog: LobbyCheckoutDog; feature
         )}
       </div>
       <div className="lobby-checkout-dog__meta">
-        <p className="lobby-checkout-dog__status">{featured ? "Checking out now" : "Checking out"}</p>
+        <p className="lobby-checkout-dog__status">{statusText}</p>
         <h2 className="lobby-checkout-dog__name" title={dog.dog_name}>
           {dog.dog_name}
         </h2>

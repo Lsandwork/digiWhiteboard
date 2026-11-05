@@ -10,9 +10,9 @@ export function getCheckoutDisplayMinutes() {
   const raw =
     process.env.CHECKOUT_DISPLAY_MINUTES ??
     process.env.NEXT_PUBLIC_CHECKOUT_DISPLAY_MINUTES ??
-    "5";
+    "10";
   const parsed = Number.parseInt(raw, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 5) : 5;
+  return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 15) : 10;
 }
 
 export function getCheckoutDisplayMs() {
@@ -36,25 +36,17 @@ export function getStableCheckoutKey(dog: LiveDog) {
 
 export function getCheckoutDisplayUntilAt(dog: LiveDog, firstSeenAt?: number, now = new Date()) {
   const nowMs = now.getTime();
+  const candidates: number[] = [];
+  const windowMs = getCheckoutDisplayMs();
   const anchor = getCheckoutAnchorAt(dog);
-  const anchorUntil = anchor ? anchor.getTime() + getCheckoutDisplayMs() : null;
-
+  if (anchor) candidates.push(anchor.getTime() + windowMs);
   if (dog.display_until && dog.display_status === "checking_out") {
     const untilMs = new Date(dog.display_until).getTime();
-    if (untilMs > nowMs) {
-      return new Date(anchorUntil ? Math.min(untilMs, anchorUntil) : untilMs);
-    }
+    if (untilMs > nowMs) candidates.push(untilMs);
   }
-
-  if (anchorUntil) {
-    return new Date(anchorUntil);
-  }
-
-  if (firstSeenAt) {
-    return new Date(firstSeenAt + getCheckoutDisplayMs());
-  }
-
-  return null;
+  if (firstSeenAt) candidates.push(firstSeenAt + windowMs);
+  if (!candidates.length) return null;
+  return new Date(Math.max(...candidates));
 }
 
 export function shouldExpireCheckoutDog(dog: LiveDog, now = new Date(), firstSeenAt?: number) {

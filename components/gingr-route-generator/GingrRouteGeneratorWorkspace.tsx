@@ -66,6 +66,19 @@ function formatUpdatedTime(iso: string | null) {
   return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
+function appointmentOptionChipClass(option: string) {
+  const token = option.toLowerCase();
+  if (token.includes("board")) return "grg-option-chip--boarding";
+  if (token.includes("taxi")) return "grg-option-chip--taxi";
+  if (token.includes("before outing") || token.includes("pick up @ home") || token.includes("fitdog to pick")) {
+    return "grg-option-chip--before";
+  }
+  if (token.includes("after outing") || token.includes("drop off @ home") || token.includes("fitdog to drop")) {
+    return "grg-option-chip--after";
+  }
+  return "grg-option-chip--club";
+}
+
 function visibleClassActivities(dog: GingrRouteDog): GingrRouteActivityId[] {
   const classIds = dog.activities.filter((id) => GINGR_ROUTE_ACTIVITY_BY_ID[id]?.category === "class");
   return classIds.length ? classIds : dog.activities.filter((id) => id !== "club");
@@ -93,11 +106,15 @@ const DogRow = memo(function DogRow({ dog }: { dog: GingrRouteDog }) {
         ))}
       </div>
       <div className="grg-dog-transport">
-        {dog.appointmentOptions?.length ? (
-          <span className="grg-transport-badge-text" title="Gingr appointment options">
-            {dog.appointmentOptions.join(", ")}
+        {dog.appointmentOptions?.map((option) => (
+          <span
+            key={option}
+            className={`grg-option-chip ${appointmentOptionChipClass(option)}`}
+            title="Gingr appointment option"
+          >
+            {option}
           </span>
-        ) : null}
+        ))}
         {displays.map((display) => (
           <span key={display.kind} className={`grg-transport-badge ${display.className}`} title={display.title}>
             <strong>{display.strong}</strong>

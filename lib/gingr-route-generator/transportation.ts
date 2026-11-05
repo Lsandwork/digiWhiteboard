@@ -160,9 +160,18 @@ function isCanonicalTravelAddonPart(raw: unknown): boolean {
   const token = normalizeToken(raw);
   if (!token) return false;
   const classified = classifyTransportationText(raw);
+  if (classified === "UNKNOWN") return false;
+
   const atClub = /\bfitdog club\b/.test(token) || /\bat (the )?club\b/.test(token);
   const hasOwner = /\bowners?\b/.test(token);
   const hasFitdogHome = /\bfitdog to\b/.test(token) && /\bhome\b/.test(token);
+  const outingTiming =
+    /\bbefore (the )?outing\b/.test(token) ||
+    /\bafter (the )?outing\b/.test(token) ||
+    /\bafter (the )?(hike|beach|excursion)\b/.test(token);
+
+  // Gingr taxi service — standalone or as an addon — is a van job.
+  if (classified === "TAXI") return true;
   if (hasFitdogHome && (classified === "FITDOG_HOME_PICKUP" || classified === "FITDOG_HOME_DROPOFF")) {
     return true;
   }
@@ -170,6 +179,9 @@ function isCanonicalTravelAddonPart(raw: unknown): boolean {
     return true;
   }
   if (classified === "BOARDING_CLUB" || (/\bboarding\b/.test(token) && atClub)) return true;
+  // Sport / outing appointment options: Before outing pickup vs owner drop-off,
+  // After outing staff drop-off vs owner pickup.
+  if (outingTiming) return true;
   return false;
 }
 
@@ -319,19 +331,29 @@ const APPOINTMENT_OPTION_LABEL: Partial<Record<GingrTransportationType, string>>
   TAXI: "Taxi Service"
 };
 
+function outingTimingPrefix(token: string): string {
+  if (/\bbefore (the )?outing\b/.test(token)) return "Before outing · ";
+  if (/\bafter (the )?outing\b/.test(token)) return "After outing · ";
+  return "";
+}
+
 /** Human-readable Gingr appointment option label for UI (canonical when recognized). */
 export function appointmentOptionLabel(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
   for (const part of splitAppointmentOptionParts(trimmed)) {
-    const type = classifyTransportToken(normalizeToken(part));
+    const token = normalizeToken(part);
+    const type = classifyTransportToken(token);
     if (type !== "UNKNOWN" && APPOINTMENT_OPTION_LABEL[type]) {
-      return APPOINTMENT_OPTION_LABEL[type]!;
+      return `${outingTimingPrefix(token)}${APPOINTMENT_OPTION_LABEL[type]!}`;
     }
   }
-  const type = classifyTransportToken(normalizeToken(trimmed));
-  if (type !== "UNKNOWN" && APPOINTMENT_OPTION_LABEL[type]) return APPOINTMENT_OPTION_LABEL[type]!;
-  if (looksLikeTransportToken(normalizeToken(trimmed))) return trimmed;
+  const token = normalizeToken(trimmed);
+  const type = classifyTransportToken(token);
+  if (type !== "UNKNOWN" && APPOINTMENT_OPTION_LABEL[type]) {
+    return `${outingTimingPrefix(token)}${APPOINTMENT_OPTION_LABEL[type]!}`;
+  }
+  if (looksLikeTransportToken(token)) return trimmed;
   return null;
 }
 
@@ -345,7 +367,9 @@ function mergeFlagsFromOptionText(flags: TransportationFlags, raw: string): Tran
 }
 
 function classifyTransportToken(token: string): GingrTransportationType {
-  const atHome = /\bat home\b/.test(token);
+  const atHome =
+    /\bat home\b/.test(token) ||
+    (/\bhome\b/.test(token) && /\bfitdog to (pick up|drop off)\b/.test(token));
   const atClub =
     /\bfitdog club\b/.test(token) ||
     /\bat (the )?club\b/.test(token) ||
@@ -357,6 +381,26 @@ function classifyTransportToken(token: string): GingrTransportationType {
     /\btaxi\b/.test(token) ||
     /\bdoor to door\b/.test(token) ||
     (/\btransport\b/.test(token) && !hasOwner && !hasPickup && !hasDropoff);
+  const beforeOuting = /\bbefore (the )?outing\b/.test(token);
+  const afterOuting =
+    /\bafter (the )?outing\b/.test(token) ||
+    /\bafter (the )?(hike|beach|excursion)\b/.test(token);
+
+  // Sport / outing appointment options: before = arrive, after = leave.
+  if (beforeOuting) {
+    if (hasOwner || (hasDropoff && !hasPickup && !/\bfitdog to\b/.test(token))) {
+      return "OWNER_CLUB_DROPOFF";
+    }
+    if (hasPickup || /\bfitdog to pick\b/.test(token)) return "FITDOG_HOME_PICKUP";
+  }
+  if (afterOuting) {
+    if (hasOwner || (hasPickup && !hasDropoff && !/\bfitdog to\b/.test(token))) {
+      return "OWNER_CLUB_PICKUP";
+    }
+    if (hasDropoff || /\bfitdog to drop\b/.test(token) || /\bstaff\b/.test(token)) {
+      return "FITDOG_HOME_DROPOFF";
+    }
+  }
 
   // Canonical Gingr addons (staff-updated names).
   if (/\bfitdog to pick up at home\b/.test(token) || (/\bfitdog to pick up\b/.test(token) && atHome)) {
@@ -587,6 +631,12 @@ export function collectReservationAppointmentOptions(
       const label = appointmentOptionLabel(part);
       if (label) labels.add(label);
     }
+  }
+  if (occupancy.isOvernight) labels.add("Boarding @ Fitdog Club");
+  const typeName = reservationTypeLabel(reservation);
+  if (isTaxiTypeName(typeName) && !occupancy.alreadyOnProperty) labels.add("Taxi Service");
+  for (const row of listServiceLikeRows(reservation)) {
+    if (isTaxiRowForRouteDate(row, routeDate, occupancy)) labels.add("Taxi Service");
   }
   return Array.from(labels);
 }

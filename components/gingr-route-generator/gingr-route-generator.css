@@ -1047,6 +1047,51 @@
 }
 
 
+.grg-option-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 16rem;
+  padding: 0.18rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+
+.grg-option-chip--before {
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+  color: #047857;
+}
+
+.grg-option-chip--after {
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #c2410c;
+}
+
+.grg-option-chip--boarding {
+  background: #eef2ff;
+  border-color: #a5b4fc;
+  color: #3730a3;
+}
+
+.grg-option-chip--taxi {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.grg-option-chip--club {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
 .grg-transport-badge-text {
   display: inline-flex;
   flex-direction: column;

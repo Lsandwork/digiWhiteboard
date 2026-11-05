@@ -2,6 +2,7 @@
 
 import { memo, useState } from "react";
 import { Dog } from "lucide-react";
+import { formatBoardCheckinClockLabel, formatBoardCheckoutClockLabel } from "@/lib/board-utils";
 import { toDisplayPhotoUrl } from "@/lib/gingr-photo-display";
 import type { CastLiteDog } from "@/lib/whiteboard/state";
 
@@ -16,6 +17,10 @@ export const CastLiteDogCard = memo(function CastLiteDogCard({ dog, mode, lowMot
   const photoUrl = toDisplayPhotoUrl(dog.photo_url, dog.gingr_animal_id);
   const initial = dog.animal_name?.trim().charAt(0).toUpperCase() ?? "";
   const personLabel = mode === "in" ? "Owner" : "Pickup";
+  const eventClock =
+    mode === "in"
+      ? formatBoardCheckinClockLabel(dog.status_started_at)
+      : formatBoardCheckoutClockLabel(dog.status_started_at);
 
   return (
     <article
@@ -45,6 +50,8 @@ export const CastLiteDogCard = memo(function CastLiteDogCard({ dog, mode, lowMot
         <p className="cast-lite-dog-card__meta">
           {personLabel}: {dog.owner_name ?? "—"}
         </p>
+        {eventClock ? <p className="cast-lite-dog-card__time">{eventClock}</p> : null}
+        {mode === "out" ? <p className="cast-lite-dog-card__checkout-cue">Put in checkout box</p> : null}
         {dog.room ? <p className="cast-lite-dog-card__room">{dog.room}</p> : null}
       </div>
     </article>
