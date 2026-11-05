@@ -1,6 +1,6 @@
-import { fetchCurrentlyCheckedInDogsRobust, todayInLosAngeles } from "@/lib/gingr-checked-in-dogs";
+import { todayInLosAngeles } from "@/lib/gingr-checked-in-dogs";
 import { fetchGingrBackOfHouse, type GingrBackOfHouseRecord } from "@/lib/gingr-board-sync";
-import { createGingrClient, normalizeGingrReservationList } from "@/lib/integrations/gingr/client";
+import type { GingrReservation } from "@/lib/integrations/gingr/types";
 import { buildTlBoardMedicationRows, buildTlBoardSyncMeta, rehydrateTlBoardSnapshot } from "./board-state";
 import {
   DEFAULT_TL_DIGI_BOARD_CONFIG,
@@ -8,8 +8,8 @@ import {
   type TlOvernightLodgingArea
 } from "./config";
 import { TL_GINGR_MEDICATION_SYNC_INTERVAL_MS, TL_GINGR_SYNC_BUDGET_MS } from "./constants";
-import { requireTlGingrApiKey, tlGingrClientConfig } from "./gingr-auth";
-import { fetchTlGingrResponse } from "./gingr-http";
+import { loadTlBoardReservationsForAdditionalServices } from "./gingr-reservation-services";
+import { requireTlGingrApiKey } from "./gingr-auth";
 import {
   fetchGingrMedicationInfo,
   resolveGingrMedicationInfo
@@ -60,9 +60,9 @@ type LodgingInfo = {
 let lastSyncAt = 0;
 let inFlightSync: Promise<TlDigiBoardSnapshot> | null = null;
 
-const MEDICATION_FETCH_CONCURRENCY = 3;
-const MEDICATION_FETCH_DELAY_MS = 80;
-const CHECKED_IN_FALLBACK_TIMEOUT_MS = 10_000;
+const MEDICATION_FETCH_CONCURRENCY = 4;
+const MEDICATION_FETCH_DELAY_MS = 50;
+const TL_RESERVATIONS_LOAD_RETRIES = 2;
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -80,20 +80,6 @@ function pickString(...values: unknown[]): string | null {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function withTimeout<T>(work: Promise<T>, timeoutMs: number, label: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      work,
-      new Promise<T>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
-      })
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
 }
 
 async function mapPool<T, R>(items: T[], concurrency: number, mapper: (item: T, index: number) => Promise<R>): Promise<R[]> {
@@ -155,91 +141,99 @@ function mapReservationWithType(row: unknown): {
   };
 }
 
-/**
- * Load checked-in overnight dogs. Prefers reservations payload (type id + name),
- * falls back to fetchCurrentlyCheckedInDogsRobust name-only matching.
- */
-async function loadOvernightCheckedInDogs(config: TlDigiBoardConfig): Promise<OvernightDog[]> {
-  const apiKey = requireTlGingrApiKey();
-  const { subdomain, locationId } = tlGingrClientConfig();
-  const client = createGingrClient({ apiKey, subdomain, locationId });
+/** Map merged checked-in reservations to overnight lodging dogs (shared with additional-services pull). */
+export function buildOvernightDogsFromReservations(
+  reservations: GingrReservation[],
+  config: TlDigiBoardConfig
+): OvernightDog[] {
   const overnight: OvernightDog[] = [];
   const seen = new Set<string>();
-
-  if (client.config.apiKey) {
-    try {
-      const body = new URLSearchParams({
-        key: client.config.apiKey,
-        location_id: client.config.locationId,
-        checked_in: "true"
-      });
-      const response = await fetchTlGingrResponse(
-        `${client.config.baseUrl}/api/v1/reservations`,
-        {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/x-www-form-urlencoded; charset=utf-8"
-          },
-          body,
-          cache: "no-store"
-        },
-        "Gingr overnight reservations"
-      );
-      if (!response.ok) {
-        const text = await response.text().catch(() => "");
-        throw new Error(`Gingr reservations ${response.status}: ${text.slice(0, 180) || response.statusText}`);
-      }
-      const rows = normalizeGingrReservationList(await response.json());
-      for (const row of rows) {
-        const mapped = mapReservationWithType(row);
-        if (!mapped) continue;
-        const areaKey = matchOvernightLodgingArea(
-          mapped.reservationTypeName,
-          mapped.reservationTypeId,
-          config
-        );
-        if (!areaKey || !isApprovedOvernightLodging(areaKey, config)) continue;
-        if (seen.has(mapped.animalId)) continue;
-        seen.add(mapped.animalId);
-        overnight.push({
-          animalId: mapped.animalId,
-          dogName: mapped.dogName,
-          reservationId: mapped.reservationId,
-          reservationTypeId: mapped.reservationTypeId,
-          reservationTypeName: mapped.reservationTypeName,
-          photoUrl: mapped.photoUrl,
-          overnightAreaKey: areaKey
-        });
-      }
-      if (overnight.length) return overnight;
-    } catch {
-      // Timed-out or failed TL reservations still fall through to the bounded
-      // GINGR_API_KEY checked-in helper so a hung dedicated key cannot blank Last sync forever.
-    }
-  }
-
-  const { dogs } = await withTimeout(
-    fetchCurrentlyCheckedInDogsRobust({ force: true }),
-    CHECKED_IN_FALLBACK_TIMEOUT_MS,
-    "Gingr checked-in fallback"
-  );
-  for (const dog of dogs) {
-    const areaKey = matchOvernightLodgingArea(dog.reservationType ?? null, null, config);
+  for (const row of reservations) {
+    const mapped = mapReservationWithType(row);
+    if (!mapped) continue;
+    const areaKey = matchOvernightLodgingArea(mapped.reservationTypeName, mapped.reservationTypeId, config);
     if (!areaKey || !isApprovedOvernightLodging(areaKey, config)) continue;
-    if (seen.has(dog.animalId)) continue;
-    seen.add(dog.animalId);
+    if (seen.has(mapped.animalId)) continue;
+    seen.add(mapped.animalId);
     overnight.push({
-      animalId: dog.animalId,
-      dogName: dog.dogName,
-      reservationId: dog.reservationId,
-      reservationTypeId: null,
-      reservationTypeName: dog.reservationType ?? null,
-      photoUrl: dog.photoUrl ?? null,
+      animalId: mapped.animalId,
+      dogName: mapped.dogName,
+      reservationId: mapped.reservationId,
+      reservationTypeId: mapped.reservationTypeId,
+      reservationTypeName: mapped.reservationTypeName,
+      photoUrl: mapped.photoUrl,
       overnightAreaKey: areaKey
     });
   }
   return overnight;
+}
+
+/** Last-known animal ids when Gingr reservations are temporarily unavailable. */
+function overnightDogsFromPreviousSnapshot(
+  previous: TlDigiBoardSnapshot | null,
+  config: TlDigiBoardConfig
+): OvernightDog[] {
+  if (!previous) return [];
+  const overnight: OvernightDog[] = [];
+  const seen = new Set<string>();
+
+  const push = (input: {
+    animalId: string;
+    dogName: string;
+    reservationId: string | null;
+    reservationTypeName: string | null;
+    photoUrl: string | null;
+    areaKey: TlOvernightLodgingArea | null;
+  }) => {
+    const areaKey = input.areaKey;
+    if (!areaKey || !isApprovedOvernightLodging(areaKey, config)) return;
+    if (seen.has(input.animalId)) return;
+    seen.add(input.animalId);
+    overnight.push({
+      animalId: input.animalId,
+      dogName: input.dogName,
+      reservationId: input.reservationId,
+      reservationTypeId: null,
+      reservationTypeName: input.reservationTypeName,
+      photoUrl: input.photoUrl,
+      overnightAreaKey: areaKey
+    });
+  };
+
+  for (const med of previous.medications) {
+    push({
+      animalId: med.gingrAnimalId,
+      dogName: med.dogName,
+      reservationId: med.gingrReservationId,
+      reservationTypeName: null,
+      photoUrl: med.photoUrl,
+      areaKey: med.lodgingAreaKey
+    });
+  }
+  for (const svc of previous.additionalServices) {
+    push({
+      animalId: svc.gingrAnimalId,
+      dogName: svc.dogName,
+      reservationId: svc.gingrReservationId,
+      reservationTypeName: null,
+      photoUrl: svc.photoUrl,
+      areaKey: matchOvernightLodgingArea(svc.lodgingLabel, null, config)
+    });
+  }
+  return overnight;
+}
+
+async function loadTlBoardReservationBundle(now: Date) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < TL_RESERVATIONS_LOAD_RETRIES; attempt += 1) {
+    try {
+      return await loadTlBoardReservationsForAdditionalServices(now);
+    } catch (error) {
+      lastError = error;
+      if (attempt + 1 < TL_RESERVATIONS_LOAD_RETRIES) await sleep(400);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Gingr reservations failed.");
 }
 
 function lodgingFromBackOfHouseRecord(record: GingrBackOfHouseRecord): LodgingInfo {
@@ -503,9 +497,27 @@ async function runTlDigiBoardSync(
   const attemptedAt = now.toISOString();
 
   try {
-    const [overnightDogs, additionalServicesResult, packageGroupWalksResult] = await Promise.all([
-      loadOvernightCheckedInDogs(config),
-      syncTlBoardAdditionalServices({ config, now }).catch((error) => ({
+    let reservationBundle: Awaited<ReturnType<typeof loadTlBoardReservationsForAdditionalServices>> | null = null;
+    let reservationsLoadError: string | null = null;
+    try {
+      reservationBundle = await loadTlBoardReservationBundle(now);
+    } catch (error) {
+      reservationsLoadError = error instanceof Error ? error.message : "Gingr reservations failed.";
+    }
+
+    const overnightDogs = reservationBundle
+      ? buildOvernightDogsFromReservations(reservationBundle.reservations, config)
+      : overnightDogsFromPreviousSnapshot(previous, config);
+
+    if (reservationsLoadError && !overnightDogs.length) {
+      throw new Error(reservationsLoadError);
+    }
+
+    const [additionalServicesResult, packageGroupWalksResult] = await Promise.all([
+      (reservationBundle
+        ? syncTlBoardAdditionalServices({ config, now, preloaded: reservationBundle })
+        : Promise.reject(new Error(reservationsLoadError ?? "Gingr reservations unavailable."))
+      ).catch((error) => ({
         services: previous?.additionalServices ?? [],
         summary: previous?.servicesSummary ?? {
           due: 0,
@@ -632,7 +644,11 @@ async function runTlDigiBoardSync(
       throw new Error(medErrors[0] || "All medication_info requests failed.");
     }
 
-    const lastErrorParts = [...medErrors.slice(0, 2), ...historyWarnings.slice(0, 1)];
+    const lastErrorParts = [
+      ...(reservationsLoadError ? [reservationsLoadError] : []),
+      ...medErrors.slice(0, 2),
+      ...historyWarnings.slice(0, 1)
+    ];
     const additionalServices = additionalServicesResult.services;
     const servicesSummary = additionalServicesResult.summary;
     const servicesCompletionStatusAvailable = additionalServicesResult.completionStatusAvailable;
@@ -650,7 +666,9 @@ async function runTlDigiBoardSync(
       lastErrorParts.push(packageGroupWalksResult.error);
     }
     const lastError = lastErrorParts.length ? lastErrorParts.join("; ") : null;
-    const medicationsHealth = "ok" as const;
+    const medicationsHealth: import("./types").TlGingrSourceHealth = reservationsLoadError
+      ? "stale"
+      : "ok";
     const servicesHealth = additionalServicesError
       ? previous?.additionalServices?.length
         ? ("stale" as const)
@@ -664,23 +682,29 @@ async function runTlDigiBoardSync(
 
     const medicationsWithPhotos = await enrichTlBoardMedicationPhotos(medications);
 
+    const syncSucceeded = !reservationsLoadError;
+    const lastSuccessfulSyncAt = syncSucceeded
+      ? attemptedAt
+      : previous?.meta.lastSuccessfulSyncAt ?? attemptedAt;
+
     const built = buildTlBoardMedicationRows({
       medications: medicationsWithPhotos,
       now,
-      lastSuccessfulSyncAt: attemptedAt,
+      lastSuccessfulSyncAt,
       lastAttemptAt: attemptedAt,
       lastError,
-      syncSucceeded: true,
-      administrationStatusAvailable
+      syncSucceeded,
+      administrationStatusAvailable,
+      medicationsHealth
     });
     const meta = buildTlBoardSyncMeta(
       {
         medications: medicationsWithPhotos,
         now,
-        lastSuccessfulSyncAt: attemptedAt,
+        lastSuccessfulSyncAt,
         lastAttemptAt: attemptedAt,
         lastError,
-        syncSucceeded: true,
+        syncSucceeded,
         administrationStatusAvailable,
         servicesCompletionStatusAvailable,
         servicesCompletionAudit,
@@ -694,9 +718,11 @@ async function runTlDigiBoardSync(
     );
 
     logTlGingrSyncEvent(
-      previous && previous.meta.medicationsHealth !== "ok"
+      syncSucceeded && previous && previous.meta.medicationsHealth !== "ok"
         ? "GINGR_SYNC_RECOVERED"
-        : "GINGR_SYNC_SUCCESS",
+        : syncSucceeded
+          ? "GINGR_SYNC_SUCCESS"
+          : "GINGR_DATA_STALE",
       {
         medicationCount: medicationsWithPhotos.length,
         servicesCount: additionalServices.length,

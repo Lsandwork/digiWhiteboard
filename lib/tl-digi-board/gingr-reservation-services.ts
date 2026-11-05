@@ -23,6 +23,7 @@
 import { todayInLosAngeles } from "@/lib/gingr-checked-in-dogs";
 import { createGingrClient, normalizeGingrReservationList } from "@/lib/integrations/gingr/client";
 import type { GingrReservation } from "@/lib/integrations/gingr/types";
+import { TL_GINGR_RESERVATIONS_TIMEOUT_MS } from "./constants";
 import { requireTlGingrApiKey, tlGingrClientConfig } from "./gingr-auth";
 import { fetchTlGingrResponse } from "./gingr-http";
 import {
@@ -84,7 +85,8 @@ async function postReservations(fields: Record<string, string>): Promise<GingrRe
       body,
       cache: "no-store"
     },
-    "Gingr reservations"
+    "Gingr reservations",
+    TL_GINGR_RESERVATIONS_TIMEOUT_MS
   );
   if (!response.ok) {
     const text = await response.text().catch(() => "");

@@ -65,6 +65,9 @@ export const TL_GINGR_SYNC_STALE_MS = 120_000;
 /** Per Gingr HTTP call — never wait unbounded. Do not put the request URL (it contains the API key) in errors. */
 export const TL_GINGR_FETCH_TIMEOUT_MS = 8_000;
 
+/** Reservations payloads can be large; allow extra headroom vs medication_info calls. */
+export const TL_GINGR_RESERVATIONS_TIMEOUT_MS = 18_000;
+
 /**
  * Hard cap for one TL Gingr sync attempt. Cron and background `after()` must not hang
  * until the Vercel maxDuration. Last-known-good is returned; the in-flight work may

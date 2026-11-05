@@ -279,7 +279,7 @@ assert.match(liveFleetCron, /ensureLiveFleetSchemaCached/);
 
 const tlCron = readFileSync("app/api/cron/tl-digi-board-sync/route.ts", "utf8");
 assert.match(tlCron, /SCHEMA_RECHECK_MS/);
-assert.match(tlCron, /maxDuration = 25/);
+assert.match(tlCron, /maxDuration = 60/);
 
 const snapshotSource = readFileSync("lib/ops-command-center/snapshot.ts", "utf8");
 assert.match(snapshotSource, /loadLatestGingrWebhookEvent/);

@@ -151,6 +151,8 @@ export function buildTlAdditionalServicesSummary(input: {
 export async function syncTlBoardAdditionalServices(options: {
   config: TlDigiBoardConfig;
   now?: Date;
+  /** When TL sync already loaded reservations, reuse them instead of duplicate Gingr pulls. */
+  preloaded?: { date: string; reservations: import("@/lib/integrations/gingr/types").GingrReservation[] };
 }): Promise<{
   services: TlBoardAdditionalServiceRow[];
   summary: TlAdditionalServicesSummary;
@@ -158,7 +160,9 @@ export async function syncTlBoardAdditionalServices(options: {
   audit: TlAdditionalServicesCompletionAudit;
 }> {
   const now = options.now ?? new Date();
-  const { date, reservations } = await loadTlBoardReservationsForAdditionalServices(now);
+  const { date, reservations } = options.preloaded
+    ? options.preloaded
+    : await loadTlBoardReservationsForAdditionalServices(now);
   const audit = auditTlAdditionalServicesFromReservations(reservations, date, now);
 
   let completedHiddenCount = 0;

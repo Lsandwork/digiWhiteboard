@@ -5,7 +5,7 @@ import { getServiceSupabase } from "@/lib/supabase/server";
 import { getTlDigiBoardSnapshot } from "@/lib/tl-digi-board/server";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 25;
+export const maxDuration = 60;
 
 const SCHEMA_RECHECK_MS = 30 * 60 * 1000;
 let lastChecklistSchemaAt = 0;
