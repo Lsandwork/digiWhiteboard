@@ -305,9 +305,10 @@ export async function POST(request: Request) {
       }
 
       const description = String(body.description ?? "").trim();
+      const category = body.category != null ? String(body.category) : null;
       const report = action === "create_groomer_complaint"
-        ? await createGroomerComplaintReport(supabase, description, actor, actorDisplayName)
-        : await createGroomerRequestReport(supabase, description, actor, actorDisplayName);
+        ? await createGroomerComplaintReport(supabase, description, actor, actorDisplayName, category)
+        : await createGroomerRequestReport(supabase, description, actor, actorDisplayName, category);
 
       await dispatchStaffOpsNotificationEvent(supabase, {
         eventType: "auto_issue",
@@ -340,9 +341,10 @@ export async function POST(request: Request) {
       }
 
       const description = String(body.description ?? "").trim();
+      const category = body.category != null ? String(body.category) : null;
       const report = action === "create_trainer_complaint"
-        ? await createTrainerComplaintReport(supabase, description, actor, actorDisplayName)
-        : await createTrainerRequestReport(supabase, description, actor, actorDisplayName);
+        ? await createTrainerComplaintReport(supabase, description, actor, actorDisplayName, category)
+        : await createTrainerRequestReport(supabase, description, actor, actorDisplayName, category);
 
       await dispatchStaffOpsNotificationEvent(supabase, {
         eventType: "auto_issue",
@@ -375,7 +377,8 @@ export async function POST(request: Request) {
       }
 
       const description = String(body.description ?? "").trim();
-      const report = await createTeamLeadRequestReport(supabase, description, actor, actorDisplayName);
+      const category = body.category != null ? String(body.category) : null;
+      const report = await createTeamLeadRequestReport(supabase, description, actor, actorDisplayName, category);
 
       await dispatchStaffOpsNotificationEvent(supabase, {
         eventType: "auto_issue",

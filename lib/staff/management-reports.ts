@@ -6,6 +6,7 @@ import { normalizeHtmlDateValue, pacificHtmlDate } from "@/lib/dates/html-date";
 import type { OwnerComplaintCategory } from "@/lib/staff/push-notices";
 import { getOwnerComplaintCategoryLabel } from "@/lib/staff/push-notices";
 import { sendSuperAdminSmsAlertFireAndForget } from "@/lib/staff/super-admin-sms";
+import { normalizeSupportCategory, titleForNewSubmission } from "@/lib/staff/support-case-display";
 
 export type ManagementReportStatus = "Open" | "Needs Review" | "Reviewed" | "Closed";
 
@@ -369,20 +370,22 @@ async function createGroomerSubmissionReport(
   supabase: SupabaseClient,
   input: {
     reportType: "groomer_complaint" | "groomer_request";
-    title: string;
     description: string;
     actor: string | null;
     submittedByName?: string | null;
+    category?: string | null;
   }
 ): Promise<ManagementReport> {
   const description = trimField(input.description, MAX_FIELD_LENGTH);
   if (!description) throw new Error("Please enter details before submitting.");
+  const kind = input.reportType.endsWith("_request") ? "request" : "complaint";
+  const category = normalizeSupportCategory(input.category, kind);
 
   const now = new Date().toISOString();
   const report: ManagementReport = {
     id: newId(),
     report_type: input.reportType,
-    title: input.title,
+    title: titleForNewSubmission({ reportType: input.reportType, category }),
     dog_handler_name: null,
     complaint_category: null,
     employee_name: null,
@@ -399,26 +402,31 @@ async function createGroomerSubmissionReport(
     created_by: input.actor,
     submitted_by_name: trimField(input.submittedByName, 120) || null,
     created_at: now,
-    updated_at: now
+    updated_at: now,
+    category,
+    item_type: kind,
+    department: departmentForReportType(input.reportType)
   };
 
   const state = await loadState(supabase);
-  await saveState(supabase, { reports: sortNewest([report, ...state.reports]) });
-  return report;
+  const saved = normalizeReport(report);
+  await saveState(supabase, { reports: sortNewest([saved, ...state.reports]) });
+  return saved;
 }
 
 export async function createGroomerComplaintReport(
   supabase: SupabaseClient,
   description: string,
   actor: string | null,
-  submittedByName?: string | null
+  submittedByName?: string | null,
+  category?: string | null
 ) {
   return createGroomerSubmissionReport(supabase, {
     reportType: "groomer_complaint",
-    title: "Groomer Complaint",
     description,
     actor,
-    submittedByName
+    submittedByName,
+    category
   });
 }
 
@@ -426,14 +434,15 @@ export async function createGroomerRequestReport(
   supabase: SupabaseClient,
   description: string,
   actor: string | null,
-  submittedByName?: string | null
+  submittedByName?: string | null,
+  category?: string | null
 ) {
   return createGroomerSubmissionReport(supabase, {
     reportType: "groomer_request",
-    title: "Groomer Request",
     description,
     actor,
-    submittedByName
+    submittedByName,
+    category
   });
 }
 
@@ -441,20 +450,22 @@ async function createTrainerSubmissionReport(
   supabase: SupabaseClient,
   input: {
     reportType: "trainer_complaint" | "trainer_request";
-    title: string;
     description: string;
     actor: string | null;
     submittedByName?: string | null;
+    category?: string | null;
   }
 ): Promise<ManagementReport> {
   const description = trimField(input.description, MAX_FIELD_LENGTH);
   if (!description) throw new Error("Please enter details before submitting.");
+  const kind = input.reportType.endsWith("_request") ? "request" : "complaint";
+  const category = normalizeSupportCategory(input.category, kind);
 
   const now = new Date().toISOString();
   const report: ManagementReport = {
     id: newId(),
     report_type: input.reportType,
-    title: input.title,
+    title: titleForNewSubmission({ reportType: input.reportType, category }),
     dog_handler_name: null,
     complaint_category: null,
     employee_name: null,
@@ -471,12 +482,16 @@ async function createTrainerSubmissionReport(
     created_by: input.actor,
     submitted_by_name: trimField(input.submittedByName, 120) || null,
     created_at: now,
-    updated_at: now
+    updated_at: now,
+    category,
+    item_type: kind,
+    department: departmentForReportType(input.reportType)
   };
 
   const state = await loadState(supabase);
-  await saveState(supabase, { reports: sortNewest([report, ...state.reports]) });
-  return report;
+  const saved = normalizeReport(report);
+  await saveState(supabase, { reports: sortNewest([saved, ...state.reports]) });
+  return saved;
 }
 
 export async function listTrainerSubmissionsForCreator(
@@ -498,14 +513,15 @@ export async function createTrainerComplaintReport(
   supabase: SupabaseClient,
   description: string,
   actor: string | null,
-  submittedByName?: string | null
+  submittedByName?: string | null,
+  category?: string | null
 ) {
   return createTrainerSubmissionReport(supabase, {
     reportType: "trainer_complaint",
-    title: "Trainer Complaint",
     description,
     actor,
-    submittedByName
+    submittedByName,
+    category
   });
 }
 
@@ -513,14 +529,15 @@ export async function createTrainerRequestReport(
   supabase: SupabaseClient,
   description: string,
   actor: string | null,
-  submittedByName?: string | null
+  submittedByName?: string | null,
+  category?: string | null
 ) {
   return createTrainerSubmissionReport(supabase, {
     reportType: "trainer_request",
-    title: "Trainer Request",
     description,
     actor,
-    submittedByName
+    submittedByName,
+    category
   });
 }
 
@@ -543,16 +560,18 @@ export async function createTeamLeadRequestReport(
   supabase: SupabaseClient,
   description: string,
   actor: string | null,
-  submittedByName?: string | null
+  submittedByName?: string | null,
+  category?: string | null
 ): Promise<ManagementReport> {
   const trimmed = trimField(description, MAX_FIELD_LENGTH);
   if (!trimmed) throw new Error("Please enter details before submitting.");
 
+  const normalizedCategory = normalizeSupportCategory(category, "request");
   const now = new Date().toISOString();
   const report: ManagementReport = {
     id: newId(),
     report_type: "team_lead_request",
-    title: "Team Lead Request",
+    title: titleForNewSubmission({ reportType: "team_lead_request", category: normalizedCategory }),
     dog_handler_name: null,
     complaint_category: null,
     employee_name: null,
@@ -569,12 +588,16 @@ export async function createTeamLeadRequestReport(
     created_by: actor,
     submitted_by_name: trimField(submittedByName, 120) || null,
     created_at: now,
-    updated_at: now
+    updated_at: now,
+    category: normalizedCategory,
+    item_type: "request",
+    department: departmentForReportType("team_lead_request")
   };
 
   const state = await loadState(supabase);
-  await saveState(supabase, { reports: sortNewest([report, ...state.reports]) });
-  return report;
+  const saved = normalizeReport(report);
+  await saveState(supabase, { reports: sortNewest([saved, ...state.reports]) });
+  return saved;
 }
 
 export async function createDogHandlerComplaintReport(

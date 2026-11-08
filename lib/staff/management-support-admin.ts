@@ -15,6 +15,7 @@ import {
   updateManagementReport
 } from "@/lib/staff/management-reports";
 import { dispatchStaffOpsNotificationEvent, listStaffOps, dispatchPersonalStaffEmailNotification } from "@/lib/staff/admin-ops";
+import { caseDisplayTitle, caseSubjectLine, effectiveCategory } from "@/lib/staff/support-case-display";
 
 export type SupportInboxFilter = {
   query?: string;
@@ -69,14 +70,6 @@ const STAFF_SUPPORT_TYPES: ManagementReportType[] = [
   "team_lead_request"
 ];
 
-const GENERIC_SUPPORT_TITLES = new Set([
-  "Groomer Complaint",
-  "Groomer Request",
-  "Trainer Complaint",
-  "Trainer Request",
-  "Team Lead Request"
-]);
-
 function newId(prefix: string) {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -87,12 +80,10 @@ function detailsText(report: ManagementReport) {
 }
 
 function subjectForReport(report: ManagementReport) {
-  if (report.title && !GENERIC_SUPPORT_TITLES.has(report.title)) {
-    return report.title;
-  }
-  const text = detailsText(report);
-  return text.slice(0, 80) || report.title;
+  return caseSubjectLine(report);
 }
+
+export { caseDisplayTitle, caseSubjectLine };
 
 export function mapReportToInboxRow(report: ManagementReport): SupportInboxRow {
   const normalized = report;
@@ -103,7 +94,7 @@ export function mapReportToInboxRow(report: ManagementReport): SupportInboxRow {
     submitted_by: normalized.submitted_by_name ?? "Staff",
     role: normalized.submitted_by_role ?? "staff",
     item_type: normalized.item_type === "request" ? "Request" : "Complaint",
-    category: normalized.category ?? null,
+    category: normalized.category ?? effectiveCategory(normalized),
     subject: subjectForReport(normalized),
     priority: normalized.priority ?? "Normal",
     status: normalized.admin_status ?? "Submitted",

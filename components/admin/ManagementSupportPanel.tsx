@@ -8,6 +8,7 @@ import { useToast } from "@/components/admin/ui/ToastProvider";
 import { EMPTY_WARNING_NOTICE_FORM, WarningNoticeForm } from "@/components/admin/WarningNoticeForm";
 import type { WarningNoticeFormData } from "@/lib/staff/warning-notice-constants";
 import type { ManagementReport } from "@/lib/staff/management-reports";
+import { caseDisplayTitle, SUPPORT_COMPLAINT_CATEGORIES, SUPPORT_REQUEST_CATEGORIES } from "@/lib/staff/support-case-display";
 import { useManagementSupportFetch } from "@/hooks/useManagementSupportFetch";
 
 type ManagementSupportSubTab = "submit" | "review" | "filed";
@@ -60,7 +61,7 @@ function SubmissionReviewCard({ report }: { report: ManagementReport }) {
         <span className={statusClass(report.status)}>{report.status.toUpperCase()}</span>
         <span className="text-xs text-admin-muted">{formatDateTime(report.created_at)}</span>
       </div>
-      <h4 className="mt-2 font-black text-white">{report.title}</h4>
+      <h4 className="mt-2 font-black text-white">{caseDisplayTitle(report)}</h4>
       {details ? (
         <div className="mt-3 space-y-2 text-sm text-admin-muted">
           <p><span className="font-bold text-white">Employee:</span> {details.employee_name} ({details.employee_department})</p>
@@ -108,16 +109,20 @@ function GroomerSubmissionForm({
   subtitle,
   placeholder,
   busy,
+  kind,
   onSubmit
 }: {
   title: string;
   subtitle: string;
   placeholder: string;
   busy: boolean;
-  onSubmit: (description: string) => Promise<void>;
+  kind: "complaint" | "request";
+  onSubmit: (payload: { description: string; category: string }) => Promise<void>;
 }) {
   const [description, setDescription] = useState("");
+  const [category, setCategory] = useState(kind === "request" ? "Supplies" : "Operational Issue");
   const [error, setError] = useState("");
+  const categories = kind === "request" ? SUPPORT_REQUEST_CATEGORIES : SUPPORT_COMPLAINT_CATEGORIES;
 
   return (
     <section className="crossover-card crossover-card--create p-5">
@@ -132,6 +137,21 @@ function GroomerSubmissionForm({
           </div>
         </div>
       </div>
+      <label className="mt-4 grid gap-2">
+        <span className="admin-label">Category *</span>
+        <select
+          className="admin-input"
+          value={category}
+          disabled={busy}
+          onChange={(event) => setCategory(event.target.value)}
+        >
+          {categories.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </label>
       <label className="mt-4 grid gap-2">
         <span className="admin-label">Details *</span>
         <textarea
@@ -158,7 +178,7 @@ function GroomerSubmissionForm({
               setError("Please enter details before submitting.");
               return;
             }
-            void onSubmit(trimmed).then(() => setDescription(""));
+            void onSubmit({ description: trimmed, category }).then(() => setDescription(""));
           }}
         >
           <Send className="h-4 w-4" />
@@ -190,14 +210,17 @@ function GroomerManagementSupportPanel({ showRequests = true }: { showRequests?:
     [data]
   );
 
-  async function submitGroomerForm(action: "create_groomer_complaint" | "create_groomer_request", description: string) {
+  async function submitGroomerForm(
+    action: "create_groomer_complaint" | "create_groomer_request",
+    payload: { description: string; category: string }
+  ) {
     setBusy(true);
     setError(null);
     try {
       const response = await fetch("/api/admin/management-support", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action, description })
+        body: JSON.stringify({ action, description: payload.description, category: payload.category })
       });
       const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to submit form.");
@@ -283,7 +306,8 @@ function GroomerManagementSupportPanel({ showRequests = true }: { showRequests?:
             subtitle="Describe the issue. Your complaint goes directly to admin and management for review."
             placeholder="Describe the complaint, including relevant details, timing, and anyone involved."
             busy={busy}
-            onSubmit={(description) => submitGroomerForm("create_groomer_complaint", description)}
+            kind="complaint"
+            onSubmit={(payload) => submitGroomerForm("create_groomer_complaint", payload)}
           />
         ) : (
           <GroomerSubmissionForm
@@ -291,7 +315,8 @@ function GroomerManagementSupportPanel({ showRequests = true }: { showRequests?:
             subtitle="Describe what you need. Your request goes directly to admin and management for review."
             placeholder="Describe the request, supplies needed, scheduling help, or other support needed."
             busy={busy}
-            onSubmit={(description) => submitGroomerForm("create_groomer_request", description)}
+            kind="request"
+            onSubmit={(payload) => submitGroomerForm("create_groomer_request", payload)}
           />
         )
       ) : (
@@ -341,14 +366,17 @@ function TrainerManagementSupportPanel() {
     [data]
   );
 
-  async function submitTrainerForm(action: "create_trainer_complaint" | "create_trainer_request", description: string) {
+  async function submitTrainerForm(
+    action: "create_trainer_complaint" | "create_trainer_request",
+    payload: { description: string; category: string }
+  ) {
     setBusy(true);
     setError(null);
     try {
       const response = await fetch("/api/admin/management-support", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action, description })
+        body: JSON.stringify({ action, description: payload.description, category: payload.category })
       });
       const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to submit form.");
@@ -406,7 +434,8 @@ function TrainerManagementSupportPanel() {
             subtitle="Describe the issue. Your complaint goes directly to admin and management for review."
             placeholder="Describe the complaint, including relevant details, timing, and anyone involved."
             busy={busy}
-            onSubmit={(description) => submitTrainerForm("create_trainer_complaint", description)}
+            kind="complaint"
+            onSubmit={(payload) => submitTrainerForm("create_trainer_complaint", payload)}
           />
         ) : (
           <GroomerSubmissionForm
@@ -414,7 +443,8 @@ function TrainerManagementSupportPanel() {
             subtitle="Describe what you need. Your request goes directly to admin and management for review."
             placeholder="Describe the request, supplies needed, scheduling help, or other support needed."
             busy={busy}
-            onSubmit={(description) => submitTrainerForm("create_trainer_request", description)}
+            kind="request"
+            onSubmit={(payload) => submitTrainerForm("create_trainer_request", payload)}
           />
         )
       ) : (
@@ -539,14 +569,18 @@ function TeamLeadManagementSupportPanel({
     [requestData]
   );
 
-  async function submitComplaint(description: string) {
+  async function submitComplaint(payload: { description: string; category: string }) {
     setBusy(true);
     setError(null);
     try {
       const response = await fetch("/api/admin/management-support", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "create_groomer_complaint", description })
+        body: JSON.stringify({
+          action: "create_groomer_complaint",
+          description: payload.description,
+          category: payload.category
+        })
       });
       const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to submit complaint.");
@@ -562,14 +596,18 @@ function TeamLeadManagementSupportPanel({
     }
   }
 
-  async function submitRequest(description: string) {
+  async function submitRequest(payload: { description: string; category: string }) {
     setBusy(true);
     setError(null);
     try {
       const response = await fetch("/api/admin/management-support", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "create_team_lead_request", description })
+        body: JSON.stringify({
+          action: "create_team_lead_request",
+          description: payload.description,
+          category: payload.category
+        })
       });
       const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to submit request.");
@@ -680,6 +718,7 @@ function TeamLeadManagementSupportPanel({
               subtitle="Describe the issue. Your complaint goes directly to admin and management for review."
               placeholder="Describe the complaint, including relevant details, timing, and anyone involved."
               busy={busy}
+              kind="complaint"
               onSubmit={submitComplaint}
             />
           ) : (
@@ -722,6 +761,7 @@ function TeamLeadManagementSupportPanel({
               subtitle="Request supplies, accommodations, or other support. Requests go directly to admin and management for review."
               placeholder="Describe what you need — supplies, equipment, scheduling accommodations, facility needs, or other support. Include quantities, timing, and why it's needed."
               busy={busy}
+              kind="request"
               onSubmit={submitRequest}
             />
           ) : (
