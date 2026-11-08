@@ -13,6 +13,7 @@ import { htmlToPlainText } from "@/lib/html/rich-text";
 import type { AdminTab } from "@/lib/admin/types";
 import type { ManagementReport, ManagementReportType } from "@/lib/staff/management-reports";
 import type { SupportHubStats, SupportInboxRow, TrainerEntryAdminRow } from "@/lib/staff/management-support-admin";
+import { caseDisplayTitle, effectiveCategory, submissionTypeLabel } from "@/lib/staff/support-case-display";
 
 type HubPayload = {
   stats: SupportHubStats;
@@ -82,13 +83,14 @@ function SupportDetailModal({
   const visibleComments = (item.comments ?? []).filter((c) => c.visibility === "visible_to_submitter");
 
   return (
-    <Modal open={open} title={item.title} onClose={onClose}>
+    <Modal open={open} title={caseDisplayTitle(item)} onClose={onClose}>
       <div className="space-y-4 text-sm">
         <div className="grid gap-3 md:grid-cols-2">
           <p><span className="font-bold text-white">Submitted by:</span> {item.submitted_by_name ?? "Staff"}</p>
           <p><span className="font-bold text-white">Role:</span> {item.submitted_by_role ?? "staff"}</p>
           <p><span className="font-bold text-white">Department:</span> {item.department}</p>
-          <p><span className="font-bold text-white">Type:</span> {item.item_type ?? "complaint"}</p>
+          <p><span className="font-bold text-white">Submission type:</span> {submissionTypeLabel(item)}</p>
+          <p><span className="font-bold text-white">Category:</span> {effectiveCategory(item)}</p>
           <p><span className="font-bold text-white">Priority:</span> <span className={priorityBadgeClass(item.priority ?? "Normal")}>{item.priority ?? "Normal"}</span></p>
           <p><span className="font-bold text-white">Status:</span> <span className={statusBadgeClass(item.admin_status ?? "Submitted")}>{item.admin_status ?? "Submitted"}</span></p>
         </div>

@@ -4,6 +4,7 @@ import { isGeminiConfigured } from "@/lib/hr/gemini-config";
 import { activePipPlans, listPipPlans, type PipPlan } from "@/lib/hr/pip";
 import { listAllManagementReports, type ManagementReport } from "@/lib/staff/management-reports";
 import { mapReportToInboxRow } from "@/lib/staff/management-support-admin";
+import { caseCreationTimelineSummary, caseDisplayTitle } from "@/lib/staff/support-case-display";
 import type {
   ActivityEvent,
   AlertSeverity,
@@ -160,7 +161,7 @@ function buildActivity(reports: ManagementReport[], plans: PipPlan[]): ActivityE
       id: `created-${report.id}`,
       at: report.created_at,
       event_type: "case_created",
-      summary: `New ${report.item_type ?? "case"} received: ${report.title}`,
+      summary: caseCreationTimelineSummary(report),
       actor: report.submitted_by_name ?? report.created_by ?? "System",
       employee: report.employee_name ?? report.dog_handler_name ?? report.submitted_by_name ?? null,
       department: report.department ?? null,
@@ -175,7 +176,7 @@ function buildActivity(reports: ManagementReport[], plans: PipPlan[]): ActivityE
         id: entry.id,
         at: entry.created_at,
         event_type: entry.action,
-        summary: `${entry.action.replace(/_/g, " ")} on ${report.title}${
+        summary: `${entry.action.replace(/_/g, " ")} on ${caseDisplayTitle(report)}${
           entry.new_value ? `: ${entry.new_value}` : ""
         }`,
         actor: entry.performed_by,
@@ -200,7 +201,7 @@ function buildActivity(reports: ManagementReport[], plans: PipPlan[]): ActivityE
         id: comment.id,
         at: comment.created_at,
         event_type: "comment_added",
-        summary: `${comment.visibility === "internal" ? "Internal note" : "Comment"} on ${report.title}`,
+        summary: `${comment.visibility === "internal" ? "Internal note" : "Comment"} on ${caseDisplayTitle(report)}`,
         actor: comment.user_name,
         employee: report.employee_name ?? report.submitted_by_name ?? null,
         department: report.department ?? null,
@@ -388,7 +389,7 @@ export async function buildSupportCommandCenter(
       .slice(0, 100)
       .map((report) => ({
         id: report.id,
-        title: report.title,
+        title: caseDisplayTitle(report),
         employee: report.employee_name ?? report.dog_handler_name ?? report.submitted_by_name ?? null,
         department: report.department ?? null,
         type: report.item_type ?? report.report_type,

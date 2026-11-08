@@ -7,6 +7,7 @@ import { getUserAccess } from "@/lib/admin/user-access";
 import { coachPipWithGemini, isGeminiConfigured, type PipAiMode } from "@/lib/hr/gemini-pip";
 import { listPipPlans } from "@/lib/hr/pip";
 import { getManagementReportById } from "@/lib/staff/management-reports";
+import { caseDisplayTitle, effectiveCategory, submissionTypeLabel } from "@/lib/staff/support-case-display";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -68,13 +69,15 @@ export async function POST(request: Request) {
       const report = await getManagementReportById(supabase, body.case_id);
       if (report) {
         recordContext = [
-          `Case: ${report.title}`,
-          `Type: ${report.report_type}`,
+          `Case: ${caseDisplayTitle(report)}`,
+          `Submission type: ${submissionTypeLabel(report)}`,
+          `Report type (routing): ${report.report_type}`,
+          `Category: ${effectiveCategory(report)}`,
           `Priority: ${report.priority ?? "Normal"}`,
           `Status: ${report.admin_status ?? report.status}`,
-          `Subject: ${report.employee_name ?? report.dog_handler_name ?? report.submitted_by_name ?? "—"}`,
+          `Employee: ${report.employee_name ?? report.dog_handler_name ?? report.submitted_by_name ?? "—"}`,
           `Department: ${report.department ?? "—"}`,
-          `Summary: ${(report.groomer_submission_details?.description ?? report.summary).slice(0, 1200)}`
+          `Details (verbatim): ${(report.groomer_submission_details?.description ?? report.summary).slice(0, 1200)}`
         ].join("\n");
       }
     }

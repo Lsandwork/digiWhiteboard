@@ -26,6 +26,7 @@ import { useToast } from "@/components/admin/ui/ToastProvider";
 import type { ActivityEvent, CommandCenterPayload, UrgentAlertRow } from "@/lib/admin/support-command-center/types";
 import type { AdminTab } from "@/lib/admin/types";
 import type { ManagementReport } from "@/lib/staff/management-reports";
+import { caseDisplayTitle, effectiveCategory, submissionTypeLabel } from "@/lib/staff/support-case-display";
 
 type Props = {
   onNavigate?: (tab: AdminTab) => void;
@@ -107,7 +108,7 @@ function caseToAlertRow(report: ManagementReport): UrgentAlertRow {
     employee: report.employee_name ?? report.dog_handler_name ?? report.submitted_by_name ?? "—",
     department: report.department ?? "—",
     alert_type: alertTypeFromReport(report),
-    summary: report.title || details.slice(0, 160),
+    summary: caseDisplayTitle(report),
     assigned_manager: report.assigned_to ?? null,
     acknowledged: Boolean(report.acknowledged_at),
     acknowledged_at: report.acknowledged_at ?? null,
@@ -736,7 +737,13 @@ export function SupportCommandCenter({ onNavigate }: Props) {
           <div className="space-y-4 text-sm">
             <div className="grid gap-2 md:grid-cols-2">
               <p><span className="font-bold text-white">Case ID:</span> {selectedAlert.source_id}</p>
-              <p><span className="font-bold text-white">Type:</span> {selectedAlert.alert_type}</p>
+              <p><span className="font-bold text-white">Submission type:</span>{" "}
+                {selectedAlert.report ? submissionTypeLabel(selectedAlert.report) : selectedAlert.alert_type}
+              </p>
+              {selectedAlert.report ? (
+                <p><span className="font-bold text-white">Category:</span> {effectiveCategory(selectedAlert.report)}</p>
+              ) : null}
+              <p><span className="font-bold text-white">Alert type:</span> {selectedAlert.alert_type}</p>
               <p><span className="font-bold text-white">Severity:</span> {selectedAlert.severity}</p>
               <p><span className="font-bold text-white">Employee / subject:</span> {selectedAlert.employee}</p>
               <p><span className="font-bold text-white">Department:</span> {selectedAlert.department}</p>
