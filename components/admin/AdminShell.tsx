@@ -144,10 +144,12 @@ export function AdminShell({
     setMobileOpen(false);
   }
 
+  const immersive = board === "staff" && (tab === "ops_command_center" || tab === "my_shift");
+
   return (
     <div className="admin-theme admin-theme--app">
       <ImpersonationBanner />
-      <div className={`admin-layout ${sidebarCollapsed ? "admin-layout--collapsed" : ""}`}>
+      <div className={`admin-layout ${sidebarCollapsed ? "admin-layout--collapsed" : ""} ${immersive ? "admin-layout--immersive" : ""}`}>
         <Sidebar
           activeTab={tab}
           board={board}

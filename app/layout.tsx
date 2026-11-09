@@ -17,6 +17,7 @@ import "../lib/fitdog-dashboard/theme-readable-canvas.css";
 import "../lib/theme/button-states.css";
 import "../lib/staff/whiteboard-theme.css";
 import "../lib/theme/professional.css";
+import "../lib/theme/ruffops-shell.css";
 
 const inter = Inter({
   subsets: ["latin"],
