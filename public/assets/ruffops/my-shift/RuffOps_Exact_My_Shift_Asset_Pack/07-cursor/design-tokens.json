@@ -1,0 +1,23 @@
+{
+  "canvas": "#020B1B",
+  "sidebar": "#04152B",
+  "panel": "#061A36",
+  "panelRaised": "#0A2347",
+  "border": "#075BAA",
+  "borderSubtle": "#153B65",
+  "text": "#F5F8FF",
+  "textSecondary": "#B8CBE6",
+  "muted": "#7F9FC8",
+  "blue": "#079BFF",
+  "cyan": "#00C7E8",
+  "green": "#00D879",
+  "purple": "#6D20D8",
+  "orange": "#F59A00",
+  "red": "#FF263D",
+  "radii": {
+    "card": "16px",
+    "tile": "14px",
+    "pill": "999px"
+  },
+  "shadow": "0 12px 32px rgba(0,0,0,.28)"
+}

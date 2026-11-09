@@ -55,6 +55,8 @@ import {
   loadCachedMyShiftFacilityFeed,
   type MyShiftFacilityFeed
 } from "@/lib/ops-command-center/my-shift-facility-feed";
+import { loadLiveFloor, type LiveFloor } from "@/lib/ops-command-center/live-floor";
+import { buildTeamRoster, type TeamMemberCard } from "@/lib/ops-command-center/command-dashboard";
 import type { CrossoverMessage, StaffDirectoryMember } from "@/lib/staff/admin-ops";
 
 export type NeedsAttentionItem = {
@@ -121,7 +123,7 @@ export type OpsCommandCenterSnapshot = {
   tools: Array<{ tab: string; label: string }>;
   /** Staff-directory department for My Shift entry + peer handoff (not RBAC role). */
   homeDepartment: string | null;
-  /** Same-department peer notes for every My Shift login. */
+  /** Today's Team Log notes from every department (Pacific day; clears after midnight). */
   departmentHandoff: {
     department: string | null;
     previousName: string | null;
@@ -146,6 +148,16 @@ export type OpsCommandCenterSnapshot = {
     serviceDate: string | null;
     additionalServices: GingrAdditionalService[];
   };
+  /** Live Gingr floor rollups for My Shift KPI cards. */
+  facilityPulse: {
+    dogsToday: number;
+    boardingStays: number;
+    taxiRuns: number;
+    classesToday: number;
+    groomingAppts: number;
+  };
+  /** Active staff-directory members shown on My Shift Team on Shift. */
+  teamOnShift: TeamMemberCard[];
 };
 
 /** Account-type labels must never appear in "Good evening, …" — use the person's name. */
@@ -196,7 +208,6 @@ function toolsForRole(roleKey: string): Array<{ tab: string; label: string }> {
     case "front_desk_coordinator":
       return [
         { tab: "crossover_communication", label: "Team Log" },
-        { tab: "fitdog_alerts", label: "Payment Alerts" },
         { tab: "owner_follow_up", label: "Owner Follow-Ups" },
         { tab: "grooming_push", label: "Grooming Ready" },
         { tab: "vip_auto_book", label: "VIP / Directory" }
@@ -242,8 +253,7 @@ function toolsForRole(roleKey: string): Array<{ tab: string; label: string }> {
         { tab: "ops_command_center", label: "Live Ops" },
         { tab: "ms_hub", label: "Support Hub" },
         { tab: "overview", label: "Overview" },
-        { tab: "walks_board", label: "Walks" },
-        { tab: "fitdog_alerts", label: "Alerts" }
+        { tab: "walks_board", label: "Walks" }
       ];
   }
 }
@@ -385,8 +395,39 @@ export function emptyOpsCommandCenterSnapshot(input: {
     tools: toolsForRole(input.roleKey),
     homeDepartment: null,
     departmentHandoff: { department: null, previousName: null, shiftNotes: [], assignOptions: [] },
+    facilityPulse: { dogsToday: 0, boardingStays: 0, taxiRuns: 0, classesToday: 0, groomingAppts: 0 },
+    teamOnShift: [],
     stale: false,
     pending: true
+  };
+}
+
+
+function facilityPulseFromSources(
+  floor: LiveFloor | null,
+  liveCounts: Record<string, number>,
+  dogsOnFloor: number,
+  extraGrooming = 0
+) {
+  if (floor && (floor.onSite.length || floor.leftToday || floor.arrivalsExpected.length)) {
+    const taxiOnSite = floor.onSite.filter((dog) => /taxi|transport|van|pickup route/i.test(dog.serviceType)).length;
+    const classesToday =
+      floor.onSiteByCategory.training +
+      [...floor.arrivalsExpected, ...floor.lateArrivals].filter((dog) => dog.category === "training").length;
+    return {
+      dogsToday: floor.onSite.length + floor.leftToday + floor.arrivalsExpected.length + floor.lateArrivals.length,
+      boardingStays: floor.onSiteByCategory.boarding,
+      taxiRuns: taxiOnSite,
+      classesToday,
+      groomingAppts: floor.onSiteByCategory.grooming + extraGrooming
+    };
+  }
+  return {
+    dogsToday: dogsOnFloor,
+    boardingStays: liveCounts.overnight || 0,
+    taxiRuns: liveCounts.transportation || 0,
+    classesToday: liveCounts.training || 0,
+    groomingAppts: (liveCounts.grooming || 0) + extraGrooming
   };
 }
 
@@ -473,7 +514,8 @@ export async function buildOpsCommandCenterSnapshot(input: {
     staffFeedResult,
     boardLanes,
     additionalServicesFeed,
-    cachedFacilityFeed
+    cachedFacilityFeed,
+    liveFloor
   ] = await Promise.all([
     timedCount(HUNG_TABLES.liveTransitionDogs, () =>
       hungSupabase
@@ -540,7 +582,8 @@ export async function buildOpsCommandCenterSnapshot(input: {
           OPS_SNAPSHOT_TIMEOUT_MS,
           { date: "", services: [], birthdays: [], syncedAt: null } as MyShiftFacilityFeed
         )
-      : Promise.resolve({ date: "", services: [], birthdays: [], syncedAt: null } as MyShiftFacilityFeed)
+      : Promise.resolve({ date: "", services: [], birthdays: [], syncedAt: null } as MyShiftFacilityFeed),
+    withTimeoutFallback(loadLiveFloor(), OPS_SNAPSHOT_TIMEOUT_MS, null as LiveFloor | null)
   ]);
 
   const checkingInCount = checkingIn.timedOut
@@ -810,7 +853,14 @@ export async function buildOpsCommandCenterSnapshot(input: {
       enabled: groomerDashboard,
       serviceDate: additionalServicesFeed.date,
       additionalServices: additionalServicesFeed.services
-    }
+    },
+    facilityPulse: facilityPulseFromSources(
+      liveFloor,
+      statusCounts,
+      dogsOnFloor,
+      groomerDashboard ? additionalServicesFeed.services.length : 0
+    ),
+    teamOnShift: buildTeamRoster(staffFeed.staffDirectory || [])
   };
 }
 

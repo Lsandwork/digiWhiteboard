@@ -144,10 +144,12 @@ export function AdminShell({
     setMobileOpen(false);
   }
 
+  const immersive = board === "staff" && (tab === "ops_command_center" || tab === "my_shift");
+
   return (
     <div className="admin-theme admin-theme--app">
       <ImpersonationBanner />
-      <div className={`admin-layout ${sidebarCollapsed ? "admin-layout--collapsed" : ""}`}>
+      <div className={`admin-layout ${sidebarCollapsed ? "admin-layout--collapsed" : ""} ${immersive ? "admin-layout--immersive" : ""} ${board === "staff" && tab === "my_shift" ? "admin-layout--my-shift" : ""}`}>
         <Sidebar
           activeTab={tab}
           board={board}
@@ -282,14 +284,28 @@ export function AdminShell({
                         }
                       }}
                     />
+                    {tab === "my_shift" ? (
+                      <span className="hidden items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-200 sm:inline-flex">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
+                        Live
+                      </span>
+                    ) : null}
                     <LockRuffOpsButton onLock={lock} />
                     <NotificationBell onOpenTab={handleTabChange} />
+                    <button
+                      type="button"
+                      className="admin-icon-btn"
+                      aria-label="Open settings"
+                      onClick={() => handleTabChange("settings")}
+                    >
+                      <FitdogDashboardIcon src={FITDOG_UI.settings} size={18} alt="" />
+                    </button>
                     <ThemeToggle />
                     <div className="admin-header-brand">
                       <img src="/assets/ruffops/brand/ruffops-mark.svg" alt="RuffOps" width={36} height={36} />
                       <div>
                         <p className="admin-header-brand__label">RUFFOPS</p>
-                        <p className="text-xs font-bold text-white">Fitdog operations</p>
+                        <p className="text-xs font-bold text-white">{tab === "my_shift" ? "Fitdog" : "Fitdog operations"}</p>
                       </div>
                     </div>
                   </div>

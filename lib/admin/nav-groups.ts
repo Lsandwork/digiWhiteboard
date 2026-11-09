@@ -333,7 +333,6 @@ const FRONT_DESK_TABS: AdminTab[] = [
   "crossover_communication",
   "owner_follow_up",
   "active_issues",
-  "fitdog_alerts",
   "vip_auto_book",
   "walks_board",
   "package_group_walks",

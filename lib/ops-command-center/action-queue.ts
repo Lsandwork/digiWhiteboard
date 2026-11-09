@@ -260,25 +260,7 @@ export function buildActionQueue(input: {
     });
   }
 
-  const { paymentAlerts, ownerActivity: activityAlerts } = splitOperationsAlerts(input.alerts);
-  for (const alert of paymentAlerts) {
-    const isSync = alert.alert_type === "FITDOG_SYNC_ERROR";
-    if (alert.alert_type === "PAYMENT_RESOLVED") continue;
-    const amount = Number(alert.amount_due) > 0 ? `$${Number(alert.amount_due).toFixed(2)} due` : null;
-    actions.push({
-      id: `payment:${alert.id}`,
-      priority: isSync ? "attention" : alert.severity === "critical" ? "critical" : "high",
-      category: isSync ? "system" : "payment",
-      title: isSync
-        ? "Fitdog sync reported an error"
-        : `${alert.alert_type.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())} · ${alert.owner_name || "Owner"}`,
-      detail: [alert.dog_name, amount, alert.failure_reason].filter(Boolean).join(" · ") || null,
-      dogName: alert.dog_name,
-      at: alert.detected_at,
-      hrefTab: "fitdog_alerts",
-      hrefLabel: "Open Payment Alerts"
-    });
-  }
+  const { ownerActivity: activityAlerts } = splitOperationsAlerts(input.alerts);
 
   const notificationCutoff = now - NOTIFICATION_HOURS * 3_600_000;
   for (const note of input.notifications) {
@@ -367,7 +349,6 @@ export async function loadCommandCenterView(options?: {
 
   sources.push({ key: "gingr", label: "Gingr", ok: !floor.error, detail: floor.error });
   sources.push({ key: "staff_ops", label: "Team Log", ok: !staffOps.error, detail: staffOps.error });
-  sources.push({ key: "alerts", label: "Payment alerts", ok: !alerts.error, detail: alerts.error });
   sources.push({ key: "body_checks", label: "Body Checks", ok: !bodyChecks.error, detail: bodyChecks.error });
 
   const queue = buildActionQueue({

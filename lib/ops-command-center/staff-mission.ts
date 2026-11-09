@@ -118,8 +118,7 @@ const QUICK_TOOLS: Record<RoleKey, StaffQuickTool[]> = {
   front_desk_coordinator: [
     { tab: "my_shift", label: "My Shift", hint: "Leaving & arriving lanes" },
     { tab: "owner_follow_up", label: "Owner follow-up", hint: "Calls and callbacks" },
-    { tab: "user_interactions", label: "Team Log", hint: "Hand off to the next desk" },
-    { tab: "fitdog_alerts", label: "Payment alerts", hint: "Owner account problems" }
+    { tab: "user_interactions", label: "Team Log", hint: "Hand off to the next desk" }
   ],
   team_leader: [
     { tab: "my_shift", label: "My Shift", hint: "Your assignments first" },

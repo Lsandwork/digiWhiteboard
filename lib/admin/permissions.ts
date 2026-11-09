@@ -801,7 +801,6 @@ export const FRONT_DESK_COORDINATOR_TABS = [
   "grooming_push",
   "owner_follow_up",
   "active_issues",
-  "fitdog_alerts",
   "vip_auto_book",
   "staff_directory",
   "bulk_photo_upload",
@@ -1594,6 +1593,11 @@ export function canAccessAdminTab(
     return false;
   }
 
+  // Retired from RuffOps — deny before the full-admin early return so it leaves every sidebar.
+  if (tab === "fitdog_alerts") {
+    return false;
+  }
+
   // Route Generator / Live Fleet are staff-board only — check before the full-admin early return
   // so lobby/marketing never treat the tab as accessible (which made nav clicks look dead).
   if (tab === "route_generator") {
@@ -1669,21 +1673,6 @@ export function canAccessAdminTab(
     if (isAdminOrManagementLegacyRole(legacyRole)) return true;
     const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
     return hasPermission(effective, "view_analytics") || hasPermission(effective, "export_reports");
-  }
-
-  if (tab === "fitdog_alerts") {
-    if (board !== "staff") return false;
-    if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
-    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
-    if (hasPermission(effective, "view_fitdog_alerts")) return true;
-    if (hasAnyRole(effective, ["super_admin", "admin", "management", "front_desk_coordinator"])) return true;
-    const roleKey = legacyRoleToRoleKey(legacyRole);
-    return (
-      roleKey === "super_admin" ||
-      roleKey === "admin" ||
-      roleKey === "management" ||
-      roleKey === "front_desk_coordinator"
-    );
   }
 
   if (tab === "vip_auto_book") {

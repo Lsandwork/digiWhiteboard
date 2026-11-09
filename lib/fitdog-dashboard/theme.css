@@ -1,19 +1,19 @@
 /* Fitdog dark dashboard design tokens — imported after base admin-theme vars */
 
 .admin-theme {
-  --fitdog-bg: #0b1118;
-  --fitdog-sidebar: #0a1017;
-  --fitdog-surface: #111b26;
-  --fitdog-surface-elevated: #152232;
-  --fitdog-border: #263445;
-  --fitdog-text: #f8fafc;
-  --fitdog-text-secondary: #b7c1ce;
-  --fitdog-orange: #ff6f26;
-  --fitdog-amber: #ffa612;
-  --fitdog-success: #29cd62;
-  --fitdog-warning: #ffbe36;
-  --fitdog-danger: #ff5252;
-  --fitdog-info: #45a6ff;
+  --fitdog-bg: #061326;
+  --fitdog-sidebar: #061326;
+  --fitdog-surface: #0b2040;
+  --fitdog-surface-elevated: #10294b;
+  --fitdog-border: rgba(48, 145, 255, 0.28);
+  --fitdog-text: #f4f8ff;
+  --fitdog-text-secondary: #b7c8e2;
+  --fitdog-orange: #1596ff;
+  --fitdog-amber: #36c7ff;
+  --fitdog-success: #16d982;
+  --fitdog-warning: #ff9b22;
+  --fitdog-danger: #f04452;
+  --fitdog-info: #36c7ff;
   --fitdog-teal: #30d2be;
 
   --admin-bg: var(--fitdog-bg);
@@ -34,8 +34,8 @@
 
   min-height: 100vh;
   background:
-    radial-gradient(circle at 12% 0%, rgba(255, 111, 38, 0.08), transparent 32%),
-    radial-gradient(circle at 88% 8%, rgba(69, 166, 255, 0.06), transparent 28%),
+    radial-gradient(circle at 12% 0%, rgba(21, 150, 255, 0.16), transparent 32%),
+    radial-gradient(circle at 88% 8%, rgba(54, 199, 255, 0.08), transparent 28%),
     var(--fitdog-bg);
   color: var(--fitdog-text);
 }
@@ -101,7 +101,7 @@
 .admin-nav-item--active,
 .admin-nav-item--active-parent {
   color: var(--fitdog-text);
-  background: rgba(255, 111, 38, 0.16);
+  background: rgba(21, 150, 255, 0.2);
   border: none;
   box-shadow: none;
 }
@@ -134,7 +134,7 @@
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(255, 111, 38, 0.35), rgba(255, 166, 18, 0.2));
+  background: linear-gradient(135deg, rgba(21, 150, 255, 0.45), rgba(54, 199, 255, 0.2));
   font-size: 0.95rem;
   font-weight: 900;
   color: var(--fitdog-text);
@@ -171,10 +171,10 @@
 }
 
 .admin-btn-primary {
-  border: 1px solid rgba(255, 111, 38, 0.55);
-  background: linear-gradient(180deg, #ff8a4c, #ff6f26 58%, #e85a12);
-  color: #ffffff;
-  box-shadow: 0 10px 24px rgba(255, 111, 38, 0.28);
+  border: 1px solid rgba(8, 119, 232, 0.7);
+  background: linear-gradient(180deg, #36c7ff, #1596ff 58%, #0877e8);
+  color: #061326;
+  box-shadow: 0 10px 24px rgba(21, 150, 255, 0.28);
 }
 
 .admin-btn-primary:hover:not(:disabled) {
@@ -189,8 +189,8 @@
 }
 
 .admin-btn-secondary:hover:not(:disabled) {
-  border-color: rgba(255, 111, 38, 0.35);
-  background: rgba(21, 34, 50, 0.95);
+  border-color: rgba(21, 150, 255, 0.45);
+  background: rgba(16, 41, 75, 0.95);
 }
 
 .admin-tab--active {
@@ -282,8 +282,8 @@
 }
 
 .fitdog-action-icon-btn:hover:not(:disabled) {
-  border-color: rgba(255, 111, 38, 0.45);
-  background: rgba(255, 111, 38, 0.12);
+  border-color: rgba(21, 150, 255, 0.45);
+  background: rgba(21, 150, 255, 0.12);
 }
 
 .fitdog-action-icon-btn:disabled {
@@ -314,9 +314,9 @@
 }
 
 .crossover-btn--primary {
-  border-color: rgba(255, 111, 38, 0.55);
-  background: linear-gradient(180deg, #ff8a4c, #ff6f26 58%, #e85a12);
-  color: #ffffff;
+  border-color: rgba(8, 119, 232, 0.7);
+  background: linear-gradient(180deg, #36c7ff, #1596ff 58%, #0877e8);
+  color: #061326;
 }
 
 .crossover-btn--outline,

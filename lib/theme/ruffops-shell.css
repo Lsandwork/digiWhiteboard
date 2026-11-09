@@ -1,0 +1,150 @@
+/* Loaded last. RuffOps staff chrome must beat Fitdog orange dashboard tokens. */
+
+html[data-theme="dark"] .admin-theme,
+html:not([data-theme]) .admin-theme {
+  --fitdog-bg: #061326;
+  --fitdog-sidebar: #061326;
+  --fitdog-surface: #0b2040;
+  --fitdog-surface-elevated: #10294b;
+  --fitdog-border: rgba(48, 145, 255, 0.28);
+  --fitdog-text: #f4f8ff;
+  --fitdog-text-secondary: #b7c8e2;
+  --fitdog-orange: #1596ff;
+  --fitdog-amber: #36c7ff;
+  --fitdog-success: #16d982;
+  --fitdog-warning: #ff9b22;
+  --fitdog-danger: #f04452;
+  --fitdog-info: #36c7ff;
+  --admin-bg: #061326;
+  --admin-card: #0b2040;
+  --admin-card-alt: #10294b;
+  --admin-border: rgba(48, 145, 255, 0.28);
+  --admin-muted: #8297b8;
+  --crossover-bg: #061326;
+  --crossover-card: #0b2040;
+  --crossover-card-alt: #10294b;
+  --crossover-border: rgba(48, 145, 255, 0.28);
+  --crossover-amber: #ff9b22;
+  --crossover-gold: #36c7ff;
+  --crossover-text: #f4f8ff;
+  --crossover-muted: #b7c8e2;
+  --crossover-green: #16d982;
+  --crossover-red: #f04452;
+  font-family: var(--ruffops-font), Inter, ui-sans-serif, system-ui, sans-serif;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(21, 150, 255, 0.18), transparent 36%),
+    radial-gradient(circle at 88% 8%, rgba(54, 199, 255, 0.08), transparent 32%),
+    #061326;
+  color: #f4f8ff;
+}
+
+html[data-theme="dark"] .admin-sidebar,
+html:not([data-theme]) .admin-sidebar {
+  background: #061326;
+  border-right-color: rgba(48, 145, 255, 0.28);
+}
+
+html[data-theme="dark"] .admin-nav-item--active,
+html[data-theme="dark"] .admin-nav-item--active-parent,
+html:not([data-theme]) .admin-nav-item--active,
+html:not([data-theme]) .admin-nav-item--active-parent,
+html[data-theme="clear"] .admin-nav-item--active,
+html[data-theme="clear"] .admin-nav-item--active-parent {
+  color: #f4f8ff;
+  background: rgba(21, 150, 255, 0.2);
+}
+
+html[data-theme="dark"] .admin-btn-primary,
+html:not([data-theme]) .admin-btn-primary,
+html[data-theme="dark"] .crossover-btn--primary,
+html:not([data-theme]) .crossover-btn--primary {
+  border-color: #0877e8;
+  background: linear-gradient(180deg, #36c7ff, #1596ff 58%, #0877e8);
+  color: #061326;
+  box-shadow: 0 10px 24px rgba(21, 150, 255, 0.28);
+}
+
+html[data-theme="dark"] .admin-btn-secondary:hover:not(:disabled),
+html:not([data-theme]) .admin-btn-secondary:hover:not(:disabled) {
+  border-color: rgba(21, 150, 255, 0.45);
+}
+
+html[data-theme="dark"] .admin-header-brand__label,
+html:not([data-theme]) .admin-header-brand__label {
+  color: #1596ff;
+}
+
+html[data-theme="dark"] .admin-user-card__avatar,
+html:not([data-theme]) .admin-user-card__avatar {
+  background: linear-gradient(135deg, rgba(21, 150, 255, 0.45), rgba(54, 199, 255, 0.2));
+  color: #061326;
+}
+
+html[data-theme="dark"] .admin-tab--active,
+html:not([data-theme]) .admin-tab--active {
+  border-bottom-color: #1596ff;
+}
+
+html[data-theme="dark"] .fitdog-action-icon-btn:hover:not(:disabled),
+html:not([data-theme]) .fitdog-action-icon-btn:hover:not(:disabled) {
+  border-color: rgba(21, 150, 255, 0.45);
+  background: rgba(21, 150, 255, 0.12);
+}
+
+/* Command / My Shift: drop the old stacked page title so the new layout is the page. */
+.admin-layout--immersive .admin-header__desktop {
+  align-items: center;
+  gap: 12px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.admin-layout--immersive .admin-section-kicker,
+.admin-layout--immersive .admin-page-title,
+.admin-layout--immersive .admin-page-subtitle,
+.admin-layout--immersive .admin-header__saved,
+.admin-layout--immersive .admin-header__utils {
+  display: none !important;
+}
+
+.admin-layout--immersive .admin-header__desktop > .min-w-0 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+
+.admin-layout--immersive .admin-header__desktop > .min-w-0 .mb-3 {
+  margin: 0;
+}
+
+.admin-layout--immersive .admin-content-main {
+  padding-top: 8px;
+}
+
+.admin-layout--immersive .admin-header,
+html[data-theme="light"] .admin-layout--immersive .admin-header,
+html[data-theme="clear"] .admin-layout--immersive .admin-header {
+  border-bottom-color: rgba(48, 145, 255, 0.22);
+  background: #061326;
+  color: #f4f8ff;
+  backdrop-filter: blur(12px);
+}
+
+.admin-layout--immersive .admin-main,
+.admin-layout--immersive .admin-content-grid,
+.admin-layout--immersive .admin-content-main,
+html[data-theme="light"] .admin-layout--immersive .admin-main,
+html[data-theme="light"] .admin-layout--immersive .admin-content-main,
+html[data-theme="clear"] .admin-layout--immersive .admin-main,
+html[data-theme="clear"] .admin-layout--immersive .admin-content-main {
+  background: #061326;
+  color: #f4f8ff;
+}
+
+html[data-theme="light"] .admin-layout--immersive .admin-btn-secondary,
+html[data-theme="clear"] .admin-layout--immersive .admin-btn-secondary {
+  border-color: rgba(48, 145, 255, 0.35);
+  background: #10294b;
+  color: #f4f8ff;
+}
