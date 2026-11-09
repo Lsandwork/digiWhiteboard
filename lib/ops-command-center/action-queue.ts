@@ -10,6 +10,12 @@ import {
   type OwnerFollowUp,
   type StaffOpsPriority
 } from "@/lib/staff/admin-ops";
+import { buildStaffMissionContext, type StaffMissionContext } from "@/lib/ops-command-center/staff-mission";
+import {
+  buildCommandDashboard,
+  mergeActivityFeed,
+  type CommandDashboard
+} from "@/lib/ops-command-center/command-dashboard";
 
 export type ActionPriority = "critical" | "high" | "attention";
 export type ActionCategory =
@@ -71,6 +77,8 @@ export type CommandCenterView = {
   staleTeamLogCount: number;
   sources: SourceStatus[];
   generatedAt: string;
+  staffMission: StaffMissionContext;
+  dashboard: CommandDashboard;
 };
 
 const CLOSED = new Set(["resolved", "closed", "done", "archived", "completed", "check out"]);
@@ -142,8 +150,8 @@ export function buildActionQueue(input: {
       detail: [dog.serviceType, dog.ownerName, dog.endsAt ? `Due ${clockLabel(dog.endsAt)}` : null].filter(Boolean).join(" · "),
       dogName: dog.dogName,
       at: dog.endsAt,
-      hrefTab: null,
-      hrefLabel: "Contact owner in Gingr"
+      hrefTab: "my_shift",
+      hrefLabel: "Leaving dogs"
     });
   }
 
@@ -156,8 +164,8 @@ export function buildActionQueue(input: {
       detail: [dog.serviceType, dog.ownerName, dog.startsAt ? `Expected ${clockLabel(dog.startsAt)}` : null].filter(Boolean).join(" · "),
       dogName: dog.dogName,
       at: dog.startsAt,
-      hrefTab: null,
-      hrefLabel: "Confirm in Gingr"
+      hrefTab: "my_shift",
+      hrefLabel: "Arriving dogs"
     });
   }
 
@@ -311,7 +319,13 @@ function errorText(error: unknown) {
   return error instanceof Error ? error.message : "Unavailable";
 }
 
-export async function loadCommandCenterView(options?: { force?: boolean }): Promise<CommandCenterView> {
+export async function loadCommandCenterView(options?: {
+  force?: boolean;
+  roleKey?: string;
+  roleLabel?: string;
+  displayName?: string | null;
+  email?: string | null;
+}): Promise<CommandCenterView> {
   const now = Date.now();
   const supabase = getServiceSupabase();
   const sources: SourceStatus[] = [];
@@ -367,5 +381,42 @@ export async function loadCommandCenterView(options?: { force?: boolean }): Prom
     now
   });
 
-  return { floor, ...queue, sources, generatedAt: new Date(now).toISOString() };
+  const pickupsDue =
+    floor.overduePickups.length + floor.pickupsRemaining.length;
+  const arrivalsExpected = floor.lateArrivals.length + floor.arrivalsExpected.length;
+  const staffMission = buildStaffMissionContext({
+    roleKey: options?.roleKey || "staff",
+    roleLabel: options?.roleLabel || "Staff",
+    displayName: options?.displayName,
+    email: options?.email,
+    actions: queue.actions,
+    pulse: {
+      onSite: floor.onSite.length,
+      pickupsDue,
+      arrivalsExpected,
+      medicalWatch: floor.medicalWatch.length,
+      openActions: queue.actions.length,
+      criticalCount: queue.actions.filter((a) => a.priority === "critical").length
+    }
+  });
+  const dashboard = buildCommandDashboard({
+    floor,
+    issues: staffOps.value?.active_issues ?? [],
+    directory: staffOps.value?.staff_directory ?? [],
+    sources,
+    actions: queue.actions,
+    now
+  });
+  const ownerActivity = mergeActivityFeed(queue.ownerActivity, staffOps.value?.activity_logs ?? []);
+
+  return {
+    floor,
+    actions: queue.actions,
+    ownerActivity,
+    staleTeamLogCount: queue.staleTeamLogCount,
+    sources,
+    generatedAt: new Date(now).toISOString(),
+    staffMission,
+    dashboard
+  };
 }

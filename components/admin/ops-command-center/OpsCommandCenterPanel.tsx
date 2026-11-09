@@ -352,13 +352,13 @@ export function OpsCommandCenterPanel({
           label="Leaving now"
           value={data.shiftSummary.dogsCheckingOut}
           tone="orange"
-          onClick={onNavigate ? () => onNavigate("front_desk_command") : undefined}
+          onClick={onNavigate ? () => onNavigate("ops_command_center") : undefined}
         />
         <SummaryCard
           label="Arriving now"
           value={data.shiftSummary.dogsArriving ?? data.boardCounts.checkingIn}
           tone="blue"
-          onClick={onNavigate ? () => onNavigate("front_desk_command") : undefined}
+          onClick={onNavigate ? () => onNavigate("ops_command_center") : undefined}
         />
         <SummaryCard
           label="Open work"

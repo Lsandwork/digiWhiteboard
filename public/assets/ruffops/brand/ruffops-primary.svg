@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="180" viewBox="0 0 720 180" role="img" aria-labelledby="title desc">
+<title id="title">RuffOps logo</title><desc id="desc">A clean paw mark followed by the RuffOps wordmark.</desc>
+<g fill="#F4F8FF">
+  <ellipse cx="72" cy="43" rx="19" ry="25" transform="rotate(-25 72 43)"/>
+  <ellipse cx="111" cy="32" rx="18" ry="24" transform="rotate(-8 111 32)"/>
+  <ellipse cx="151" cy="43" rx="19" ry="25" transform="rotate(25 151 43)"/>
+  <ellipse cx="42" cy="79" rx="16" ry="22" transform="rotate(-40 42 79)"/>
+  <path d="M96 77 C72 77 48 103 48 130 C48 151 66 160 85 151 C98 145 111 145 124 151 C143 160 161 151 161 130 C161 103 137 77 113 77 Z"/>
+</g>
+<text x="190" y="116" font-family="Inter, Arial, sans-serif" font-size="88" font-weight="750" letter-spacing="-4" fill="#F4F8FF">Ruff<tspan fill="#1596FF">Ops</tspan></text>
+</svg>

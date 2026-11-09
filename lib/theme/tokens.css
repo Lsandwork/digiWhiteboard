@@ -4,27 +4,27 @@ html[data-theme="dark"],
 html:not([data-theme]) {
   color-scheme: dark;
 
-  --background: #02060b;
-  --background-subtle: #0b1118;
-  --surface: #111b26;
-  --surface-raised: #152232;
-  --surface-hover: rgba(255, 255, 255, 0.04);
-  --surface-active: rgba(255, 111, 38, 0.14);
-  --surface-inverse: #f8fafc;
+  --background: #061326;
+  --background-subtle: #081a33;
+  --surface: #0b2040;
+  --surface-raised: #10294b;
+  --surface-hover: rgba(21, 150, 255, 0.08);
+  --surface-active: rgba(21, 150, 255, 0.16);
+  --surface-inverse: #f4f8ff;
 
-  --text-primary: #f8fafc;
-  --text-secondary: #b7c1ce;
-  --text-muted: #94a3b8;
-  --text-inverse: #12213a;
+  --text-primary: #f4f8ff;
+  --text-secondary: #b7c8e2;
+  --text-muted: #8297b8;
+  --text-inverse: #061326;
 
-  --border: #263445;
-  --border-strong: #334155;
-  --divider: rgba(255, 255, 255, 0.08);
+  --border: rgba(48, 145, 255, 0.22);
+  --border-strong: rgba(54, 199, 255, 0.35);
+  --divider: rgba(183, 200, 226, 0.12);
 
-  --brand: #ff6f26;
-  --brand-hover: #ff8a4c;
-  --brand-soft: rgba(255, 111, 38, 0.14);
-  --brand-foreground: #0b1118;
+  --brand: #1596ff;
+  --brand-hover: #36c7ff;
+  --brand-soft: rgba(21, 150, 255, 0.16);
+  --brand-foreground: #061326;
 
   --success: #29cd62;
   --success-soft: rgba(41, 205, 98, 0.18);
@@ -46,21 +46,21 @@ html:not([data-theme]) {
   --input-border: #263445;
   --input-placeholder: #64748b;
 
-  --table-header: rgba(28, 18, 13, 0.98);
+  --table-header: rgba(16, 41, 75, 0.98);
   --table-row: transparent;
-  --table-row-hover: rgba(255, 166, 0, 0.04);
-  --table-row-selected: rgba(255, 111, 38, 0.1);
+  --table-row-hover: rgba(21, 150, 255, 0.06);
+  --table-row-selected: rgba(21, 150, 255, 0.12);
 
-  --sidebar-background: #0a1017;
+  --sidebar-background: #061326;
   --sidebar-item: transparent;
-  --sidebar-item-hover: rgba(255, 255, 255, 0.04);
-  --sidebar-item-active: rgba(255, 111, 38, 0.14);
-  --sidebar-section-label: #64748b;
+  --sidebar-item-hover: rgba(21, 150, 255, 0.08);
+  --sidebar-item-active: rgba(21, 150, 255, 0.18);
+  --sidebar-section-label: #8297b8;
 
   --header-background: transparent;
-  --overlay: rgba(2, 6, 11, 0.72);
+  --overlay: rgba(6, 19, 38, 0.72);
   --shadow-color: rgba(0, 0, 0, 0.35);
-  --focus-ring: rgba(255, 111, 38, 0.55);
+  --focus-ring: rgba(21, 150, 255, 0.55);
 }
 
 html[data-theme="light"] {

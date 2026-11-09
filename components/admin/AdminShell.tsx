@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import type { AdminTab, AdminBoardType } from "@/lib/admin/types";
 import { ADMIN_TABS } from "@/lib/admin/types";
@@ -8,7 +7,7 @@ import {
   canAccessAdminTab,
   type UserAccess
 } from "@/lib/admin/permissions";
-import { FITDOG_BRAND, FITDOG_UI } from "@/lib/fitdog-dashboard/assets";
+import { FITDOG_UI } from "@/lib/fitdog-dashboard/assets";
 import { Sidebar, MobileMenuButton } from "@/components/admin/Sidebar";
 import { ImpersonationBanner } from "@/components/admin/ImpersonationBanner";
 import { buildStaffPanelNav, findNavSectionForTab, getTabDescription, getTabLabel } from "@/lib/admin/nav-groups";
@@ -93,10 +92,10 @@ export function AdminShell({
   const { locked, lock, unlock } = useRuffOpsLock();
   const title =
     board === "staff"
-      ? "Staff Digital Whiteboard Admin"
+      ? "RuffOps — Staff operations"
       : board === "marketing"
-        ? "Marketing — CAST-TV"
-        : "Lobby Whiteboard Admin";
+        ? "RuffOps — CAST-TV"
+        : "RuffOps — Lobby";
   const effectiveRole = isDemo ? (demoRole ?? role) : role;
 
   const visibleTabs = useMemo(
@@ -173,7 +172,7 @@ export function AdminShell({
               <div className="admin-appbar__leading">
                 <MobileMenuButton onClick={() => setMobileOpen(true)} />
                 <div className="admin-appbar__titles min-w-0">
-                  <p className="admin-appbar__brand">Fitdog</p>
+                  <p className="admin-appbar__brand">RuffOps</p>
                   <h1 className="admin-appbar__title">{pageLabel}</h1>
                 </div>
               </div>
@@ -287,10 +286,10 @@ export function AdminShell({
                     <NotificationBell onOpenTab={handleTabChange} />
                     <ThemeToggle />
                     <div className="admin-header-brand">
-                      <Image src={FITDOG_BRAND.logoBadge64} alt="Fitdog" width={36} height={36} className="rounded-full" />
+                      <img src="/assets/ruffops/brand/ruffops-mark.svg" alt="RuffOps" width={36} height={36} />
                       <div>
-                        <p className="admin-header-brand__label">FITDOG</p>
-                        <p className="text-xs font-bold text-white">Fitdog Digi-board</p>
+                        <p className="admin-header-brand__label">RUFFOPS</p>
+                        <p className="text-xs font-bold text-white">Fitdog operations</p>
                       </div>
                     </div>
                   </div>

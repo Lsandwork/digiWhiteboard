@@ -628,6 +628,7 @@ const TRAINER_PERMISSIONS: PermissionKey[] = [
   "ruffly.contacts.view",
   "ruffly.leads.view",
   "view_my_shift",
+  "view_ops_command_center",
   "view_ops_dog_profile",
 ];
 
@@ -651,6 +652,7 @@ const GROOMER_PERMISSIONS: PermissionKey[] = [
   "ruffly.inbox.reply",
   "ruffly.leads.view",
   "view_my_shift",
+  "view_ops_command_center",
   "view_ops_dog_profile",
 ];
 
@@ -663,6 +665,8 @@ const STAFF_VIEWER_PERMISSIONS: PermissionKey[] = [
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS,
   "view_my_shift",
+  "view_ops_command_center",
+  "view_ops_dog_profile",
 ];
 
 /** Lobby marketing panel — lobby content plus Team Log landing access. */
@@ -735,6 +739,7 @@ const DOG_HANDLER_PERMISSIONS: PermissionKey[] = [
   "manage_photo_upload_queue",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   "view_my_shift",
+  "view_ops_command_center",
   "view_ops_dog_profile",
   "receive_walks_board_reminders",
 ];

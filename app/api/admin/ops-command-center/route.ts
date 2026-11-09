@@ -88,7 +88,19 @@ export async function GET(request: Request) {
   }
   if (view === "live_floor") {
     try {
-      const commandCenter = await loadCommandCenterView({ force: url.searchParams.get("refresh") === "1" });
+      const roleKey = legacyRoleToRoleKey(gate.session.role);
+      const personName = await withTimeoutFallback(
+        resolveSessionDisplayName(getServiceSupabase({ timeoutMs: 2_000 }), gate.session),
+        2_000,
+        null
+      );
+      const commandCenter = await loadCommandCenterView({
+        force: url.searchParams.get("refresh") === "1",
+        roleKey,
+        roleLabel: ROLE_LABELS[roleKey] || gate.access.displayLabel || "Staff",
+        displayName: personName,
+        email: gate.session.email
+      });
       return NextResponse.json(commandCenter, { headers: { "Cache-Control": "no-store" } });
     } catch (error) {
       return NextResponse.json(

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { ChunkLoadRecovery } from "@/components/ChunkLoadRecovery";
 import { RuffOpsConsoleSignature } from "@/components/branding/RuffOpsConsoleSignature";
@@ -16,6 +17,12 @@ import "../lib/fitdog-dashboard/theme-readable-canvas.css";
 import "../lib/theme/button-states.css";
 import "../lib/staff/whiteboard-theme.css";
 import "../lib/theme/professional.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--ruffops-font"
+});
 
 export const metadata: Metadata = {
   title: "Fitdog Health & Social Club",
@@ -37,7 +44,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" data-platform="ruffops" suppressHydrationWarning>
+    <html lang="en" data-platform="ruffops" className={inter.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: TV_HARD_REFRESH_BOOT_SCRIPT }} />

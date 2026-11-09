@@ -10,7 +10,7 @@ import type { AdminTab } from "@/lib/admin/types";
 import { ADMIN_TABS } from "@/lib/admin/types";
 import type { AdminBoardType } from "@/lib/admin/types";
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
-import { FITDOG_BRAND, FITDOG_TAB_ICONS } from "@/lib/fitdog-dashboard/assets";
+import { FITDOG_TAB_ICONS } from "@/lib/fitdog-dashboard/assets";
 import { GINGR_NAV_ICON } from "@/lib/gingr/constants";
 import { openGingrSecurely } from "@/lib/gingr/open-gingr";
 import { RUFFLY_NAV_ICON } from "@/lib/ruffly/branding/assets";
@@ -598,10 +598,10 @@ export function Sidebar({
       <aside className={`admin-sidebar ${mobileOpen ? "admin-sidebar--open" : ""} ${collapsed ? "admin-sidebar--collapsed" : ""}`}>
         <div className="flex items-center justify-between gap-3 px-4 py-5">
           <div className="admin-sidebar-brand">
-            <Image src={FITDOG_BRAND.logoBadge128} alt="Fitdog" width={44} height={44} className="rounded-full" />
+            <img src="/assets/ruffops/brand/ruffops-mark.svg" alt="RuffOps" width={44} height={44} />
             <div className="admin-sidebar-brand__text min-w-0">
-              <p className="admin-sidebar-brand__title truncate">{sidebarPanelTitle(role, username)}</p>
-              <p className="admin-sidebar-brand__subtitle truncate">{sidebarPanelSubtitle(role)}</p>
+              <p className="admin-sidebar-brand__title truncate">RuffOps</p>
+              <p className="admin-sidebar-brand__subtitle truncate">{sidebarPanelTitle(role, username)}</p>
             </div>
           </div>
           <button type="button" className="admin-icon-btn admin-sidebar-close" onClick={onMobileClose} aria-label="Close navigation">

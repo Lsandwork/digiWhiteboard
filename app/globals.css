@@ -3892,25 +3892,26 @@ html.lobby-tv-display .lobby-idle-state .social-video-shell {
 }
 
 .admin-theme {
-  --admin-bg: #120b07;
-  --admin-card: #1c120d;
-  --admin-card-alt: #21150f;
-  --admin-border: rgba(255, 166, 0, 0.22);
-  --admin-muted: #c8b8a8;
-  --crossover-bg: #120b07;
-  --crossover-card: #1c120d;
-  --crossover-card-alt: #21150f;
-  --crossover-border: rgba(255, 166, 0, 0.22);
-  --crossover-amber: #f59e0b;
-  --crossover-gold: #fdba24;
-  --crossover-text: #ffffff;
-  --crossover-muted: #c8b8a8;
-  --crossover-green: #22c55e;
-  --crossover-red: #ef4444;
+  --admin-bg: #061326;
+  --admin-card: #0b2040;
+  --admin-card-alt: #10294b;
+  --admin-border: rgba(48, 145, 255, 0.28);
+  --admin-muted: #8297b8;
+  --crossover-bg: #061326;
+  --crossover-card: #0b2040;
+  --crossover-card-alt: #10294b;
+  --crossover-border: rgba(48, 145, 255, 0.28);
+  --crossover-amber: #ff9b22;
+  --crossover-gold: #36c7ff;
+  --crossover-text: #f4f8ff;
+  --crossover-muted: #b7c8e2;
+  --crossover-green: #16d982;
+  --crossover-red: #f04452;
   min-height: 100vh;
+  font-family: var(--ruffops-font), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background:
-    radial-gradient(circle at 10% 0%, rgba(245, 158, 11, 0.1), transparent 35%),
-    radial-gradient(circle at 90% 10%, rgba(100, 185, 220, 0.06), transparent 30%),
+    radial-gradient(circle at 12% 0%, rgba(21, 150, 255, 0.16), transparent 36%),
+    radial-gradient(circle at 88% 8%, rgba(54, 199, 255, 0.08), transparent 32%),
     var(--admin-bg);
   color: var(--crossover-text);
 }
@@ -3933,7 +3934,7 @@ html.lobby-tv-display .lobby-idle-state .social-video-shell {
   max-height: 100vh;
   flex-direction: column;
   border-right: 1px solid var(--admin-border);
-  background: rgba(15, 10, 8, 0.96);
+  background: rgba(6, 19, 38, 0.98);
   transition: padding 0.2s ease, border-color 0.2s ease;
 }
 

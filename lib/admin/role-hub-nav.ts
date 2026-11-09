@@ -88,7 +88,7 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionLabel: "Front Desk Coordinator",
     primary: [
       { tab: "my_shift" },
-      { tab: "front_desk_command" },
+      { tab: "ops_command_center", label: "Live Floor" },
       { tab: "sa_floor_hub" },
       { tab: "sa_whiteboard_hub" },
       { tab: "sa_apps_hub", label: "Apps" },
@@ -104,6 +104,7 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionLabel: "Team Lead",
     primary: [
       { tab: "my_shift" },
+      { tab: "ops_command_center", label: "Live Floor" },
       { tab: "yard_command" },
       { tab: "ruffops_checklist" },
       { tab: "sa_floor_hub" },
@@ -119,6 +120,7 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionLabel: "Trainer",
     primary: [
       { tab: "my_shift" },
+      { tab: "ops_command_center", label: "Live Floor" },
       { tab: "trainer_ops" },
       { tab: "trainer_push" },
       { tab: "package_commissions", label: "Commissions" },
@@ -135,6 +137,7 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionLabel: "Groomer",
     primary: [
       { tab: "my_shift" },
+      { tab: "ops_command_center", label: "Live Floor" },
       { tab: "grooming_push" },
       { tab: "whiteboard_preview" },
       { tab: "sa_floor_hub" },
@@ -150,6 +153,7 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionLabel: "My Panel",
     primary: [
       { tab: "my_shift" },
+      { tab: "ops_command_center", label: "Live Floor" },
       { tab: "sa_floor_hub" },
       { tab: "sa_apps_hub", label: "Apps" },
       { tab: "management_support", label: "Submit Request" },

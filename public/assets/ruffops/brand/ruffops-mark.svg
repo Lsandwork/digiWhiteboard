@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="RuffOps paw icon">
+<g fill="#F4F8FF">
+<ellipse cx="50" cy="43" rx="18" ry="25" transform="rotate(-25 50 43)"/>
+<ellipse cx="88" cy="31" rx="18" ry="24" transform="rotate(-8 88 31)"/>
+<ellipse cx="127" cy="43" rx="18" ry="25" transform="rotate(25 127 43)"/>
+<ellipse cx="24" cy="81" rx="16" ry="22" transform="rotate(-40 24 81)"/>
+<path d="M76 76 C51 76 29 102 29 128 C29 150 47 160 66 151 C80 145 96 145 110 151 C129 160 147 150 147 128 C147 102 124 76 100 76 Z"/>
+</g></svg>
