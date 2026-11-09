@@ -31,8 +31,7 @@ const QUICK_TABS: Array<{ tab: string; label: string; keywords: string }> = [
   { tab: "grooming_push", label: "Grooming Push", keywords: "groomer ready" },
   { tab: "live_fleet", label: "Live Fleet", keywords: "fleet vans gps samsara map" },
   { tab: "route_generator", label: "Route Generator", keywords: "routes vans" },
-  { tab: "media_library", label: "Media Library", keywords: "photos videos" },
-  { tab: "fitdog_alerts", label: "Fitdog Alerts", keywords: "payment" }
+  { tab: "media_library", label: "Media Library", keywords: "photos videos" }
 ];
 
 export function OpsGlobalSearch({
@@ -112,7 +111,8 @@ export function OpsGlobalSearch({
         title="Search RuffOps (⌘K / Ctrl+K)"
       >
         <Search className="h-3.5 w-3.5" />
-        Search
+        <span className="hidden lg:inline">Search dogs, owners, or services...</span>
+        <span className="lg:hidden">Search</span>
         <kbd className="rounded border border-white/15 px-1 text-[10px] text-admin-muted">⌘K</kbd>
       </button>
 
@@ -122,7 +122,7 @@ export function OpsGlobalSearch({
           <input
             autoFocus
             className="admin-input w-full pl-9"
-            placeholder="Dog, owner, employee tool, alert…"
+            placeholder="Search dogs, owners, or services..."
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />

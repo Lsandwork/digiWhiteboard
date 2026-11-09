@@ -1,0 +1,712 @@
+/* My Shift reference tokens — scoped so other admin pages keep their chrome. */
+
+.admin-layout--my-shift {
+  --myshift-canvas: #020b1b;
+  --myshift-sidebar: #04152b;
+  --myshift-panel: #061a36;
+  --myshift-raised: #0a2347;
+  --myshift-border: #075baa;
+  --myshift-border-subtle: #153b65;
+  --myshift-text: #f5f8ff;
+  --myshift-text-secondary: #b8cbe6;
+  --myshift-muted: #7f9fc8;
+  --myshift-blue: #079bff;
+  --myshift-cyan: #00c7e8;
+  --myshift-green: #00d879;
+  --myshift-purple: #6d20d8;
+  --myshift-orange: #f59a00;
+  --myshift-red: #ff263d;
+}
+
+.admin-layout--my-shift .admin-sidebar {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(7, 155, 255, 0.16), transparent 42%),
+    var(--myshift-sidebar);
+  border-right: 1px solid rgba(7, 155, 255, 0.18);
+}
+
+.admin-layout--my-shift .admin-nav-item--active,
+.admin-layout--my-shift .admin-nav-item--active-parent {
+  background: linear-gradient(90deg, rgba(7, 155, 255, 0.38), rgba(7, 155, 255, 0.08));
+  box-shadow: inset 3px 0 0 var(--myshift-blue);
+  color: #f5f8ff;
+}
+
+.admin-layout--my-shift .admin-nav-item:hover:not(.admin-nav-item--active) {
+  background: rgba(7, 155, 255, 0.08);
+}
+
+.admin-layout--my-shift .admin-main,
+.admin-layout--my-shift .admin-content-grid,
+.admin-layout--my-shift .admin-content-main {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(7, 155, 255, 0.16), transparent 34%),
+    radial-gradient(circle at 88% 8%, rgba(0, 199, 232, 0.08), transparent 28%),
+    var(--myshift-canvas);
+}
+
+.admin-layout--my-shift .admin-header {
+  background: rgba(4, 21, 43, 0.92);
+  border-bottom: 1px solid rgba(7, 155, 255, 0.18);
+}
+
+.admin-layout--my-shift .admin-sidebar-help-card,
+.admin-layout--my-shift .theme-select {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .admin-layout--my-shift .admin-header__desktop > .min-w-0 {
+    display: none !important;
+  }
+}
+
+.admin-layout--my-shift .admin-header__meta {
+  flex: 1;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.admin-layout--my-shift .admin-header__meta > button.admin-btn-secondary {
+  flex: 1;
+  max-width: 460px;
+  justify-content: flex-start;
+  border-radius: 999px;
+  border-color: rgba(7, 155, 255, 0.28);
+  background: #061a36;
+  color: #b8cbe6;
+  padding: 8px 14px;
+}
+
+.admin-layout--my-shift .admin-header-brand__label {
+  letter-spacing: 0.08em;
+}
+
+.admin-layout--my-shift .admin-header-brand p.text-xs {
+  color: #f5f8ff;
+}
+
+.ruffops-myshift {
+  position: relative;
+  color: var(--myshift-text, #f5f8ff);
+  font-family: var(--ruffops-font), Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.ruffops-myshift * {
+  box-sizing: border-box;
+}
+
+.myshift-watermark {
+  position: absolute;
+  right: 8%;
+  top: 8px;
+  width: 180px;
+  opacity: 0.08;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.ruffops-myshift > *:not(.myshift-watermark) {
+  position: relative;
+  z-index: 1;
+}
+
+.myshift-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.myshift-header__title-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.myshift-user-tile {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  object-fit: cover;
+  box-shadow: 0 10px 24px rgba(7, 155, 255, 0.32);
+  flex-shrink: 0;
+}
+
+.myshift-header h2 {
+  margin: 0;
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #f5f8ff;
+}
+
+.myshift-header p.lede {
+  margin: 2px 0 0;
+  color: #b8cbe6;
+  font-size: 0.92rem;
+}
+
+.myshift-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.myshift-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(7, 155, 255, 0.28);
+  background: #061a36;
+  border-radius: 16px;
+  padding: 10px 14px;
+  min-height: 52px;
+}
+
+.myshift-chip img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.myshift-chip--shift {
+  border-color: rgba(0, 216, 121, 0.45);
+  background: linear-gradient(180deg, rgba(0, 216, 121, 0.2), rgba(6, 26, 54, 0.92));
+  color: #00d879;
+}
+
+.myshift-chip .k {
+  color: #7f9fc8;
+  font-size: 0.78rem;
+}
+
+.myshift-chip .v {
+  color: #f5f8ff;
+  font-weight: 700;
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.myshift-chip--shift .v {
+  color: #d9ffe8;
+}
+
+.myshift-refresh {
+  padding: 0 4px;
+}
+
+.myshift-kpis {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.myshift-kpi {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  padding: 14px 14px 8px;
+  text-align: left;
+  color: #fff;
+  min-height: 118px;
+  cursor: pointer;
+  transition: transform 0.16s ease, filter 0.16s ease;
+}
+
+.myshift-kpi:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.myshift-kpi:focus-visible,
+.myshift-action:focus-visible,
+.myshift-link:focus-visible,
+.myshift-task:focus-visible,
+.myshift-alert:focus-visible {
+  outline: 2px solid #079bff;
+  outline-offset: 2px;
+}
+
+.myshift-kpi__top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.myshift-kpi .icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.myshift-kpi .value {
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.myshift-kpi .label {
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.myshift-kpi .spark {
+  display: block;
+  width: 100%;
+  height: 28px;
+  margin-top: 6px;
+  filter: brightness(0) invert(1);
+  opacity: 0.55;
+}
+
+.myshift-kpi--blue {
+  background: linear-gradient(165deg, #2db4ff 0%, #079bff 46%, #0466b8 100%);
+  border: 1px solid rgba(173, 224, 255, 0.28);
+  box-shadow: 0 12px 28px rgba(7, 155, 255, 0.22);
+}
+.myshift-kpi--purple {
+  background: linear-gradient(165deg, #8b3cf0 0%, #6d20d8 48%, #4a0fa3 100%);
+  border: 1px solid rgba(214, 180, 255, 0.28);
+  box-shadow: 0 12px 28px rgba(109, 32, 216, 0.24);
+}
+.myshift-kpi--green {
+  background: linear-gradient(165deg, #22ea96 0%, #00d879 48%, #00a35c 100%);
+  border: 1px solid rgba(176, 255, 220, 0.28);
+  box-shadow: 0 12px 28px rgba(0, 216, 121, 0.2);
+}
+.myshift-kpi--orange {
+  background: linear-gradient(165deg, #ffb340 0%, #f59a00 48%, #c67800 100%);
+  border: 1px solid rgba(255, 220, 160, 0.28);
+  box-shadow: 0 12px 28px rgba(245, 154, 0, 0.2);
+}
+.myshift-kpi--cyan {
+  background: linear-gradient(165deg, #2ad6f0 0%, #00c7e8 48%, #0891b2 100%);
+  border: 1px solid rgba(176, 244, 255, 0.28);
+  box-shadow: 0 12px 28px rgba(0, 199, 232, 0.2);
+}
+
+.myshift-grid {
+  display: grid;
+  grid-template-columns: 1.12fr 0.88fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.myshift-col {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.myshift-panel {
+  position: relative;
+  border-radius: 16px;
+  border: 1px solid rgba(7, 155, 255, 0.22);
+  background: #061a36;
+  padding: 14px 16px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  min-width: 0;
+}
+
+.myshift-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.myshift-panel__head h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.myshift-panel__head h3 img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.myshift-link {
+  background: none;
+  border: 0;
+  color: #079bff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.myshift-link:hover {
+  color: #4db8ff;
+}
+
+.myshift-link:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.myshift-shift {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.myshift-shift__meta {
+  display: grid;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: #b8cbe6;
+  align-content: start;
+}
+
+.myshift-shift__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.myshift-shift__row svg {
+  margin-top: 2px;
+  color: #7f9fc8;
+  flex-shrink: 0;
+}
+
+.myshift-shift__row--live {
+  color: #00d879;
+}
+
+.myshift-live-dot {
+  width: 9px;
+  height: 9px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: #00d879;
+  box-shadow: 0 0 0 4px rgba(0, 216, 121, 0.16);
+  flex-shrink: 0;
+}
+
+.myshift-shift__meta strong {
+  color: #f5f8ff;
+  font-weight: 700;
+}
+
+.myshift-hero {
+  width: 100%;
+  height: 100%;
+  min-height: 148px;
+  max-height: 188px;
+  object-fit: cover;
+  object-position: 50% 20%;
+  border-radius: 14px;
+}
+
+.myshift-task,
+.myshift-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 0;
+  border: 0;
+  border-bottom: 1px solid rgba(21, 59, 101, 0.7);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.myshift-task:last-child,
+.myshift-alert:last-child {
+  border-bottom: 0;
+}
+
+.myshift-task:hover,
+.myshift-alert:hover {
+  background: rgba(7, 155, 255, 0.04);
+}
+
+.myshift-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid #079bff;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.myshift-check--done {
+  background: #00d879;
+  border-color: #00d879;
+  color: #020b1b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.myshift-task--done span:last-child {
+  color: #7f9fc8;
+}
+
+.myshift-alert {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+}
+
+.myshift-sev {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.myshift-sev--critical { background: #ff263d; }
+.myshift-sev--high { background: #f59a00; }
+.myshift-sev--attention { background: #079bff; }
+.myshift-sev--informational { background: #00c7e8; }
+
+.myshift-alert time {
+  color: #7f9fc8;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.myshift-team {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.myshift-person {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 64px;
+}
+
+.myshift-avatar {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 2px solid rgba(7, 155, 255, 0.45);
+  background: #0a2347;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+}
+
+.myshift-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.2);
+}
+
+.myshift-avatar .dot {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #00d879;
+  border: 2px solid #04152b;
+}
+
+.myshift-person .n {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #f5f8ff;
+}
+
+.myshift-person .d {
+  font-size: 0.68rem;
+  color: #7f9fc8;
+}
+
+.myshift-more {
+  width: 52px;
+  min-height: 52px;
+  border-radius: 999px;
+  border: 1px dashed rgba(7, 155, 255, 0.4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #b8cbe6;
+  font-weight: 700;
+  background: transparent;
+  cursor: pointer;
+}
+
+.myshift-more__label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #7f9fc8;
+}
+
+.myshift-actions {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.myshift-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-height: 92px;
+  padding: 12px 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(7, 155, 255, 0.45);
+  background: #0a2347;
+  color: #f5f8ff;
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.myshift-action:hover {
+  border-color: #079bff;
+  box-shadow: 0 0 0 1px rgba(7, 155, 255, 0.25);
+}
+
+.myshift-action img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.myshift-action span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.myshift-activity {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(21, 59, 101, 0.7);
+}
+
+.myshift-activity:last-child {
+  border-bottom: 0;
+}
+
+.myshift-activity__title {
+  color: #b8cbe6;
+}
+
+.myshift-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  margin-top: 6px;
+}
+
+.myshift-empty,
+.myshift-sub {
+  color: #7f9fc8;
+  font-size: 0.85rem;
+}
+
+.myshift-empty {
+  padding: 8px 0;
+}
+
+.myshift-sub {
+  padding-top: 2px;
+  line-height: 1.35;
+}
+
+.myshift-banner {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  border-radius: 14px;
+  border: 1px solid rgba(245, 154, 0, 0.35);
+  background: rgba(245, 154, 0, 0.1);
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  color: #ffe7c2;
+}
+
+.myshift-note-list {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.myshift-note-list li {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px 12px;
+}
+
+.myshift-note-list strong {
+  color: #f5f8ff;
+  font-size: 0.9rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .myshift-kpi,
+  .myshift-action {
+    transition: none;
+  }
+  .myshift-kpi:hover {
+    filter: none;
+    transform: none;
+  }
+}
+
+@media (max-width: 1200px) {
+  .myshift-kpis,
+  .myshift-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .myshift-grid,
+  .myshift-shift {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .myshift-kpis,
+  .myshift-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+  .myshift-header h2 {
+    font-size: 1.4rem;
+  }
+  .myshift-team {
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+}

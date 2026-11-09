@@ -97,7 +97,6 @@ export const SUPER_ADMIN_HUBS: Record<(typeof SUPER_ADMIN_HUB_TABS)[number], Sup
           tabLink("crossover_communication", "Team Log", "Team handoff log between shifts."),
           tabLink("owner_follow_up", "Owner Follow Up", "Owner callbacks and follow-ups."),
           tabLink("active_issues", "Active Issues", "Open floor issues and escalations."),
-          tabLink("fitdog_alerts", "Fitdog Alerts", "Payment failures and Fitdog sync alerts."),
           tabLink("vip_auto_book", "VIP Auto Book", "VIP clients who always want auto-booking."),
           tabLink("walks_board", "Walks Board", "Physical whiteboard walk-check alarm."),
           tabLink(

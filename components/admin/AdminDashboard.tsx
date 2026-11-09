@@ -28,7 +28,6 @@ import { TrainerPushPanel } from "@/components/admin/TrainerPushPanel";
 import { TrainerEntryPanel } from "@/components/admin/TrainerEntryPanel";
 import { PackageCommissionsPanel } from "@/components/admin/PackageCommissionsPanel";
 import { TrackIncidentsPanel } from "@/components/admin/TrackIncidentsPanel";
-import { FitdogAlertsPanel } from "@/components/admin/FitdogAlertsPanel";
 import { VetVisitsPanel } from "@/components/admin/VetVisitsPanel";
 import { VipAutoBookPanel } from "@/components/admin/VipAutoBookPanel";
 import { RouteGeneratorPanel } from "@/components/admin/RouteGeneratorPanel";
@@ -449,7 +448,7 @@ export function AdminDashboard() {
     // Front Desk Command is hidden for all users (see canAccessAdminTab) —
     // deep links and in-app navigation buttons must not open it either.
     // Send the user to their normal first accessible tab instead.
-    if (tab === "front_desk_command") {
+    if (tab === "front_desk_command" || tab === "fitdog_alerts") {
       const fallbackTab = firstAccessibleAdminTab(access, effectiveRole, effectiveBoard, { isDemo }) as AdminTab;
       goToBoardTab(effectiveBoard, fallbackTab);
       return;
@@ -963,7 +962,6 @@ export function AdminDashboard() {
 
         {tab === "package_commissions" ? <PackageCommissionsPanel /> : null}
         {tab === "track_incidents" ? <TrackIncidentsPanel /> : null}
-        {tab === "fitdog_alerts" ? <FitdogAlertsPanel /> : null}
         {tab === "vet_visits" ? <VetVisitsPanel /> : null}
         {tab === "vip_auto_book" ? <VipAutoBookPanel /> : null}
         {tab === "route_generator" ? <RouteGeneratorPanel /> : null}

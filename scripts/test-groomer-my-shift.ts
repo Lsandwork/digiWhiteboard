@@ -28,7 +28,7 @@ assert.equal(isGroomerDashboardUser({ legacyRole: "front_desk_coordinator", acce
 assert.equal(isGroomerDashboardUser({ legacyRole: "groomer", access: dualAccess }), false);
 assert.equal(isGroomerDashboardUser({ legacyRole: "team_leader", access: accessFromLegacyRole("tl", "tl@fitdog.test", "team_leader") }), false);
 assert.equal(canViewFitdogAlerts(groomerAccess, "groomer"), false);
-assert.equal(canViewFitdogAlerts(coordinatorAccess, "front_desk_coordinator"), true);
+assert.equal(canViewFitdogAlerts(coordinatorAccess, "front_desk_coordinator"), false);
 
 const actor = { name: "Ivy", email: "ivy@fitdog.test", directoryName: "Ivy" };
 assert.equal(assignedToGroomerUser("Ivy", null, actor), true);

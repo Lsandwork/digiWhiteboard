@@ -214,7 +214,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     steps: [
       "Primary tabs: My Shift, Front Desk Command, Floor Ops, Whiteboard, Apps, Staff Directory, Submit Request, Notifications, Settings, Help.",
       "My Shift Needs Attention includes today’s Gingr facility-calendar services (group walk, puzzle playtime, private training, daily enrichment, club food, taxi, bath/nails/grooming — Free Daily Walk excluded) plus dogs scheduled or checked in with a birthday today from the Gingr dog profile. Previous Front Desk Notes replace Live board on My Shift.",
-      "Floor Ops opens Ops Command Center, Team Log, Owner Follow Up, Active Issues, Fitdog Alerts, VIP Auto Book, Walks, photos, and Shift Handoff.",
+      "Floor Ops opens Ops Command Center, Team Log, Owner Follow Up, Active Issues, VIP Auto Book, Walks, photos, and Shift Handoff.",
       "Whiteboard opens Standard Notices, Grooming Push, Yard Camera Push, and display tools your login allows.",
       "Apps opens Gingr, Ruffly, and other connected apps."
     ],
@@ -231,7 +231,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     steps: [
       "Primary tabs: My Shift, Yard Command, RuffOps Checklist, Floor Ops, Whiteboard, Apps, Submit Request, Settings, Help.",
       "My Shift Needs Attention shows Open Log and Active Issues assigned to you, plus today’s Gingr facility-calendar services (group walk, puzzle playtime, private training, daily enrichment, club food, taxi, bath/nails/grooming — Free Daily Walk excluded) and dogs scheduled or checked in with a birthday today.",
-      "Fitdog Alerts (app.fitdog.com payments) are not on the Team Lead dashboard. Coordinator dashboards, including a coordinator who also has a Team Lead account, stay unchanged.",
+      "Coordinator dashboards, including a coordinator who also has a Team Lead account, stay unchanged.",
       "Floor Ops covers Ops Command Center, Team Log, follow-ups, active issues, walks, the shared RuffOps Checklist, and photo upload.",
       "Whiteboard covers Standard Notices, Yard Camera Push, Grooming Push, and Live Preview.",
       "Apps covers Gingr and Ruffly. Route Generator is Super Admin, Admin, Management, and Transportation only."
@@ -280,7 +280,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     steps: [
       "Trainer primary: My Shift, Trainer Ops, Trainer Push, Commissions, Floor Ops, Apps, Submit Request, Notifications, Settings, Help.",
       "Groomer primary: My Shift, Grooming Push, Live Preview, Floor Ops, Apps, Submit Request, Notifications, Settings, Help. Ops Command Center is under Floor Ops when your login includes it.",
-      "My Shift Needs Attention shows Open Log and Active Issues assigned to you. Today’s additional services come from the Gingr facility calendar (walks, taxi, club food, enrichment, and private training add-ons excluded). Fitdog Alerts are not on Groomer accounts.",
+      "My Shift Needs Attention shows Open Log and Active Issues assigned to you. Today’s additional services come from the Gingr facility calendar (walks, taxi, club food, enrichment, and private training add-ons excluded).",
       "Floor Ops opens Team Log, Walks Board, and Video Links.",
       "Apps opens Gingr and Ruffly."
     ],
@@ -849,7 +849,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     adminTab: "fitdog_alerts",
     adminBoard: "staff",
-    audiences: ["admin", "staff_ops"]
+    audiences: []
   },
   {
     id: "add-admin-user",
@@ -890,7 +890,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Sign in at Fitdog Digi-Board with your assigned email and password.",
       "Your sidebar is cleaned: primary tabs plus Floor Ops, Whiteboard, and Apps hubs (see “Where did my menu items go?”).",
       "Start from My Shift / Front Desk Command or Yard Command for live dogs and Gingr connection status.",
-      "Team Lead dashboard: My Shift Needs Attention is assigned Open Log + Active Issues, plus previous Team Lead Team Log notes. Coordinator dashboards still see the full desk view including Fitdog Alerts.",
+      "Team Lead dashboard: My Shift Needs Attention is assigned Open Log + Active Issues, plus previous Team Lead Team Log notes. Coordinator dashboards still see the full desk view.",
       "Open Floor Ops for Team Log, Owner Follow Up, Active Issues, Walks Board, and photos.",
       "Open Whiteboard for Push Notices and related live alerts; open Apps for Gingr / Ruffly when enabled.",
       "Staff Directory is view-only for Front Desk — search and review staff, but you cannot add, edit, or delete directory rows.",
@@ -970,7 +970,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "management-role",
     title: "What can an Assistant Manager (Management) do?",
-    summary: "Management runs Ops Command Center, Team Log, Fitdog Alerts, commissions, and other staff Digi tools — and can delete any Team Log entry when needed.",
+    summary: "Management runs Ops Command Center, Team Log, commissions, and other staff Digi tools — and can delete any Team Log entry when needed.",
     category: "Users & Login",
     keywords: [
       "assistant manager",
@@ -978,7 +978,6 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "role",
       "permissions",
       "team log",
-      "fitdog alerts",
       "delete",
       "ops command center",
       "commissions",
@@ -989,7 +988,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Sign in at Fitdog Digi-Board with your assigned Management credentials.",
       "Use the cleaned Admin-style sidebar: My Shift, Ops Command Center, Floor Ops, Whiteboard, Support, People & HR, Commissions, Apps, Admin, Help.",
       "Use Ops Command Center / My Shift for live floor state and Gingr Connected / Disconnected health.",
-      "Open Floor Ops / Whiteboard / Apps hubs for Team Log, Push Notices, Fitdog Alerts, Route Generator, and related tools.",
+      "Open Floor Ops / Whiteboard / Apps hubs for Team Log, Push Notices, Route Generator, and related tools.",
       "On Team Log, review Crossover Log (today), Open Log, and Archived Log (prior closed items).",
       "Management can delete any Team Log entry — not only their own.",
       "Open Commissions from the sidebar when you have package/class commission access.",
@@ -1233,7 +1232,6 @@ const ARTICLE_AUDIENCES: Record<string, HelpAudience[]> = {
   "schedule-push-notices": STAFF_OPS_AND_ADMIN,
   "front-desk-log": STAFF_OPS_AND_ADMIN,
   "staff-ops-pages": STAFF_OPS_AND_ADMIN,
-  "fitdog-alerts-help": STAFF_OPS_AND_ADMIN,
   "vip-auto-book-help": STAFF_OPS_AND_ADMIN,
   "add-admin-user": ADMIN_ONLY,
   "front-desk-coordinator": STAFF_OPS_AND_ADMIN,
@@ -1272,7 +1270,6 @@ const MANAGEMENT_EXTRA_ARTICLE_IDS = new Set([
   "ruffops-reports",
   "front-desk-log",
   "staff-ops-pages",
-  "fitdog-alerts-help",
   "vip-auto-book-help",
   "ops-command-center-help",
   "grooming-push-help",
@@ -1349,6 +1346,7 @@ function getArticleAudiences(article: HelpArticle): HelpAudience[] {
 }
 
 export function articleVisibleToRole(article: HelpArticle, role: AdminUserRole): boolean {
+  if (article.id === "fitdog-alerts-help") return false;
   if (isFullAdminRole(role)) return true;
   const audiences = getArticleAudiences(article);
 

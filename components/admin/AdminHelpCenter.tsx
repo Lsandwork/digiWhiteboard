@@ -33,7 +33,6 @@ const QUICK_LINKS: QuickLinkItem[] = [
   { href: "/admin?board=staff&tab=grooming_push", label: "Grooming Push", roles: ["admin", "staff_ops"] },
   { href: "/admin?board=staff&tab=package_commissions", label: "Commissions", roles: ["admin", "staff_ops"] },
   { href: "/admin?board=staff&tab=route_generator", label: "Route Generator", roles: ["admin", "staff_ops"] },
-  { href: "/admin?board=staff&tab=fitdog_alerts", label: "Fitdog Alerts", roles: ["admin", "staff_ops"] },
   { href: "/admin?board=staff&tab=vip_auto_book", label: "VIP Auto Book", roles: ["admin", "staff_ops"] },
   { href: "/admin?board=staff&tab=push_notices", label: "Push Notices", roles: ["admin", "staff_ops"] },
   { href: "/admin?board=staff&tab=walks_board", label: "Walks Board", roles: ["admin", "staff_ops", "handler"] },

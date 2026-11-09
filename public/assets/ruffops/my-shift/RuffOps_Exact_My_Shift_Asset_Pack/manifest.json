@@ -1,0 +1,18 @@
+{
+  "name": "RuffOps Exact My Shift Graphics Asset Pack",
+  "source": "User-supplied My Shift dashboard mockup",
+  "reference_dimensions": {
+    "width": 1536,
+    "height": 1024
+  },
+  "file_count": 91,
+  "asset_types": [
+    "exact screenshot crops",
+    "photo crops",
+    "avatar crops",
+    "PNG icon crops",
+    "SVG sparklines",
+    "design tokens",
+    "Cursor integration prompt"
+  ]
+}

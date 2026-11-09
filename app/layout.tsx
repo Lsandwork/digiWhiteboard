@@ -18,6 +18,7 @@ import "../lib/theme/button-states.css";
 import "../lib/staff/whiteboard-theme.css";
 import "../lib/theme/professional.css";
 import "../lib/theme/ruffops-shell.css";
+import "../lib/theme/my-shift.css";
 
 const inter = Inter({
   subsets: ["latin"],

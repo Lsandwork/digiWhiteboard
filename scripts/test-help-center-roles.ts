@@ -27,7 +27,6 @@ const REQUIRED_BY_ROLE: Record<AdminUserRole, string[]> = {
   owner_admin: [
     "env-vars",
     "front-desk-log",
-    "fitdog-alerts-help",
     "add-admin-user",
     "viewer-basics",
     "ops-command-center-help",
@@ -38,7 +37,6 @@ const REQUIRED_BY_ROLE: Record<AdminUserRole, string[]> = {
   manager_admin: [
     "env-vars",
     "front-desk-log",
-    "fitdog-alerts-help",
     "add-admin-user",
     "viewer-basics",
     "ops-command-center-help",
@@ -50,7 +48,6 @@ const REQUIRED_BY_ROLE: Record<AdminUserRole, string[]> = {
     "front-desk-log",
     "management-role",
     "staff-ops-pages",
-    "fitdog-alerts-help",
     "ops-command-center-help",
     "commissions-help",
     "route-generator-help"
@@ -59,7 +56,6 @@ const REQUIRED_BY_ROLE: Record<AdminUserRole, string[]> = {
     "front-desk-log",
     "front-desk-coordinator",
     "staff-ops-pages",
-    "fitdog-alerts-help",
     "ops-command-center-help",
     "route-generator-help"
   ],
@@ -67,7 +63,6 @@ const REQUIRED_BY_ROLE: Record<AdminUserRole, string[]> = {
     "front-desk-log",
     "front-desk-coordinator",
     "staff-ops-pages",
-    "fitdog-alerts-help",
     "ops-command-center-help",
     "route-generator-help"
   ],
@@ -115,6 +110,12 @@ assert.equal(
   articleVisibleToRole(HELP_ARTICLES.find((a) => a.id === "front-desk-log")!, "assistant_manager"),
   true,
   "assistant manager must see team log help"
+);
+
+assert.equal(
+  articleVisibleToRole(HELP_ARTICLES.find((a) => a.id === "fitdog-alerts-help")!, "owner_admin"),
+  false,
+  "Fitdog Alerts help is retired from RuffOps"
 );
 
 console.log(

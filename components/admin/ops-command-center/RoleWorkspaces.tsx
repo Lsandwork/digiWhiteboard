@@ -106,9 +106,6 @@ export function FrontDeskCommandPanel({ onNavigate }: { onNavigate?: (tab: strin
         <Lane title="Ready / checking out" dogs={leaving.map((d) => toCard(d, "ready_for_pickup"))} onOpen={setSelected} />
       </div>
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="admin-btn-secondary" onClick={() => onNavigate?.("fitdog_alerts")}>
-          Package / payment attention
-        </button>
         <button type="button" className="admin-btn-secondary" onClick={() => onNavigate?.("owner_follow_up")}>
           Owner needs contact
         </button>

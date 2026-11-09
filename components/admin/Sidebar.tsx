@@ -1,7 +1,5 @@
 "use client";
 
-import { readResponseJson } from "@/lib/http/read-response-json";
-
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -11,11 +9,11 @@ import { ADMIN_TABS } from "@/lib/admin/types";
 import type { AdminBoardType } from "@/lib/admin/types";
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
 import { FITDOG_TAB_ICONS } from "@/lib/fitdog-dashboard/assets";
+import { MY_SHIFT_ASSETS } from "@/lib/ops-command-center/my-shift-assets";
 import { GINGR_NAV_ICON } from "@/lib/gingr/constants";
 import { openGingrSecurely } from "@/lib/gingr/open-gingr";
 import { RUFFLY_NAV_ICON } from "@/lib/ruffly/branding/assets";
 import { getAdminSidebarRoleLabel, isGroomerRole, isTeamLeaderRole, isTrainerRole } from "@/lib/admin/users";
-import { startVisibilityAwareInterval } from "@/lib/visibility-poll";
 import { isFrontDeskCoordinatorLoginEmail } from "@/lib/admin/team-lead-profile";
 import {
   bucketNavEntries,
@@ -83,7 +81,7 @@ function sectionContainsActive(
 }
 
 function NavIcon({ tab }: { tab: AdminTab }) {
-  const iconSrc = FITDOG_TAB_ICONS[tab];
+  const iconSrc = MY_SHIFT_ASSETS.nav[tab] || FITDOG_TAB_ICONS[tab];
   if (iconSrc) return <FitdogDashboardIcon src={iconSrc} size={18} className="admin-nav-item__icon shrink-0" />;
   return <span className="admin-nav-item__icon inline-block h-[18px] w-[18px] shrink-0 rounded bg-white/10" aria-hidden />;
 }
@@ -142,7 +140,7 @@ function SidebarNavGroup({
   onSelect: (tab: AdminTab) => void;
 }) {
   const childActive = entry.children.some((child) => child.tab === activeTab);
-  const groupIcon = FITDOG_TAB_ICONS[entry.children[0]?.tab];
+  const groupIcon = MY_SHIFT_ASSETS.nav[entry.children[0]?.tab || ""] || FITDOG_TAB_ICONS[entry.children[0]?.tab];
   const groupBadge = entry.children.reduce((sum, child) => sum + (badgeCounts?.[child.tab] || 0), 0);
 
   return (
@@ -478,7 +476,7 @@ export function Sidebar({
   const userCollapsedSectionsRef = useRef(new Set<string>());
   const prevActiveGroupIdRef = useRef<string | null>(null);
   const prevActiveSectionIdRef = useRef<string | null>(null);
-  const [badgeCounts, setBadgeCounts] = useState<Partial<Record<AdminTab, number>>>({});
+  const badgeCounts: Partial<Record<AdminTab, number>> = {};
   const [needHelpVisible, setNeedHelpVisible] = useState(false);
   const [needHelpConfirmOpen, setNeedHelpConfirmOpen] = useState(false);
 
@@ -490,26 +488,6 @@ export function Sidebar({
     }
   }, []);
 
-  useEffect(() => {
-    if (!visibleTabs.includes("fitdog_alerts")) return;
-    let cancelled = false;
-    async function loadBadges() {
-      try {
-        const res = await fetch("/api/admin/fitdog-alerts?view=badge", { cache: "no-store" });
-        if (!res.ok) return;
-        const json = (await readResponseJson(res)) as { count?: number };
-        if (!cancelled) setBadgeCounts({ fitdog_alerts: Number(json.count || 0) });
-      } catch {
-        // Badge fetch is best-effort.
-      }
-    }
-    void loadBadges();
-    const stop = startVisibilityAwareInterval(() => void loadBadges(), 30_000);
-    return () => {
-      cancelled = true;
-      stop();
-    };
-  }, [visibleTabs]);
 
   useEffect(() => {
     if (!activeGroupId) return;
@@ -676,11 +654,22 @@ export function Sidebar({
             <div className="min-w-0 flex-1">
               <p className="admin-user-card__name truncate">{displayName?.trim() || username.split("@")[0] || username}</p>
               <p className="admin-user-card__meta truncate">{roleLabel}</p>
-              <p className="admin-user-card__meta truncate">{username}</p>
+              <button type="button" className="admin-user-card__meta truncate text-left underline-offset-2 hover:underline" onClick={onLogout}>
+                Switch Account
+              </button>
             </div>
-            <button type="button" className="admin-icon-btn shrink-0" onClick={onLogout} aria-label="Log out">
-              <FitdogDashboardIcon src="/assets/fitdog/ui/logout-64.png" size={18} alt="Log out" />
+            <button type="button" className="admin-icon-btn shrink-0" onClick={onLogout} aria-label="Switch account">
+              <FitdogDashboardIcon src="/assets/fitdog/ui/logout-64.png" size={18} alt="Switch account" />
             </button>
+          </div>
+          <div className="rounded-2xl border border-sky-400/20 bg-[#061a36] px-3 py-3">
+            <div className="flex items-center gap-2">
+              <img src="/assets/ruffops/brand/ruffops-mark.svg" alt="" width={28} height={28} />
+              <div>
+                <p className="text-sm font-bold text-white">RuffOps</p>
+                <p className="text-[11px] text-sky-200/80">Care. Play. Belong.</p>
+              </div>
+            </div>
           </div>
         </div>
       </aside>

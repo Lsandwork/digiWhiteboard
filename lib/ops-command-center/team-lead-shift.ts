@@ -1,6 +1,6 @@
 import { isFrontDeskDepartmentLabel, isTeamLeadDepartmentLabel } from "@/lib/admin/team-lead-profile";
 import type { ActiveIssue, CrossoverMessage, StaffDirectoryMember } from "@/lib/staff/admin-ops";
-import { belongsInOpenLog, shiftLogSubmittedBy } from "@/lib/staff/front-desk-log";
+import { belongsInCrossoverLog, belongsInOpenLog, shiftLogSubmittedBy } from "@/lib/staff/front-desk-log";
 
 export type ShiftActor = {
   name?: string | null;
@@ -17,6 +17,7 @@ export type TeamLeadShiftNote = {
   createdAt: string;
   dogName?: string | null;
   status?: string | null;
+  department?: string | null;
 };
 
 function normalizeToken(value?: string | null) {
@@ -190,35 +191,35 @@ export function actorHomeDepartment(
 }
 
 /**
- * Peer handoff notes for the actor's staff-directory department only.
- * Front Desk sees Front Desk peers (not Team Lead); Team Lead sees Team Lead; etc.
+ * Facility-wide Team Log notes for the current Pacific day.
+ * Every department's entries appear on My Shift. After midnight Pacific the list
+ * clears so the next day only shows that day's notes.
  */
 export function previousDepartmentShiftNotes(
   messages: CrossoverMessage[],
-  actor: ShiftActor,
+  _actor: ShiftActor,
   directory: StaffDirectoryMember[],
   department: string | null,
-  limit = 10
+  limit = 50
 ): { department: string | null; previousLeadName: string | null; notes: TeamLeadShiftNote[] } {
   const home = normalizeStaffDepartmentLabel(department);
-  if (!home) return { department: null, previousLeadName: null, notes: [] };
 
-  const peerNotes = messages
-    .filter((message) => messageDepartmentLabel(message, directory) === home)
-    .filter((message) => !isCurrentUserSubmitter(message, actor))
+  const todaysNotes = messages
+    .filter((message) => belongsInCrossoverLog(message))
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-  if (!peerNotes.length) return { department: home, previousLeadName: null, notes: [] };
+  if (!todaysNotes.length) return { department: home, previousLeadName: null, notes: [] };
 
-  const previousLeadName = shiftLogSubmittedBy(peerNotes[0]);
-  const notes = peerNotes.slice(0, limit).map((message) => ({
+  const previousLeadName = shiftLogSubmittedBy(todaysNotes[0]);
+  const notes = todaysNotes.slice(0, limit).map((message) => ({
     id: message.id,
     title: message.subject || message.log_type || "Shift note",
     detail: String(message.details || message.message || "").trim() || null,
     submittedBy: shiftLogSubmittedBy(message),
     createdAt: message.created_at,
     dogName: message.related_dog_name,
-    status: message.status
+    status: message.status,
+    department: messageDepartmentLabel(message, directory)
   }));
 
   return { department: home, previousLeadName, notes };
