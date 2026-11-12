@@ -277,7 +277,19 @@ assert.equal(january?.start.startsWith("2026-01-15T08:00:00"), true);
 assert.equal((ADMIN_TABS as readonly string[]).includes("body_checks"), true);
 assert.equal(getTabLabel("body_checks"), "Body Checks");
 assert.equal(parentHubForTab("body_checks"), "sa_floor_hub");
-for (const role of ["daycare", "team_leader", "groomer", "front_desk_coordinator", "manager_admin"]) {
+for (const role of [
+  "daycare",
+  "team_leader",
+  "groomer",
+  "front_desk_coordinator",
+  "manager_admin",
+  "overnight",
+  "trainer",
+  "driver",
+  "hiker",
+  "viewer",
+  "maintenance"
+]) {
   assert.equal(
     canAccessAdminTab(accessFromLegacyRole(`u-${role}`, `${role}@fitdog.test`, role), "body_checks", role, "staff"),
     true,

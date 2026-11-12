@@ -34,6 +34,7 @@ import { availableActionsForKind } from "@/lib/ops-command-center/work-item-acti
 import type { UserAccess } from "@/lib/admin/permissions";
 import { isCoordinatorDashboardUser, isTeamLeadDashboardUser } from "@/lib/admin/team-lead-profile";
 import { isGroomerDashboardUser } from "@/lib/admin/groomer-profile";
+import { isOvernightLegacyRole } from "@/lib/admin/permissions";
 import {
   assignedActiveIssues,
   assignedGroomerActiveIssues,
@@ -499,6 +500,7 @@ export async function buildOpsCommandCenterSnapshot(input: {
     access: input.access,
     email: input.email
   });
+  const overnightDashboard = isOvernightLegacyRole(input.roleKey);
   const deskFacilityFeed = yardTeamLead || coordinatorDashboard;
 
   const [
@@ -709,7 +711,9 @@ export async function buildOpsCommandCenterSnapshot(input: {
         ...staffFeed.issueItems.filter((item) => item.priority === "critical" || item.priority === "high"),
         ...staffFeed.followUpItems.filter((item) => item.priority === "critical" || item.priority === "high" || dueSoon(item.dueAt)),
         ...taskWork.filter((item) => item.priority === "critical" || item.priority === "high" || dueSoon(item.dueAt)),
-        ...notifWork.filter((item) => item.priority === "critical" || item.priority === "high")
+        ...(overnightDashboard
+          ? []
+          : notifWork.filter((item) => item.priority === "critical" || item.priority === "high"))
       ];
 
   const needsAttentionRaw: NeedsAttentionItem[] = needsAttentionSource.map((item) => ({

@@ -18,6 +18,8 @@ assert.match(dash, /Grooming Appts/);
 assert.match(dash, /Shift Details/);
 assert.match(dash, /Today’s Tasks/);
 assert.match(dash, /Important Alerts/);
+assert.match(dash, /activeIssuesForImportantAlerts/);
+assert.match(dash, /No active issues right now/);
 assert.match(dash, /Team on Shift/);
 assert.match(dash, /Quick Actions/);
 assert.match(dash, /Recent Activity/);

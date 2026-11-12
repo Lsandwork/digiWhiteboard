@@ -21,7 +21,7 @@ const visible = ADMIN_TABS.filter((tab) => canAccessAdminTab(access, tab, "overn
 assert.deepEqual(
   [...visible].sort(),
   [...OVERNIGHT_TABS].sort(),
-  "overnight staff panel is exactly the six allowed tabs"
+  "overnight staff panel is exactly the allowed tabs"
 );
 
 for (const tab of OVERNIGHT_TABS) {
@@ -29,11 +29,12 @@ for (const tab of OVERNIGHT_TABS) {
   assert.equal(canAccessAdminTab(access, tab, "overnight", "lobby"), false, `overnight ${tab} stays off the lobby board`);
 }
 
+assert.equal(canAccessAdminTab(access, "body_checks", "overnight", "staff"), true, "overnight opens body_checks");
+
 for (const tab of [
   "push_notices",
   "checklist",
   "walks_board",
-  "body_checks",
   "package_group_walks",
   "bulk_photo_upload",
   "users",
@@ -66,6 +67,7 @@ const nav = buildStaffPanelNav(visible, "staff", "overnight");
 assert.deepEqual(itemLabels(nav), [
   "My Shift",
   "Team Log",
+  "Body Checks",
   "Submit Request",
   "Notifications",
   "Global Settings",

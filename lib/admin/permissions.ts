@@ -883,10 +883,11 @@ export const DOG_HANDLER_TABS = [
   "help"
 ] as const;
 
-/** Overnight staff panel — only these six tools. */
+/** Overnight staff panel — core overnight tools plus floor body checks. */
 export const OVERNIGHT_TABS = [
   "my_shift",
   "crossover_communication",
+  "body_checks",
   "management_support",
   "notifications",
   "settings",
@@ -1623,7 +1624,7 @@ export function canAccessAdminTab(
     return false;
   }
 
-  // Overnight accounts stay on the staff board and only the six panel tabs.
+  // Overnight accounts stay on the staff board and only the overnight panel tabs.
   if (isOvernightLegacyRole(legacyRole)) {
     if (board !== "staff") return false;
     return (OVERNIGHT_TABS as readonly string[]).includes(tab);

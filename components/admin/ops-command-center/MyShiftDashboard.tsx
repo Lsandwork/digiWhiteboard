@@ -92,6 +92,45 @@ function severityMark(severity: string) {
   return "1";
 }
 
+function priorityRank(priority: string) {
+  if (priority === "critical") return 0;
+  if (priority === "high") return 1;
+  if (priority === "attention") return 2;
+  return 3;
+}
+
+type MyShiftAlertRow = {
+  id: string;
+  severity: string;
+  title: string;
+  detail: string | null;
+  hrefTab: string | null;
+  dogName?: string | null;
+};
+
+function activeIssuesForImportantAlerts(data: OpsCommandCenterSnapshot): MyShiftAlertRow[] {
+  const fromNeeds = (data.needsAttention || []).filter((item) => item.kind === "active_issue");
+  const fromWork = (data.openWork || [])
+    .filter((item) => item.kind === "active_issue")
+    .map((item) => ({
+      id: item.id,
+      severity: item.priority,
+      title: item.title,
+      detail: item.detail,
+      hrefTab: item.hrefTab || "active_issues",
+      dogName: item.dogName ?? null
+    }));
+  const seen = new Set<string>();
+  return [...fromNeeds, ...fromWork]
+    .filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    })
+    .sort((a, b) => priorityRank(a.severity) - priorityRank(b.severity))
+    .slice(0, 4);
+}
+
 function KpiGlyph({ name }: { name: "dogs" | "boarding" | "taxi" | "classes" | "grooming" }) {
   const common = { width: 26, height: 26, viewBox: "0 0 24 24", fill: "none", "aria-hidden": true as const };
   if (name === "dogs") {
@@ -191,7 +230,7 @@ export function MyShiftDashboard({
     taskId: task.id
   }));
   const taskRows = (tasks.length ? tasks : data.openWork || []).slice(0, 5);
-  const alerts = (data.needsAttention?.length ? data.needsAttention : []).slice(0, 4);
+  const alerts = activeIssuesForImportantAlerts(data);
   const activity = (data.recentEvents || []).slice(0, 5);
   const lead =
     team.find((member) => /lead|manager|coordinator/i.test(`${member.role} ${member.department}`))?.name ||
@@ -393,7 +432,7 @@ export function MyShiftDashboard({
                 </button>
               ))
             ) : (
-              <p className="myshift-empty">No urgent alerts right now.</p>
+              <p className="myshift-empty">No active issues right now.</p>
             )}
           </section>
 

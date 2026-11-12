@@ -195,6 +195,7 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     primary: [
       { tab: "my_shift" },
       { tab: "crossover_communication" },
+      { tab: "body_checks" },
       { tab: "management_support", label: "Submit Request" },
       { tab: "notifications" },
       { tab: "settings" },
