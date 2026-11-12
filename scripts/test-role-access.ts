@@ -24,6 +24,7 @@ const roles: AdminUserRole[] = [
   "daycare",
   "driver",
   "hiker",
+  "overnight",
   "marketing",
   "viewer"
 ];
@@ -187,7 +188,7 @@ assert.equal(isFullAdminRole(""), false, "empty role is not full admin (users)")
 
 assert.equal(canCreateFrontDeskLogForRole("viewer"), false, "viewer cannot create team log");
 assert.equal(canEditFrontDeskLogForRole("viewer"), false, "viewer cannot edit team log");
-assert.equal(canCreateFrontDeskLogForRole("overnight"), false, "overnight cannot create team log");
+assert.equal(canCreateFrontDeskLogForRole("overnight"), true, "overnight can create team log");
 assert.equal(canEditFrontDeskLogForRole("maintenance"), false, "maintenance cannot edit team log");
 assert.equal(canCreateFrontDeskLogForRole("daycare"), true, "handlers can create team log");
 assert.equal(canEditFrontDeskLogForRole("daycare"), true, "handlers can edit team log");

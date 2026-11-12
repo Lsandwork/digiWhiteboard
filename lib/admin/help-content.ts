@@ -1327,6 +1327,15 @@ const DOG_HANDLER_ARTICLE_IDS = new Set([
   "troubleshoot-no-checkouts"
 ]);
 
+const OVERNIGHT_ARTICLE_IDS = new Set([
+  ...CORE_ACCOUNT_ARTICLE_IDS,
+  "what-is-this",
+  "cleaned-menu-hubs",
+  "need-help-card-dismiss",
+  "front-desk-log",
+  "ops-command-center-help"
+]);
+
 const MARKETING_ARTICLE_IDS = new Set([
   ...CORE_ACCOUNT_ARTICLE_IDS,
   "what-is-this",
@@ -1360,6 +1369,10 @@ export function articleVisibleToRole(article: HelpArticle, role: AdminUserRole):
 
   if (role === "daycare") {
     return DOG_HANDLER_ARTICLE_IDS.has(article.id);
+  }
+
+  if (role === "overnight") {
+    return OVERNIGHT_ARTICLE_IDS.has(article.id);
   }
 
   if (role === "marketing") {

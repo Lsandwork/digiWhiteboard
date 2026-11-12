@@ -51,6 +51,7 @@ const dashboardRoleOptions: { value: AdminUserRole; label: string }[] = [
   { value: "trainer", label: "Trainer" },
   { value: "daycare", label: "Dog Handler" },
   { value: "driver", label: "Driver/Hiker" },
+  { value: "overnight", label: "Overnight" },
   { value: "front_desk_coordinator", label: "Front Desk - Coordinator" },
   { value: "team_leader", label: "Team Lead" },
   { value: "manager_admin", label: "Manager Admin" },

@@ -111,6 +111,7 @@ const ROLES = [
   "daycare",
   "driver",
   "hiker",
+  "overnight",
   "marketing",
   "viewer",
   ""
