@@ -48,7 +48,7 @@ const PRIMARY_ROLE_OPTIONS: { value: RoleKey; description: string }[] = [
     value: "driver",
     description: "Driver/Hiker staff board — same pages and permissions as Dog Handler."
   },
-  { value: "overnight", description: "Overnight staff board access." },
+  { value: "overnight", description: "Overnight panel: My Shift, Team Log, Submit Request, Notifications, Global Settings, and Help Center." },
   { value: "maintenance", description: "Maintenance staff board access." },
   { value: "staff", description: "Basic staff board access." },
   { value: "viewer", description: "Read-only dashboard access." }

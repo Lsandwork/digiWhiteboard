@@ -34,6 +34,7 @@ export type AdminUserRole =
   | "daycare"
   | "driver"
   | "hiker"
+  | "overnight"
   | "marketing"
   | "viewer";
 export type AdminUserStatus = "active" | "disabled";
@@ -49,6 +50,7 @@ export const ADMIN_USER_ROLE_LABELS: Record<AdminUserRole, string> = {
   daycare: "Dog Handler",
   driver: "Driver/Hiker",
   hiker: "Driver/Hiker",
+  overnight: "Overnight",
   marketing: "Marketing Account",
   viewer: "Viewer"
 };
@@ -65,6 +67,7 @@ export const ADMIN_SIDEBAR_ROLE_LABELS: Record<AdminUserRole, string> = {
   daycare: "Dog Handler",
   driver: "Driver/Hiker",
   hiker: "Driver/Hiker",
+  overnight: "Overnight",
   marketing: "Marketing Account",
   viewer: "Viewer"
 };
@@ -194,6 +197,7 @@ export function canFileStaffComplaint(role?: string | null) {
     role === "daycare" ||
     role === "driver" ||
     role === "hiker" ||
+    role === "overnight" ||
     role === "viewer"
   );
 }
@@ -206,7 +210,7 @@ export function canSubmitGroomerComplaint(role?: string | null) {
 /** Groomer-style request form — groomers, dog handlers, and driver/hikers. */
 export function canSubmitGroomerRequest(role?: string | null) {
   if (isAdminOrManagementRole(role)) return false;
-  return role === "groomer" || role === "daycare" || role === "driver" || role === "hiker";
+  return role === "groomer" || role === "daycare" || role === "driver" || role === "hiker" || role === "overnight";
 }
 
 /** Groomers and dog handlers can review their own filed complaints and requests. */

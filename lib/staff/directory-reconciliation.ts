@@ -20,7 +20,8 @@ export const STAFF_DIRECTORY_DEPARTMENTS = [
   "Management",
   "Marketing",
   "Maintenance",
-  "Transportation"
+  "Transportation",
+  "Overnight"
 ] as const;
 
 export const STAFF_DIRECTORY_DASHBOARD_ROLES: AdminUserRole[] = [
@@ -34,6 +35,7 @@ export const STAFF_DIRECTORY_DASHBOARD_ROLES: AdminUserRole[] = [
   "daycare",
   "driver",
   "hiker",
+  "overnight",
   "marketing",
   "viewer"
 ];

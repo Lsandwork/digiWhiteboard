@@ -242,6 +242,8 @@ function defaultDepartmentsForRole(role: RoleKey): DepartmentKey[] {
     case "driver":
     case "hiker":
       return ["transportation"];
+    case "overnight":
+      return ["overnight"];
     default:
       return [];
   }

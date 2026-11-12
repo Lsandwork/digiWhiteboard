@@ -41,7 +41,8 @@ export const HUB_NAV_ROLES = [
   "groomer",
   "daycare",
   "driver",
-  "hiker"
+  "hiker",
+  "overnight"
 ] as const satisfies readonly AdminUserRole[];
 
 export type HubNavRole = (typeof HUB_NAV_ROLES)[number];
@@ -182,6 +183,18 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
       { tab: "my_shift" },
       { tab: "sa_floor_hub" },
       { tab: "sa_apps_hub", label: "Apps" },
+      { tab: "management_support", label: "Submit Request" },
+      { tab: "notifications" },
+      { tab: "settings" },
+      { tab: "help" }
+    ]
+  },
+  overnight: {
+    sectionId: "overnight_home",
+    sectionLabel: "Overnight",
+    primary: [
+      { tab: "my_shift" },
+      { tab: "crossover_communication" },
       { tab: "management_support", label: "Submit Request" },
       { tab: "notifications" },
       { tab: "settings" },

@@ -17,6 +17,7 @@ const ALL_ROLES: AdminUserRole[] = [
   "daycare",
   "driver",
   "hiker",
+  "overnight",
   "marketing",
   "viewer"
 ];
@@ -71,6 +72,7 @@ const REQUIRED_BY_ROLE: Record<AdminUserRole, string[]> = {
   daycare: ["front-desk-log", "dog-handler-basics", "ops-command-center-help"],
   driver: ["front-desk-log", "dog-handler-basics", "ops-command-center-help", "route-generator-help"],
   hiker: ["front-desk-log", "dog-handler-basics", "ops-command-center-help", "route-generator-help"],
+  overnight: ["front-desk-log", "ops-command-center-help"],
   marketing: ["marketing-account", "lobby-promotions", "lobby-tv-cast", "what-is-this"],
   viewer: ["lobby-messages", "lobby-tv-cast", "viewer-basics", "what-is-this"]
 };

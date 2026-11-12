@@ -656,7 +656,7 @@ const GROOMER_PERMISSIONS: PermissionKey[] = [
   "view_ops_dog_profile",
 ];
 
-/** Read-only staff roles (viewer / overnight / maintenance / generic staff). */
+/** Read-only staff roles (viewer / maintenance / generic staff). Overnight has its own panel. */
 const STAFF_VIEWER_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
   "view_staff_whiteboard",
@@ -883,6 +883,16 @@ export const DOG_HANDLER_TABS = [
   "help"
 ] as const;
 
+/** Overnight staff panel — only these six tools. */
+export const OVERNIGHT_TABS = [
+  "my_shift",
+  "crossover_communication",
+  "management_support",
+  "notifications",
+  "settings",
+  "help"
+] as const;
+
 export const MARKETING_TABS = [
   "content",
   "promotions",
@@ -909,7 +919,17 @@ export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   daycare: DOG_HANDLER_PERMISSIONS,
   driver: [...DOG_HANDLER_PERMISSIONS, ...TRANSPORTATION_ROUTE_PERMISSIONS],
   hiker: [...DOG_HANDLER_PERMISSIONS, ...TRANSPORTATION_ROUTE_PERMISSIONS],
-  overnight: STAFF_VIEWER_PERMISSIONS,
+  overnight: [
+    "view_admin_panel",
+    "view_my_shift",
+    "view_front_desk_log",
+    "create_front_desk_log",
+    "edit_front_desk_log",
+    "submit_groomer_complaint",
+    "submit_groomer_request",
+    "view_own_groomer_submissions",
+    ...STAFF_NOTIFICATION_PERMISSIONS
+  ],
   maintenance: STAFF_VIEWER_PERMISSIONS,
   staff: STAFF_VIEWER_PERMISSIONS,
   marketing: MARKETING_PERMISSIONS,
@@ -1511,6 +1531,10 @@ export function isDogHandlerLegacyRole(legacyRole?: string | null) {
   );
 }
 
+export function isOvernightLegacyRole(legacyRole?: string | null) {
+  return legacyRole === "overnight";
+}
+
 /** Staff DigiBoard roles — staff board only (not lobby admin). */
 export function isStaffDigiBoardOnlyLegacyRole(legacyRole?: string | null) {
   return (
@@ -1518,7 +1542,8 @@ export function isStaffDigiBoardOnlyLegacyRole(legacyRole?: string | null) {
     isGroomerLegacyRole(legacyRole) ||
     isTrainerLegacyRole(legacyRole) ||
     isDogHandlerLegacyRole(legacyRole) ||
-    isFrontDeskCoordinatorLegacyRole(legacyRole)
+    isFrontDeskCoordinatorLegacyRole(legacyRole) ||
+    isOvernightLegacyRole(legacyRole)
   );
 }
 
@@ -1596,6 +1621,12 @@ export function canAccessAdminTab(
   // Retired from RuffOps — deny before the full-admin early return so it leaves every sidebar.
   if (tab === "fitdog_alerts") {
     return false;
+  }
+
+  // Overnight accounts stay on the staff board and only the six panel tabs.
+  if (isOvernightLegacyRole(legacyRole)) {
+    if (board !== "staff") return false;
+    return (OVERNIGHT_TABS as readonly string[]).includes(tab);
   }
 
   // Route Generator / Live Fleet are staff-board only — check before the full-admin early return
@@ -1985,6 +2016,13 @@ export function firstAccessibleAdminTab(
       if (canAccessAdminTab(access, tab, legacyRole, resolvedBoard, options)) return tab;
     }
     return "checklist";
+  }
+
+  if (isOvernightLegacyRole(legacyRole) && resolvedBoard === "staff") {
+    for (const tab of OVERNIGHT_TABS) {
+      if (canAccessAdminTab(access, tab, legacyRole, resolvedBoard, options)) return tab;
+    }
+    return "my_shift";
   }
 
   if (isMarketingLegacyRole(legacyRole) && resolvedBoard === "lobby") {
