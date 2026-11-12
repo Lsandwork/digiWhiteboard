@@ -150,8 +150,9 @@ const QUICK_TOOLS: Record<RoleKey, StaffQuickTool[]> = {
     { tab: "walks_board", label: "Walks board", hint: "Outings on the board" }
   ],
   overnight: [
-    { tab: "overnight_command", label: "Overnight", hint: "Rounds and handoff" },
-    { tab: "shift_handoff", label: "Shift handoff", hint: "Structured pass-down" }
+    { tab: "body_checks", label: "Body checks", hint: "Wellness follow-ups on rounds" },
+    { tab: "crossover_communication", label: "Team Log", hint: "Hand off to the next shift" },
+    { tab: "notifications", label: "Notifications", hint: "Rounds and escalations" }
   ],
   maintenance: [{ tab: "my_shift", label: "My Shift", hint: "Facility snapshot" }],
   staff: [{ tab: "my_shift", label: "My Shift", hint: "Start here every shift" }],
