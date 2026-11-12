@@ -5,18 +5,20 @@ import { SiteHeader } from "@/components/ruffops-site/SiteHeader";
 import { SITE } from "@/lib/ruffops-site/config";
 import "./ruffops-site.css";
 
+// Single-weight loaders avoid Vercel production builds failing with
+// "next/font/google queries have exactly one entry" (multi-weight CSS).
 const display = Syne({
   subsets: ["latin"],
   variable: "--font-ro-display",
   display: "swap",
-  weight: ["600", "700", "800"]
+  weight: "700"
 });
 
 const body = DM_Sans({
   subsets: ["latin"],
   variable: "--font-ro-body",
   display: "swap",
-  weight: ["400", "500", "600", "700"]
+  weight: "400"
 });
 
 export const metadata: Metadata = {
