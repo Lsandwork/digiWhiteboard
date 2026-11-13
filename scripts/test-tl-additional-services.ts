@@ -4,6 +4,7 @@ import {
   additionalServicesFromReservation,
   buildTlAdditionalServicesSummary
 } from "../lib/tl-digi-board/additional-services";
+import { mergeTlBoardReservationSources } from "../lib/tl-digi-board/gingr-reservation-services";
 import {
   mergeGingrServiceRows,
   resolveGingrServiceCompletion,
@@ -102,6 +103,29 @@ const auditAllReliable = auditTlAdditionalServicesFromReservations(
   new Date("2026-08-17T20:00:00.000Z")
 );
 assert.equal(auditAllReliable.allReliable, true);
+
+const byDateCheckedInOnly = mergeTlBoardReservationSources([], [
+  {
+    id: "3002",
+    reservation_id: "3002",
+    check_in_stamp: "1710001000",
+    animal: { id: "89", name: "Bowie" },
+    reservation_type: { type: "Suite" },
+    services: []
+  } as GingrReservation,
+  {
+    id: "3003",
+    reservation_id: "3003",
+    animal: { id: "90", name: "Future" },
+    reservation_type: { type: "Suite" },
+    services: []
+  } as GingrReservation
+]);
+assert.deepEqual(
+  byDateCheckedInOnly.map((row) => row.id),
+  ["3002"],
+  "by-date rows can rescue checked-in reservations, but future reservations stay out"
+);
 
 const sixThirtyAm = new Date("2026-08-17T13:30:00.000Z");
 assert.equal(isTlServicesEmailWindow(sixThirtyAm), true);

@@ -235,6 +235,16 @@ function overnightDogsFromPreviousSnapshot(
   return overnight;
 }
 
+function shouldPreservePreviousTlBoardOnEmptyReservations(
+  previous: TlDigiBoardSnapshot | null,
+  config: TlDigiBoardConfig = DEFAULT_TL_DIGI_BOARD_CONFIG
+) {
+  return overnightDogsFromPreviousSnapshot(previous, config).length > 0;
+}
+
+export const __shouldPreservePreviousTlBoardOnEmptyReservationsForTests =
+  shouldPreservePreviousTlBoardOnEmptyReservations;
+
 async function loadTlBoardReservationBundle(now: Date) {
   let lastError: unknown;
   for (let attempt = 0; attempt < TL_RESERVATIONS_LOAD_RETRIES; attempt += 1) {
@@ -520,6 +530,14 @@ async function runTlDigiBoardSync(
     const overnightDogs = reservationBundle
       ? buildOvernightDogsFromReservations(reservationBundle.reservations, config)
       : overnightDogsFromPreviousSnapshot(previous, config);
+
+    if (
+      reservationBundle &&
+      !overnightDogs.length &&
+      shouldPreservePreviousTlBoardOnEmptyReservations(previous, config)
+    ) {
+      throw new Error("Gingr reservations returned no checked-in overnight dogs; preserving last-known TL board.");
+    }
 
     if (reservationsLoadError && !overnightDogs.length) {
       throw new Error(reservationsLoadError);

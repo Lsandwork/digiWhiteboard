@@ -21,6 +21,7 @@ import {
 } from "../lib/tl-digi-board/display-state";
 import { dateAtLaLocal } from "../lib/tl-digi-board/medication-windows";
 import { assembleTlDigiBoardPublicPayload } from "../lib/tl-digi-board/server";
+import { __shouldPreservePreviousTlBoardOnEmptyReservationsForTests } from "../lib/tl-digi-board/sync";
 import type { TlDigiBoardSnapshot, TlGingrMedicationRecord } from "../lib/tl-digi-board/types";
 
 function emptySummary() {
@@ -330,6 +331,15 @@ function sampleSnapshot(nowIso: string, medications: TlGingrMedicationRecord[]):
   assert.equal(tlBoardSnapshotNeedsBackgroundSync(snapshot, now), false);
   const forced = tlBoardSnapshotNeedsBackgroundSync(snapshot, now, { forceRefresh: true });
   assert.equal(forced, true);
+}
+
+// A successful-but-empty reservation pull after a populated board is not proof of All Clear.
+{
+  const previous = sampleSnapshot("2026-08-18T20:00:00.000Z", [
+    sampleMed({ lodgingAreaKey: "suite", lodgingLabel: "SUITE • 4", lodgingRunName: "Suite 4" })
+  ]);
+  assert.equal(__shouldPreservePreviousTlBoardOnEmptyReservationsForTests(previous), true);
+  assert.equal(__shouldPreservePreviousTlBoardOnEmptyReservationsForTests(sampleSnapshot("2026-08-18T20:00:00.000Z", [])), false);
 }
 
 // Header: never treat a missing payload as CONNECTION ISSUE, and never blank Period at 5pm.

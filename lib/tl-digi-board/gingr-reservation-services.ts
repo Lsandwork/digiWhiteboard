@@ -127,7 +127,10 @@ export function mergeTlBoardReservationSources(
     const id = reservationIdOf(reservation);
     if (!id) continue;
     const existing = map.get(id);
-    if (!existing) continue;
+    if (!existing) {
+      if (isCheckedInReservation(reservation)) map.set(id, reservation);
+      continue;
+    }
     map.set(id, mergeReservationServiceArrays(existing, reservation));
   }
 
