@@ -1,5 +1,5 @@
 /**
- * Best-effort feed of live staff-ops into Ops Command Center.
+ * Best-effort feed of live staff-ops + Fitdog payment alerts into Ops Command Center.
  * Does not mutate source systems — read-only aggregation for dashboard boxes.
  */
 
@@ -20,6 +20,7 @@ import {
   type StaffDirectoryMember,
   type StaffOpsPriority
 } from "@/lib/staff/admin-ops";
+import { listOpenAlerts } from "@/lib/fitdog-ops/store";
 import type { OperationsAlert } from "@/lib/fitdog-ops/types";
 
 const CLOSED_STATUSES = new Set([
@@ -173,23 +174,32 @@ export function alertToWorkItem(row: OperationsAlert): OpsWorkItem {
 export async function loadStaffOpsFeed(supabaseClient?: SupabaseClient) {
   const supabase = supabaseClient ?? getServiceSupabase();
   let opsFailed = false;
+  let alertsFailed = false;
   let opsTimedOut = false;
-  const ops = await getOrLoadTtlCache(STAFF_OPS_LIST_CACHE_KEY, STAFF_OPS_LIST_CACHE_TTL_MS, () => listStaffOps(supabase)).catch(
-    (error: unknown) => {
-      opsFailed = true;
-      opsTimedOut = isInfrastructureError(error);
-      return null;
-    }
-  );
+  let alertsTimedOut = false;
+  const [ops, alerts] = await Promise.all([
+    // Same key/TTL as /api/admin/staff-operations so My Shift reuses a warm Team Log list.
+    getOrLoadTtlCache(STAFF_OPS_LIST_CACHE_KEY, STAFF_OPS_LIST_CACHE_TTL_MS, () => listStaffOps(supabase)).catch(
+      (error: unknown) => {
+        opsFailed = true;
+        opsTimedOut = isInfrastructureError(error);
+        return null;
+      }
+    ),
+    listOpenAlerts(supabase).catch((error: unknown) => {
+      alertsFailed = true;
+      alertsTimedOut = isInfrastructureError(error);
+      return [] as OperationsAlert[];
+    })
+  ]);
 
   const followUps = openFollowUps(ops?.owner_follow_ups || []);
   const issues = openIssues(ops?.active_issues || []);
-  const paymentAlerts: OperationsAlert[] = [];
-  const ownerActivity: OperationsAlert[] = [];
+  const { paymentAlerts, ownerActivity } = splitOperationsAlerts(alerts || []);
 
   const followUpItems = followUps.map(followUpToWorkItem);
   const issueItems = issues.map(issueToWorkItem);
-  const alertItems: OpsWorkItem[] = [];
+  const alertItems = paymentAlerts.map(alertToWorkItem);
 
   const activityEvents = (ops?.activity_logs || []).slice(0, 20).map((log) => ({
     id: `activity:${log.id}`,
@@ -201,8 +211,15 @@ export async function loadStaffOpsFeed(supabaseClient?: SupabaseClient) {
     occurredAt: log.created_at
   }));
 
-  const timedOut = opsTimedOut;
-  const feedHealth: "ok" | "degraded" | "error" = timedOut ? "degraded" : opsFailed ? "error" : "ok";
+  const timedOut = opsTimedOut || alertsTimedOut;
+  const feedHealth: "ok" | "degraded" | "error" =
+    timedOut
+      ? "degraded"
+      : opsFailed && alertsFailed
+        ? "error"
+        : opsFailed || alertsFailed
+          ? "degraded"
+          : "ok";
 
   return {
     followUps,
@@ -224,7 +241,11 @@ export async function loadStaffOpsFeed(supabaseClient?: SupabaseClient) {
         ? null
         : timedOut
           ? "Staff ops is still refreshing live data."
-          : "Staff ops feed could not be loaded."
+          : opsFailed && alertsFailed
+            ? "Staff ops and payment alerts could not be loaded."
+            : opsFailed
+              ? "Staff ops feed could not be loaded."
+              : "Payment alerts could not be loaded."
   };
 }
 

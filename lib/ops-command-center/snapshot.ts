@@ -404,13 +404,13 @@ export function emptyOpsCommandCenterSnapshot(input: {
 }
 
 
-function facilityPulseFromSources(
+export function facilityPulseFromSources(
   floor: LiveFloor | null,
   liveCounts: Record<string, number>,
   dogsOnFloor: number,
   extraGrooming = 0
 ) {
-  if (floor && (floor.onSite.length || floor.leftToday || floor.arrivalsExpected.length)) {
+  if (floor && !floor.error) {
     const taxiOnSite = floor.onSite.filter((dog) => /taxi|transport|van|pickup route/i.test(dog.serviceType)).length;
     const classesToday =
       floor.onSiteByCategory.training +
