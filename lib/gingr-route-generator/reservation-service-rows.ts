@@ -5,6 +5,7 @@
 export const RESERVATION_SERVICE_ARRAY_KEYS = [
   "services",
   "service_items",
+  "serviceItems",
   "additional_services",
   "reservation_services",
   "addons",

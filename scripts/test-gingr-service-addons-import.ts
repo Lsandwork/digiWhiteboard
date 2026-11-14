@@ -39,6 +39,19 @@ for (const label of [
 const schedule = buildScheduleFromGingrUpload({ buffer, fileName: "service-addons-route-notes.pdf", date: ROUTE_DATE });
 assert.ok(schedule.dogs.length >= 15, `Expected most report dogs; got ${schedule.dogs.length}`);
 
+const annie = schedule.dogs.find((entry) => /^annie\b/i.test(entry.name) && entry.ownerLastName === "Waterstone");
+assert.ok(annie, "Expected Annie Waterstone from Service Addons PDF");
+assert.equal(annie!.reservationType, "Sports Sign Ups");
+assert.deepEqual(annie!.bookedActivityLabels, ["Adventure Hike"]);
+assert.deepEqual(
+  annie!.activities,
+  ["adventure_hike"],
+  "reservation type must not duplicate as a second route activity"
+);
+assert.ok(annie!.appointmentOptions.length >= 2, "Annie should show Before/After home addons");
+assert.equal(annie!.startLocation, "home");
+assert.equal(annie!.endLocation, "home");
+
 const fitdogHome = dog(schedule, "Zuma Coccari") || dog(schedule, "Zuma");
 assert.ok(fitdogHome, "Expected Zuma from fixture");
 assert.deepEqual(fitdogHome!.appointmentOptions, [
