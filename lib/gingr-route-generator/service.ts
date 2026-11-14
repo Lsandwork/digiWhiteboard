@@ -1,4 +1,5 @@
 import { createGingrClient } from "@/lib/integrations/gingr/client";
+import { mergeGingrReservationsById } from "@/lib/gingr-route-generator/gingr-reservation-merge";
 import {
   buildGingrRouteSchedulePayload,
   summarizeRouteDogs,
@@ -75,10 +76,12 @@ export async function loadGingrRouteSchedule(options: {
     if (!client.config.apiKey) {
       throw new Error("GINGR_API_KEY is not configured.");
     }
-    const [reservations, fitdog] = await Promise.all([
+    const [byDate, checkedIn, fitdog] = await Promise.all([
       client.listReservationsByDate(date),
+      client.listCheckedInReservations().catch(() => [] as Awaited<ReturnType<typeof client.listReservationsByDate>>),
       loadFitdogSignupDogs(date)
     ]);
+    const reservations = mergeGingrReservationsById(byDate, checkedIn);
     const gingr = buildGingrRouteSchedulePayload(date, reservations, {
       cached: false,
       fetchedAt: new Date().toISOString()

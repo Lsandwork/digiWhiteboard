@@ -8,6 +8,10 @@ import {
   sortGingrRouteActivities
 } from "@/lib/gingr-route-generator/activities";
 import {
+  isGingrTransportBookingLabel,
+  stripGingrActivityServicePrefix
+} from "@/lib/gingr-route-generator/booking-display";
+import {
   classifyGingrVisit,
   classifyHalfDayPeriod,
   collectReservationRouteOptions,
@@ -31,6 +35,7 @@ import {
   resolveRouteVanKey,
   type GingrRouteVanKey
 } from "@/lib/gingr-route-generator/van-assignment";
+import { listReservationServiceArrays } from "@/lib/gingr-route-generator/reservation-service-rows";
 
 export type GingrRouteAddressStatus = "ok" | "missing" | "incomplete";
 
@@ -43,6 +48,10 @@ export type GingrRouteDog = {
   activities: GingrRouteActivityId[];
   /** Subject labels for RSVP-style columns (Canine Fitness, Adventure Hike, etc.). */
   activityLabels: string[];
+  /** Gingr reservation type (Sports Sign Ups, Group Class, …) — not the Activity line. */
+  reservationType: string | null;
+  /** Additional services on the reservation for the route date (`Activity | …` rows). */
+  bookedActivityLabels: string[];
   /** Fitdog van pickup from the owner's home. */
   pickup: boolean;
   /** Fitdog van drop-off to the owner's home. */
@@ -157,21 +166,11 @@ function reservationTypeName(reservation: GingrReservation): string {
 }
 
 function reservationServiceRows(reservation: GingrReservation): Array<Record<string, unknown>> {
-  const record = reservation as Record<string, unknown>;
-  const candidates = [record.services, record.additional_services, record.reservation_services, record.addons];
-  const rows: Array<Record<string, unknown>> = [];
-  for (const candidate of candidates) {
-    if (!Array.isArray(candidate)) continue;
-    for (const item of candidate) {
-      const row = asRecord(item);
-      if (Object.keys(row).length) rows.push(row);
-    }
-  }
-  return rows;
+  return listReservationServiceArrays(reservation as Record<string, unknown>);
 }
 
 function serviceName(service: Record<string, unknown>): string {
-  return pickString(service.name, service.service, service.type, service.s_name) || "";
+  return pickString(service.name, service.service, service.type, service.s_name, service.s_type) || "";
 }
 
 function ownerDisplayName(reservation: GingrReservation): string {
@@ -466,11 +465,13 @@ function collectRouteDayActivities(
   const typeActivity = routeActivityForServiceName(typeName);
   if (typeActivity) {
     const start = gingrTimestampDateKey(reservation.start_date);
-    if (typeActivity.category === "club") {
+    if (hasDatedRouteService) {
+      // A dated Activity | … row is authoritative; reservation type is bookkeeping only.
+    } else if (typeActivity.category === "club") {
       if (stayCoversRouteDate(reservation, routeDate)) ids.add(typeActivity.id);
     } else if (start) {
       if (start === routeDate) ids.add(typeActivity.id);
-    } else if (!hasDatedRouteService) {
+    } else {
       // Undated record from a date-scoped Gingr fetch — it belongs to this date.
       ids.add(typeActivity.id);
     }
@@ -481,6 +482,25 @@ function collectRouteDayActivities(
   if (flatActivity && !occupancy.isOvernight && !hasDatedRouteService) ids.add(flatActivity.id);
 
   return Array.from(ids);
+}
+
+function collectBookedActivityLabels(reservation: GingrReservation, routeDate: string): string[] {
+  const occupancy = resolveBoardingOccupancy(reservation as Record<string, unknown>, routeDate);
+  const undatedRowApplies = undatedRowAppliesToRouteDate(reservation, routeDate, occupancy.isOvernight);
+  const labels = new Set<string>();
+  for (const service of reservationServiceRows(reservation)) {
+    const rawName = serviceName(service);
+    if (!rawName || isGingrTransportBookingLabel(rawName)) continue;
+    const scheduled =
+      gingrTimestampDateKey(service.scheduled_at) || gingrTimestampDateKey(service.scheduled_until);
+    if (!scheduled || scheduled !== routeDate) continue;
+    if (!serviceAppliesToRouteDate(service, routeDate, undatedRowApplies)) continue;
+    const activity = routeActivityForServiceName(rawName, true);
+    if (!activity || !isRouteQualifyingActivity(activity.id)) continue;
+    const display = stripGingrActivityServicePrefix(rawName) || activity.label;
+    labels.add(display);
+  }
+  return Array.from(labels);
 }
 
 /** Dates of the reservation's class / outing services (taxi rides are not activity days). */
@@ -671,6 +691,8 @@ type Acc = {
   imageUrl: string | null;
   activitySet: Set<GingrRouteActivityId>;
   activityLabels: Set<string>;
+  reservationTypeLabels: Set<string>;
+  bookedActivityLabelSet: Set<string>;
   isTaxi: boolean;
   assignedLabels: Set<string>;
   ownerLastName: string | null;
@@ -707,6 +729,20 @@ export function normalizeGingrRouteReservations(
   reservations: GingrReservation[],
   date: string
 ): Omit<GingrRouteSchedulePayload, "fetchedAt" | "cached"> {
+  const qualifiesByAnimal = new Map<string, boolean>();
+  for (const reservation of reservations) {
+    try {
+      if (asRecord(reservation).cancelled_date) continue;
+      const key = animalKey(reservation);
+      const dayActivities = collectRouteDayActivities(reservation, date);
+      if (dayActivities.some((activityId) => isRouteQualifyingActivity(activityId))) {
+        qualifiesByAnimal.set(key, true);
+      }
+    } catch {
+      // First pass is best-effort.
+    }
+  }
+
   const byAnimal = new Map<string, Acc>();
 
   for (const reservation of reservations) {
@@ -724,6 +760,8 @@ export function normalizeGingrRouteReservations(
           imageUrl: reservationPhoto(reservation),
           activitySet: new Set(),
           activityLabels: new Set(),
+          reservationTypeLabels: new Set(),
+          bookedActivityLabelSet: new Set(),
           isTaxi: false,
           assignedLabels: new Set(),
           ownerLastName: null,
@@ -758,6 +796,12 @@ export function normalizeGingrRouteReservations(
       if (!acc.imageUrl) acc.imageUrl = reservationPhoto(reservation);
 
       const typeName = reservationTypeName(reservation);
+      if (typeName && !isGingrTransportBookingLabel(typeName)) {
+        acc.reservationTypeLabels.add(typeName.trim());
+      }
+      for (const label of collectBookedActivityLabels(reservation, date)) {
+        acc.bookedActivityLabelSet.add(label);
+      }
       const services = reservationServiceRows(reservation);
       const occupancy = resolveBoardingOccupancy(reservation as Record<string, unknown>, date);
       const undatedRowApplies = undatedRowAppliesToRouteDate(reservation, date, occupancy.isOvernight);
@@ -772,7 +816,9 @@ export function normalizeGingrRouteReservations(
         acc.activityLabels.add(activity.label);
       }
 
-      const qualifyingServiceOnDate = dayActivities.some((activityId) => isRouteQualifyingActivity(activityId));
+      const qualifyingServiceOnDate =
+        dayActivities.some((activityId) => isRouteQualifyingActivity(activityId)) ||
+        qualifiesByAnimal.get(key) === true;
       const route = collectReservationRouteOptions(reservation as Record<string, unknown>, date, {
         qualifyingServiceOnDate,
         qualifyingServiceDates: qualifyingServiceDates(reservation)
@@ -884,6 +930,10 @@ export function normalizeGingrRouteReservations(
       acc.imageUrl = `/api/gingr/animal-photo/image?animalId=${acc.animalId}`;
     }
     const activities = sortGingrRouteActivities(acc.activitySet);
+    const reservationType = Array.from(acc.reservationTypeLabels)[0] ?? null;
+    const bookedActivityLabels = Array.from(acc.bookedActivityLabelSet).filter(
+      (label) => !reservationType || label.toLowerCase() !== reservationType.toLowerCase()
+    );
     const routeVanKey = resolveRouteVanKey({
       assignedLabels: Array.from(acc.assignedLabels),
       isTaxi: acc.isTaxi,
@@ -906,6 +956,8 @@ export function normalizeGingrRouteReservations(
       imageUrl: acc.imageUrl,
       activities,
       activityLabels: activities.map((id) => GINGR_ROUTE_ACTIVITY_BY_ID[id].label),
+      reservationType,
+      bookedActivityLabels,
       ...transport,
       isTaxi: acc.isTaxi,
       assignedTo: Array.from(acc.assignedLabels)[0] || null,

@@ -524,6 +524,26 @@
   color: var(--grg-muted);
 }
 
+.grg-booked-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.grg-booked-kicker {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--grg-muted);
+  margin-bottom: 0.1rem;
+}
+
+.grg-booked--activity {
+  font-weight: 600;
+}
+
 .grg-dog-activity {
   display: flex;
   align-items: center;
@@ -1693,9 +1713,49 @@
   border-left-color: #f59e0b;
 }
 
+.grg-end-badge {
+  display: inline-block;
+  margin-bottom: 0.2rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.grg-end--van .grg-end-badge {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.grg-end--owner .grg-end-badge {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.grg-end--club .grg-end-badge {
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.grg-end--review .grg-end-badge {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
 .grg-end-title {
   font-weight: 700;
   line-height: 1.3;
+}
+
+.grg-end-subtitle {
+  margin-top: 0.1rem;
+  font-size: 0.75rem;
+  color: #475569;
+  line-height: 1.35;
 }
 
 .grg-end--review .grg-end-title {

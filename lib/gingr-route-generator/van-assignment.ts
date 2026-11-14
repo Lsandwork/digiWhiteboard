@@ -6,6 +6,7 @@
 import { gingrTimestampDateKey } from "@/lib/gingr-route-generator/transportation";
 import type { GingrRouteActivityId } from "@/lib/gingr-route-generator/activities";
 import { GINGR_ROUTE_ACTIVITY_BY_ID } from "@/lib/gingr-route-generator/activities";
+import { listReservationServiceArrays } from "@/lib/gingr-route-generator/reservation-service-rows";
 
 export type GingrRouteVanKey = "van_1" | "van_2" | "van_3" | "van_5" | "van_6";
 
@@ -56,16 +57,7 @@ export function vanKeyFromExportVehicle(vehicleName: string | null | undefined):
 }
 
 function serviceRows(reservation: Record<string, unknown>): Record<string, unknown>[] {
-  const rows: Record<string, unknown>[] = [];
-  for (const key of ["services", "service_items", "addons", "items"]) {
-    const value = reservation[key];
-    if (!Array.isArray(value)) continue;
-    for (const item of value) {
-      const record = asRecord(item);
-      if (record) rows.push(record);
-    }
-  }
-  return rows;
+  return listReservationServiceArrays(reservation);
 }
 
 function assigneeFromRecord(record: Record<string, unknown>): string | null {

@@ -9,10 +9,15 @@ import { parseCsv } from "@/lib/route-generator/parser";
 import { extractPdfText, isPdfBuffer } from "@/lib/gingr-route-generator/pdf-text";
 import { buildGingrRouteSchedulePayload, type GingrRouteSchedulePayload } from "@/lib/gingr-route-generator/normalize";
 import { splitAppointmentOptionParts } from "@/lib/gingr-route-generator/transportation";
+import {
+  isServiceAddonsReportText,
+  mergeServiceAddonUploadRows,
+  parseServiceAddonsReportText
+} from "@/lib/gingr-route-generator/service-addons-pdf";
 
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 
-type MappedRow = {
+export type MappedUploadRow = {
   dogName: string;
   ownerName: string;
   ownerFirst: string | null;
@@ -56,7 +61,7 @@ function splitList(value: string | null): string[] {
     .filter(Boolean);
 }
 
-function mapCsvRows(text: string): MappedRow[] {
+function mapCsvRows(text: string): MappedUploadRow[] {
   const parsed = parseCsv(text);
   if (!parsed.headers.length || !parsed.rows.length) return [];
   const headers = parsed.headers;
@@ -69,7 +74,7 @@ function mapCsvRows(text: string): MappedRow[] {
   const resIdH = pickHeader(headers, [/reservation id/, /booking id/, /^id$/]);
   const typeH = pickHeader(headers, [/reservation type/, /^type$/, /service type/]);
   const serviceH = pickHeader(headers, [/^service$/, /services/, /class/, /activity/]);
-  const addonH = pickHeader(headers, [/appointment option/, /addon/, /add on/, /transport/]);
+  const addonH = pickHeader(headers, [/service addons?/, /appointment option/, /addon/, /add on/, /transport/]);
   const addressH = pickHeader(headers, [/^address$/, /full address/, /street address/, /pickup address/]);
   const streetH = pickHeader(headers, [/^street$/, /address 1/, /address1/]);
   const cityH = pickHeader(headers, [/^city$/]);
@@ -119,7 +124,7 @@ function mapCsvRows(text: string): MappedRow[] {
     .filter((row) => row.dogName);
 }
 
-function mapPdfTable(text: string): MappedRow[] {
+function mapPdfTable(text: string): MappedUploadRow[] {
   const lines = text
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -161,7 +166,7 @@ function splitOwner(name: string): { first: string | null; last: string | null }
   return { first: parts[0]!, last: parts.slice(1).join(" ") };
 }
 
-function toReservation(row: MappedRow, date: string, index: number): GingrReservation {
+function toReservation(row: MappedUploadRow, date: string, index: number): GingrReservation {
   const owner = splitOwner(row.ownerName);
   const first = row.ownerFirst || owner.first;
   const last = row.ownerLast || owner.last;
@@ -171,7 +176,7 @@ function toReservation(row: MappedRow, date: string, index: number): GingrReserv
   const state = row.state || combined?.state || null;
   const zip = row.zip || combined?.zip || null;
   const serviceNames = Array.from(
-    new Set([row.reservationType, ...row.services, ...row.addons].filter((value): value is string => Boolean(value)))
+    new Set([row.reservationType, ...row.services].filter((value): value is string => Boolean(value)))
   );
   if (!serviceNames.length) serviceNames.push("Daycare Full Day");
   const scheduledAt = row.date && /T\d{2}:/.test(row.date) ? row.date : `${date}T09:00:00`;
@@ -207,9 +212,18 @@ function toReservation(row: MappedRow, date: string, index: number): GingrReserv
   };
 }
 
-export function parseGingrUploadText(text: string, date: string): GingrReservation[] {
+function mapUploadedRows(text: string, date: string): MappedUploadRow[] {
+  if (isServiceAddonsReportText(text)) {
+  const fromReport = parseServiceAddonsReportText(text, date);
+    if (fromReport.length) return mergeServiceAddonUploadRows(fromReport);
+  }
   const fromCsv = mapCsvRows(text);
-  const rows = fromCsv.length ? fromCsv : mapPdfTable(text);
+  if (fromCsv.length) return mergeServiceAddonUploadRows(fromCsv);
+  return mergeServiceAddonUploadRows(mapPdfTable(text));
+}
+
+export function parseGingrUploadText(text: string, date: string): GingrReservation[] {
+  const rows = mapUploadedRows(text, date);
   return rows.map((row, index) => toReservation(row, date, index));
 }
 
