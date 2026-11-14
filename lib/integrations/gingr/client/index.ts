@@ -176,6 +176,41 @@ export function createGingrClient(overrides?: GingrClientConfig) {
         const payload = await requestForm<unknown>(`/api/v1/reservations_by_owner`, fields, "GET");
         return normalizeGingrReservationList(payload);
       }
+    },
+  /** Some facilities expose fuller service / addon rows when scoped by animal. */
+    async listReservationsForAnimal(animalId: string, startDate: string, endDate: string) {
+      const fields = {
+        animal_id: animalId,
+        a_id: animalId,
+        start_date: startDate,
+        end_date: endDate,
+        checked_in: "false",
+        location_id: config.locationId
+      };
+      try {
+        return await this.listReservationsPaged(fields, 4);
+      } catch {
+        return [] as GingrReservation[];
+      }
+    },
+    /** Best-effort single-reservation pull when the date list payload is summary-only. */
+    async getReservationById(reservationId: string) {
+      const id = reservationId.trim();
+      if (!id) return null;
+      const attempts: Array<Record<string, string>> = [
+        { reservation_id: id, id, location_id: config.locationId },
+        { r_id: id, location_id: config.locationId }
+      ];
+      for (const fields of attempts) {
+        try {
+          const payload = await requestForm<unknown>(`/api/v1/reservations`, fields, "POST");
+          const rows = normalizeGingrReservationList(payload);
+          if (rows.length) return rows[0]!;
+        } catch {
+          // try next shape
+        }
+      }
+      return null;
     }
   };
 }

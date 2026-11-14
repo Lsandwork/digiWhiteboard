@@ -1856,6 +1856,44 @@ void (async () => {
     assert.equal(serviceItems!.transportPlan.startingLocation.locationType, "HOME");
     assert.equal(serviceItems!.transportPlan.finalDestination.locationType, "HOME");
 
+    const stringOptions = normalizeGingrRouteReservations(
+      [
+        reservation({
+          reservation_id: "9704",
+          animal_id: 9700,
+          a_name: "Annie",
+          owner: ownerHome(),
+          type: "Sports Sign Ups",
+          services: [{ name: "Activity | Adventure Hike", scheduled_at: `${routeDate}T09:00:00-07:00` }],
+          appointment_options:
+            "Before Outing - Fitdog to Pick Up @ Home, After Outing - Fitdog to Drop Off @ Home"
+        })
+      ],
+      routeDate
+    ).dogs[0];
+    assert.ok(stringOptions, "string appointment_options fixture");
+    assert.ok(stringOptions!.appointmentOptions.length >= 2);
+
+    const buriedAddonField = normalizeGingrRouteReservations(
+      [
+        reservation({
+          reservation_id: "9705",
+          animal_id: 9700,
+          a_name: "Annie",
+          owner: ownerHome(),
+          type: "Sports Sign Ups",
+          services: [{ name: "Activity | Adventure Hike", scheduled_at: `${routeDate}T09:00:00-07:00` }],
+          custom_fields: [
+            { label: "Service Addon", value: "Before Outing - Fitdog to Pick Up @ Home" },
+            { value: "After Outing - Fitdog to Drop Off @ Home" }
+          ]
+        })
+      ],
+      routeDate
+    ).dogs[0];
+    assert.ok(buriedAddonField, "deep scan custom_fields fixture");
+    assert.ok(buriedAddonField!.appointmentOptions.length >= 2);
+
     const annieEchoedTypeService = normalizeGingrRouteReservations(
       [
         reservation({

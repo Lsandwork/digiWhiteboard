@@ -38,9 +38,10 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const dateParam = url.searchParams.get("date")?.trim() || todayPacificDateKey();
   const refresh = url.searchParams.get("refresh") === "1";
+  const useUpload = url.searchParams.get("source") === "upload";
 
   try {
-    const payload = await loadGingrRouteSchedule({ date: dateParam, refresh });
+    const payload = await loadGingrRouteSchedule({ date: dateParam, refresh, useUpload });
     return NextResponse.json(payload);
   } catch (error) {
     console.error(
