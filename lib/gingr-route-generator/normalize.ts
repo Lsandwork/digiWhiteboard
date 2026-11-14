@@ -449,19 +449,31 @@ function collectRouteDayActivities(
   // When the reservation carries dated route services, those dates are authoritative
   // and the undated reservation type must not qualify the dog on other days.
   let hasDatedRouteService = false;
+  const typeName = reservationTypeName(reservation);
+  const typeToken = typeName.trim().toLowerCase();
+  let hasDistinctDatedActivityRow = false;
+  const serviceRows = reservationServiceRows(reservation);
 
-  for (const service of reservationServiceRows(reservation)) {
+  for (const service of serviceRows) {
     const name = serviceName(service);
     const scheduled =
       gingrTimestampDateKey(service.scheduled_at) || gingrTimestampDateKey(service.scheduled_until);
     const activity = routeActivityForServiceName(name, scheduled === routeDate);
+    if (!activity || !scheduled || !isRouteQualifyingActivity(activity.id)) continue;
+    hasDatedRouteService = true;
+    if (typeToken && name.trim().toLowerCase() !== typeToken) hasDistinctDatedActivityRow = true;
+  }
+
+  for (const service of serviceRows) {
+    const name = serviceName(service);
+    if (hasDistinctDatedActivityRow && typeToken && name.trim().toLowerCase() === typeToken) continue;
+    const scheduled =
+      gingrTimestampDateKey(service.scheduled_at) || gingrTimestampDateKey(service.scheduled_until);
+    const activity = routeActivityForServiceName(name, scheduled === routeDate);
     if (!activity) continue;
-    if (scheduled && isRouteQualifyingActivity(activity.id)) hasDatedRouteService = true;
     if (!serviceAppliesToRouteDate(service, routeDate, undatedRowApplies)) continue;
     ids.add(activity.id);
   }
-
-  const typeName = reservationTypeName(reservation);
   const typeActivity = routeActivityForServiceName(typeName);
   if (typeActivity) {
     const start = gingrTimestampDateKey(reservation.start_date);

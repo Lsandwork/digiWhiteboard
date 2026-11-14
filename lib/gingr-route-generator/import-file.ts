@@ -175,9 +175,8 @@ function toReservation(row: MappedUploadRow, date: string, index: number): Gingr
   const city = row.city || combined?.city || null;
   const state = row.state || combined?.state || null;
   const zip = row.zip || combined?.zip || null;
-  const serviceNames = Array.from(
-    new Set([row.reservationType, ...row.services].filter((value): value is string => Boolean(value)))
-  );
+  const serviceNames = Array.from(new Set(row.services.filter((value): value is string => Boolean(value))));
+  if (!serviceNames.length && row.reservationType) serviceNames.push(row.reservationType);
   if (!serviceNames.length) serviceNames.push("Daycare Full Day");
   const scheduledAt = row.date && /T\d{2}:/.test(row.date) ? row.date : `${date}T09:00:00`;
 

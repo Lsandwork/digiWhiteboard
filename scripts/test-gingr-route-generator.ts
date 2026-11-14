@@ -1856,6 +1856,29 @@ void (async () => {
     assert.equal(serviceItems!.transportPlan.startingLocation.locationType, "HOME");
     assert.equal(serviceItems!.transportPlan.finalDestination.locationType, "HOME");
 
+    const annieEchoedTypeService = normalizeGingrRouteReservations(
+      [
+        reservation({
+          reservation_id: "9702",
+          animal_id: 9700,
+          a_name: "Annie",
+          owner: ownerHome(),
+          type: "Sports Sign Ups",
+          services: [
+            { name: "Sports Sign Ups", scheduled_at: `${routeDate}T09:00:00-07:00` },
+            { name: "Activity | Adventure Hike", scheduled_at: `${routeDate}T09:00:00-07:00` }
+          ],
+          service_items: [
+            { name: "Before Outing - Fitdog to Pick Up @ Home", scheduled_at: `${gingrSlashDate} 12:00 am` },
+            { name: "After Outing - Fitdog to Drop Off @ Home", scheduled_at: `${gingrSlashDate} 12:00 am` }
+          ]
+        })
+      ],
+      routeDate
+    ).dogs[0];
+    assert.ok(annieEchoedTypeService, "Annie echoed reservation type row");
+    assert.deepEqual(annieEchoedTypeService!.activities, ["adventure_hike"]);
+
     const nestedAddons = normalizeGingrRouteReservations(
       [
         reservation({
