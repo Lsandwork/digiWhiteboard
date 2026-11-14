@@ -115,6 +115,8 @@ import { RuffopsChecklistPanel } from "@/components/admin/RuffopsChecklistPanel"
 import { BodyChecksPanel } from "@/components/admin/body-checks/BodyChecksPanel";
 import { ReportsPanel } from "@/components/admin/ReportsPanel";
 import { TlDigiBoardPanel } from "@/components/admin/TlDigiBoardPanel";
+import TeamEngagementPanel from "@/components/admin/team-engagement/TeamEngagementPanel";
+import { ManagementSupportEngagementShell } from "@/components/admin/team-engagement/ManagementSupportEngagementShell";
 import { LobbySlideshowUploadPanel } from "@/components/admin/LobbySlideshowUploadPanel";
 import { CastTvPanel } from "@/components/admin/CastTvPanel";
 import { SuperAdminHubPanel, SuperAdminNestedReturnBar } from "@/components/admin/SuperAdminHubPanel";
@@ -501,7 +503,8 @@ export function AdminDashboard() {
       nextTab === "live_fleet" ||
       nextTab === "package_commissions" ||
       nextTab === "ops_system_health" ||
-      nextTab === "body_checks";
+      nextTab === "body_checks" ||
+      nextTab === "team_engagement";
     const nextBoard = forceStaffBoard ? "staff" : board;
     goToBoardTab(nextBoard, nextTab, extraParams);
   }
@@ -681,7 +684,7 @@ export function AdminDashboard() {
     : isFrontDeskCoordinatorLoginEmail(data.username)
       ? "Front Desk Coordinator"
       : userAccess.displayLabel;
-  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "user_interactions", "crossover_communication", "owner_follow_up", "active_issues", "fitdog_alerts", "vip_auto_book", "whiteboard_preview", "yard_links", "walks_board", "package_group_walks", "ruffops_checklist", "body_checks", "tl_digi_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "track_incidents", "vet_visits", "route_generator", "live_fleet", "my_shift", "ops_command_center", "front_desk_command", "yard_command", "driver_mode", "overnight_command", "trainer_ops", "ops_system_health", "shift_handoff", "sa_floor_hub", "sa_whiteboard_hub", "sa_people_hub", "sa_apps_hub", "sa_admin_hub", "analytics", "reports", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "media_library", "handler_shift_entry"].includes(tab);
+  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "user_interactions", "crossover_communication", "owner_follow_up", "active_issues", "fitdog_alerts", "vip_auto_book", "whiteboard_preview", "yard_links", "walks_board", "package_group_walks", "ruffops_checklist", "body_checks", "tl_digi_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "track_incidents", "vet_visits", "route_generator", "live_fleet", "my_shift", "ops_command_center", "front_desk_command", "yard_command", "driver_mode", "overnight_command", "trainer_ops", "ops_system_health", "shift_handoff", "sa_floor_hub", "sa_whiteboard_hub", "sa_people_hub", "sa_apps_hub", "sa_admin_hub", "analytics", "reports", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "media_library", "handler_shift_entry", "team_engagement"].includes(tab);
   const hubNavRole = currentRole;
   const showRoleHubNav = isHubNavRole(hubNavRole) && board === "staff";
   // Plain filter (not useMemo): this block runs only after the `if (!data)` early return.
@@ -942,7 +945,8 @@ export function AdminDashboard() {
         {tab === "tl_digi_board" ? <TlDigiBoardPanel /> : null}
 
         {tab === "management_support" ? (
-          <ManagementSupportPanel
+          <ManagementSupportEngagementShell
+            showEngagement={hasPermission(userAccess, "engagement.participate")}
             mode={
               isHandlerPanel
                 ? "handler"
@@ -958,6 +962,8 @@ export function AdminDashboard() {
             }
           />
         ) : null}
+
+        {tab === "team_engagement" ? <TeamEngagementPanel /> : null}
 
         {tab === "ms_hub" ? <ManagementSupportHubPanel onNavigate={(nextTab) => setActiveTab(nextTab)} /> : null}
         {tab === "ms_groomer_complaints" ? <GroomerComplaintsAdminPanel /> : null}

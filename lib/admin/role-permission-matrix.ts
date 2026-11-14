@@ -6,6 +6,7 @@ import {
   SUPER_ADMIN_ONLY_PERMISSIONS
 } from "@/lib/admin/permission-catalog";
 import {
+  ENGAGEMENT_SUPER_ADMIN_ONLY_PERMISSIONS,
   permissionsForRoles as staticPermissionsForRoles,
   ROLE_PERMISSIONS,
   type PermissionKey,
@@ -18,6 +19,32 @@ const SETTINGS_STORE_KEY = "role_permission_matrix";
 
 function emptyMatrix(): RolePermissionMatrix {
   return {};
+}
+
+const ENGAGEMENT_LEADERSHIP_ROLES = new Set<RoleKey>(["super_admin", "admin", "management"]);
+const ENGAGEMENT_PARTICIPANT_KEYS = new Set<PermissionKey>(["engagement.participate", "engagement.create_bark_out"]);
+
+/**
+ * Engagement keys that a matrix edit can never grant: Super Admin-only controls for every other role,
+ * and leadership keys for staff roles (the Manage Team Engagement tab is leadership-only).
+ */
+export function isEngagementPermissionLockedForRole(role: RoleKey, permission: PermissionKey): boolean {
+  if (!permission.startsWith("engagement.")) return false;
+  if (role === "super_admin") return true;
+  if (ENGAGEMENT_SUPER_ADMIN_ONLY_PERMISSIONS.has(permission)) return true;
+  return !ENGAGEMENT_LEADERSHIP_ROLES.has(role) && !ENGAGEMENT_PARTICIPANT_KEYS.has(permission);
+}
+
+function enforceEngagementLocks(matrix: RolePermissionMatrix) {
+  for (const role of Object.keys(matrix) as RoleKey[]) {
+    if (role === "super_admin") continue;
+    for (const key of ALL_CATALOG_PERMISSION_KEYS) {
+      if (isEngagementPermissionLockedForRole(role, key)) {
+        matrix[role][key] = (ROLE_PERMISSIONS[role] ?? []).includes(key) && !ENGAGEMENT_SUPER_ADMIN_ONLY_PERMISSIONS.has(key);
+      }
+    }
+  }
+  return matrix;
 }
 
 export function buildDefaultRolePermissionMatrix(): RolePermissionMatrix {
@@ -39,7 +66,7 @@ export function buildDefaultRolePermissionMatrix(): RolePermissionMatrix {
       }
     }
   }
-  return matrix;
+  return enforceEngagementLocks(matrix);
 }
 
 function mergeMatrix(base: RolePermissionMatrix, stored: RolePermissionMatrix): RolePermissionMatrix {
@@ -61,7 +88,7 @@ function mergeMatrix(base: RolePermissionMatrix, stored: RolePermissionMatrix): 
       }
     }
   }
-  return merged;
+  return enforceEngagementLocks(merged);
 }
 
 export async function loadRolePermissionMatrix(supabase: SupabaseClient): Promise<RolePermissionMatrix> {
@@ -114,6 +141,7 @@ export function permissionsForRolesFromMatrix(roles: RoleKey[], matrix: RolePerm
 export function isPermissionLockedForRole(role: RoleKey, permission: PermissionKey): boolean {
   if (role === "super_admin") return true;
   if (role === "admin" && SUPER_ADMIN_ONLY_PERMISSIONS.has(permission)) return true;
+  if (isEngagementPermissionLockedForRole(role, permission)) return true;
   return false;
 }
 

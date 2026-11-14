@@ -98,3 +98,38 @@ export function roleAssignmentError(
 export function actorMayAssignSuperAdmin(access: UserAccess | null | undefined, legacyRole?: string | null) {
   return getAdminUserCreationTier(access, legacyRole) === "super_admin";
 }
+
+export function sameMembers(a: readonly string[], b: readonly string[]) {
+  const left = new Set(a);
+  const right = new Set(b);
+  return left.size === right.size && [...left].every((value) => right.has(value));
+}
+
+/**
+ * Only Super Admin may change their own roles or departments; everyone else asks another administrator.
+ * Pass `null` for anything the request leaves unchanged.
+ */
+export function selfAccessChangeError(input: {
+  isSelf: boolean;
+  actorIsSuperAdmin: boolean;
+  current: Pick<UserAccess, "primaryRole" | "roles" | "departments">;
+  nextPrimaryRole: RoleKey | null;
+  nextAdditionalRoles: readonly RoleKey[] | null;
+  nextDepartments: readonly string[] | null;
+}): string | null {
+  if (!input.isSelf || input.actorIsSuperAdmin) return null;
+  const { current } = input;
+  const primary = input.nextPrimaryRole ?? current.primaryRole;
+  const primaryChanging = primary !== current.primaryRole;
+  const additionalChanging =
+    input.nextAdditionalRoles !== null &&
+    !sameMembers(
+      input.nextAdditionalRoles.filter((role) => role !== primary),
+      current.roles.filter((role) => role !== current.primaryRole)
+    );
+  const departmentsChanging = input.nextDepartments !== null && !sameMembers(input.nextDepartments, current.departments);
+  if (primaryChanging || additionalChanging || departmentsChanging) {
+    return "Ask another administrator to change your own role or departments.";
+  }
+  return null;
+}

@@ -175,6 +175,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   whiteboard_preview: "Live Preview",
   yard_links: "Video Links",
   management_support: "Submit Request",
+  team_engagement: "Manage Team Engagement",
   ms_hub: "Support Command Center",
   ms_groomer_complaints: "Groomer Complaints",
   ms_groomer_requests: "Groomer Requests",
@@ -278,6 +279,8 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   whiteboard_preview: "Preview what is live on the whiteboard right now.",
   yard_links: "Manage yard camera and video links.",
   management_support: "Submit complaints, requests, and write-ups.",
+  team_engagement:
+    "Recognition, Bark Out moderation, development, feedback, and engagement analytics for the teams you lead.",
   ms_hub: "Command center for urgent alerts, PIPs, complaints, requests, compliance, and AI-assisted manager actions.",
   templates: "Reusable message templates for staff communications.",
   notifications: "Internal staff notifications and replies.",
@@ -516,7 +519,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
         "staff_management",
         "Management",
         compactEntries([
-          ...singles(["ms_hub", "management_support"], visible),
+          ...singles(["ms_hub", "management_support", "team_engagement"], visible),
           group("support_complaints", "Complaints", SUPPORT_COMPLAINT_TABS, visible),
           group("support_requests", "Requests", SUPPORT_REQUEST_TABS, visible),
           ...singles(["admin_trainer_entries", ...MANAGEMENT_FLOOR_TABS], visible)

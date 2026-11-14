@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test:team-engagement": "tsx scripts/test-team-engagement-moderation.ts && tsx scripts/test-team-engagement-access.ts && tsx scripts/test-team-engagement-bark-outs.ts",
     "test:cleanup": "tsx scripts/test-transition-cleanup.ts",
     "test:checkout-display": "tsx scripts/test-checkout-display.ts",
     "test:checkout-prompt": "tsx scripts/test-checkout-prompt.ts",

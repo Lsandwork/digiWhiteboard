@@ -19,10 +19,16 @@ import { isStaffOpsStatusOpen } from "@/lib/user-interactions/lifecycle";
 import { assertResolutionNoteIfRequired } from "@/lib/user-interactions/resolution-validation";
 import {
   StaffOpsAtomicSaveUnavailableError,
+  StaffOpsAuthorizationError,
   StaffOpsConflictError
 } from "@/lib/user-interactions/staff-ops-auth";
 import { deriveLegacyCrossoverFields, legacyFieldValuesFromMessage, resolveCrossoverMessage } from "@/lib/staff/crossover-templates";
-import { syncStaffDirectoryLoginAccount } from "@/lib/staff/directory-login";
+import {
+  directoryLoginChangeError,
+  directoryLoginDeleteError,
+  syncStaffDirectoryLoginAccount,
+  type DirectoryLoginActor
+} from "@/lib/staff/directory-login";
 import { listAdminUsers } from "@/lib/admin/users";
 import {
   applyStaffDirectoryReconciliation as applyReconciliationToDirectory,
@@ -1819,12 +1825,24 @@ export async function updateActiveIssue(
   return updatedRecord;
 }
 
+async function assertDirectoryLoginChange(
+  supabase: SupabaseClient,
+  loginActor: DirectoryLoginActor | undefined,
+  actorAdminId: string | null | undefined,
+  input: Parameters<typeof directoryLoginChangeError>[2]
+) {
+  const actor = loginActor ?? { adminUserId: actorAdminId ?? null, legacyRole: null, email: null };
+  const error = await directoryLoginChangeError(supabase, actor, input);
+  if (error) throw new StaffOpsAuthorizationError(error);
+}
+
 export async function createStaffDirectoryMember(
   supabase: SupabaseClient,
   input: Record<string, unknown>,
   actor: string | null,
   actorAdminId?: string | null,
-  writeOptions?: StaffOpsWriteOptions
+  writeOptions?: StaffOpsWriteOptions,
+  loginActor?: DirectoryLoginActor
 ) {
   validateStaffDirectoryFields(input, { partial: false });
   const name = cleanString(input.name);
@@ -1836,6 +1854,13 @@ export async function createStaffDirectoryMember(
     cleanString(input.department, departmentForDashboardRole(dashboardRole) ?? FRONT_DESK_DEPARTMENT) ||
     departmentForDashboardRole(dashboardRole) ||
     FRONT_DESK_DEPARTMENT;
+  await assertDirectoryLoginChange(supabase, loginActor, actorAdminId, {
+    email,
+    dashboard_role: dashboardRole,
+    department,
+    temp_password: optionalString(input.temp_password),
+    confirm_password: optionalString(input.confirm_password)
+  });
   const login = await syncStaffDirectoryLoginAccount(
     supabase,
     {
@@ -1888,7 +1913,8 @@ export async function updateStaffDirectoryMember(
   patch: Record<string, unknown>,
   actor: string | null,
   actorAdminId?: string | null,
-  writeOptions?: StaffOpsWriteOptions
+  writeOptions?: StaffOpsWriteOptions,
+  loginActor?: DirectoryLoginActor
 ) {
   validateStaffDirectoryFields(patch, { partial: true });
   const now = nowIso();
@@ -1905,6 +1931,14 @@ export async function updateStaffDirectoryMember(
       ? cleanString(patch.department, departmentForDashboardRole(nextDashboardRole) ?? existing.department)
       : departmentForDashboardRole(nextDashboardRole) ?? existing.department;
 
+  await assertDirectoryLoginChange(supabase, loginActor, actorAdminId, {
+    email: nextEmail,
+    admin_user_id: existing.admin_user_id,
+    dashboard_role: nextDashboardRole,
+    department: nextDepartment,
+    temp_password: optionalString(patch.temp_password),
+    confirm_password: optionalString(patch.confirm_password)
+  });
   const login = await syncStaffDirectoryLoginAccount(
     supabase,
     {
@@ -1973,11 +2007,18 @@ export async function deleteStaffDirectoryMember(
   supabase: SupabaseClient,
   id: string,
   actor: string | null,
-  writeOptions?: StaffOpsWriteOptions
+  writeOptions?: StaffOpsWriteOptions,
+  loginActor?: DirectoryLoginActor
 ) {
   const preState = await loadState(supabase);
   const existing = preState.staff_directory.find((member) => member.id === id);
   if (!existing) throw new Error("Staff member not found.");
+  const deleteError = await directoryLoginDeleteError(
+    supabase,
+    loginActor ?? { adminUserId: null, legacyRole: null, email: null },
+    { email: existing.email, admin_user_id: existing.admin_user_id }
+  );
+  if (deleteError) throw new StaffOpsAuthorizationError(deleteError);
 
   await mutateStaffOpsState(supabase, (state) => {
     const row = state.staff_directory.find((member) => member.id === id);

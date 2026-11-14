@@ -247,6 +247,19 @@ async function runMiddleware(request: NextRequest) {
       }
     }
 
+    // Team Engagement checks each request on its API as well; demo and impersonated sessions never open the tab.
+    if (
+      isAdminDashboardPath(pathname) &&
+      request.nextUrl.searchParams.get("tab") === "team_engagement" &&
+      (session.isDemo || session.impersonatorEmail)
+    ) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/admin";
+      url.searchParams.set("board", "staff");
+      url.searchParams.set("tab", session.isDemo ? "demo_push" : firstAccessibleAdminTab(null, role, "staff"));
+      return NextResponse.redirect(url);
+    }
+
     if (isAdminDashboardPath(pathname) && !session.isDemo && isStaffDigiBoardOnlyLegacyRole(role)) {
       const url = request.nextUrl.clone();
       const board = url.searchParams.get("board");
