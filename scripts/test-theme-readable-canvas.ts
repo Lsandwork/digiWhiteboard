@@ -38,7 +38,11 @@ assert.match(readable, /crossover-table__subject-preview/, "table previews must 
 assert.match(readable, /crossover-urgent-pill--on/, "filter pills must remap on light canvases");
 assert.match(readable, /FINAL LINE OF DEFENSE/, "must include comprehensive clear/light text defense");
 assert.match(readable, /admin-content-main/, "must target admin-content-main canvas");
-assert.match(readable, /\.notif-response-modal/, "clear/light must keep notification modal body text readable");
+assert.match(
+  readable,
+  /:is\(\.admin-on-dark, \.notif-response-modal/,
+  "clear/light must keep notification modal body text readable"
+);
 
 const clearTheme = readFileSync(resolve(root, "lib/fitdog-dashboard/theme-clear.css"), "utf8");
 assert.match(clearTheme, /html\[data-theme="clear"\] \.crossover-dashboard/, "clear theme must remap crossover-dashboard tokens");

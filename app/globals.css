@@ -6211,6 +6211,27 @@ html[data-theme="light"] .admin-toast--error {
   }
 }
 
+/*
+ * Notification detail modal — dark overlay for every staff theme and role.
+ * Portal wrapper resets Clear/Light navy tokens so body copy stays high-contrast.
+ */
+.notif-response-portal.admin-on-dark {
+  --fitdog-text: #f2f5f9;
+  --fitdog-text-secondary: #c5d0dc;
+  --admin-muted: #c5d0dc;
+  --crossover-text: #f2f5f9;
+  --crossover-muted: #c5d0dc;
+  --text-primary: #f2f5f9;
+  --text-secondary: #c5d0dc;
+  --text-muted: #b8c5d6;
+  color: #f2f5f9;
+  background: transparent !important;
+}
+
+.notif-response-modal.admin-on-dark :is(.rich-text, .notif-response-rich-text) :is(p, li, span, div, em, strong, b, i, blockquote, ul, ol, h1, h2, h3, h4) {
+  color: var(--notif-modal-text, #f2f5f9) !important;
+}
+
 /* Theme-aware admin surfaces (commissions, cast, drawers) */
 .admin-surface-panel {
   border: 1px solid var(--border, var(--admin-border));

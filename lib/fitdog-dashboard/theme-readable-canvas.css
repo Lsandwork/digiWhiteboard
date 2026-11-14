@@ -771,8 +771,8 @@ html[data-theme="light"] .admin-toast {
  * Must come AFTER the light-canvas remaps so white / muted text stays readable
  * on dark backgrounds in Light and Clear themes.
  */
-html[data-theme="light"] .admin-theme .admin-on-dark,
-html[data-theme="clear"] .admin-theme .admin-on-dark {
+html[data-theme="light"] .admin-theme :is(.admin-on-dark, .notif-response-modal, .notif-response-portal),
+html[data-theme="clear"] .admin-theme :is(.admin-on-dark, .notif-response-modal, .notif-response-portal) {
   --admin-muted: #cbd5e1;
   --fitdog-text: #f8fafc;
   --fitdog-text-secondary: #cbd5e1;
@@ -784,7 +784,7 @@ html[data-theme="clear"] .admin-theme .admin-on-dark {
   color: #f8fafc !important;
 }
 
-html[data-theme="light"] .admin-theme .admin-on-dark :is(
+html[data-theme="light"] .admin-theme :is(.admin-on-dark, .notif-response-modal) :is(
     .text-white,
     [class*="text-white/"],
     .admin-text-emphasis,
@@ -793,7 +793,7 @@ html[data-theme="light"] .admin-theme .admin-on-dark :is(
     h3,
     h4
   ),
-html[data-theme="clear"] .admin-theme .admin-on-dark :is(
+html[data-theme="clear"] .admin-theme :is(.admin-on-dark, .notif-response-modal) :is(
     .text-white,
     [class*="text-white/"],
     .admin-text-emphasis,
@@ -805,12 +805,12 @@ html[data-theme="clear"] .admin-theme .admin-on-dark :is(
   color: #ffffff !important;
 }
 
-html[data-theme="light"] .admin-theme .admin-on-dark :is(.text-admin-muted, .admin-muted, .admin-page-subtitle),
-html[data-theme="clear"] .admin-theme .admin-on-dark :is(.text-admin-muted, .admin-muted, .admin-page-subtitle) {
+html[data-theme="light"] .admin-theme :is(.admin-on-dark, .notif-response-modal) :is(.text-admin-muted, .admin-muted, .admin-page-subtitle),
+html[data-theme="clear"] .admin-theme :is(.admin-on-dark, .notif-response-modal) :is(.text-admin-muted, .admin-muted, .admin-page-subtitle) {
   color: #cbd5e1 !important;
 }
 
-html[data-theme="light"] .admin-theme .admin-on-dark :is(
+html[data-theme="light"] .admin-theme :is(.admin-on-dark, .notif-response-modal) :is(
     [class*="text-slate-100"],
     [class*="text-slate-200"],
     [class*="text-slate-300"],
@@ -821,7 +821,7 @@ html[data-theme="light"] .admin-theme .admin-on-dark :is(
     [class*="text-zinc-200"],
     [class*="text-zinc-300"]
   ),
-html[data-theme="clear"] .admin-theme .admin-on-dark :is(
+html[data-theme="clear"] .admin-theme :is(.admin-on-dark, .notif-response-modal) :is(
     [class*="text-slate-100"],
     [class*="text-slate-200"],
     [class*="text-slate-300"],
@@ -833,6 +833,18 @@ html[data-theme="clear"] .admin-theme .admin-on-dark :is(
     [class*="text-zinc-300"]
   ) {
   color: #e2e8f0 !important;
+}
+
+html[data-theme="light"] .admin-theme .notif-response-modal :is(.rich-text, .notif-response-rich-text) :is(p, li, span, div, em, strong, b, i, blockquote, ul, ol),
+html[data-theme="clear"] .admin-theme .notif-response-modal :is(.rich-text, .notif-response-rich-text) :is(p, li, span, div, em, strong, b, i, blockquote, ul, ol) {
+  color: #f2f5f9 !important;
+}
+
+html[data-theme="light"] .admin-theme .notif-response-modal .notif-response-table td,
+html[data-theme="clear"] .admin-theme .notif-response-modal .notif-response-table td,
+html[data-theme="light"] .admin-theme .notif-response-modal .notif-response-table__mono,
+html[data-theme="clear"] .admin-theme .notif-response-modal .notif-response-table__mono {
+  color: #f2f5f9 !important;
 }
 
 /* Hard-coded dark map / fleet chrome stays light-on-dark even without the class. */
@@ -865,23 +877,3 @@ html[data-theme="clear"] .admin-theme :is(
   color: #f8fafc !important;
 }
 
-/*
- * Notifications detail modal — fixed dark surface on top of Clear/Light page theme.
- * Without this, Clear's navy page text inherits into the brown modal and body copy disappears.
- */
-html[data-theme="light"] .admin-theme .notif-response-modal,
-html[data-theme="clear"] .admin-theme .notif-response-modal {
-  --fitdog-text: #f2f5f9;
-  --fitdog-text-secondary: #c5d0dc;
-  --admin-muted: #c5d0dc;
-  --crossover-text: #f2f5f9;
-  --crossover-muted: #c5d0dc;
-  color: #f2f5f9;
-}
-
-html[data-theme="light"] .admin-theme .notif-response-portal,
-html[data-theme="clear"] .admin-theme .notif-response-portal {
-  background: transparent !important;
-  min-height: 0;
-  color: #f2f5f9;
-}

@@ -163,7 +163,7 @@ export function NotificationResponseModal({
     "—";
 
   const modal = (
-    <div className="admin-theme notif-response-portal">
+    <div className="admin-theme admin-on-dark notif-response-portal">
       <div
         className="notif-response-backdrop"
         onMouseDown={(event) => {
@@ -172,7 +172,7 @@ export function NotificationResponseModal({
       >
         <div
           ref={dialogRef}
-          className="notif-response-modal"
+          className="notif-response-modal admin-on-dark"
           role="dialog"
           aria-modal="true"
           aria-labelledby={titleId}
