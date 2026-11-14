@@ -20,8 +20,9 @@ import {
 export { hubLinkHref, hubLinkLabel };
 
 export type RolePrimaryLeaf = {
-  tab: AdminTab;
+  tab?: AdminTab;
   label?: string;
+  routeId?: "gingr-route-generator";
 };
 
 export type RoleHubNavConfig = {
@@ -89,13 +90,18 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionLabel: "Front Desk Coordinator",
     primary: [
       { tab: "my_shift" },
-      { tab: "ops_command_center", label: "Live Floor" },
-      { tab: "sa_floor_hub" },
+      { tab: "ops_command_center", label: "Ops Command Center" },
+      { tab: "crossover_communication" },
+      { tab: "owner_follow_up" },
+      { tab: "active_issues" },
+      { tab: "body_checks" },
+      { tab: "yard_links" },
+      { tab: "notifications" },
+      { routeId: "gingr-route-generator" },
       { tab: "sa_whiteboard_hub" },
       { tab: "sa_apps_hub", label: "Apps" },
       { tab: "staff_directory" },
       { tab: "management_support", label: "Submit Request" },
-      { tab: "notifications" },
       { tab: "settings" },
       { tab: "help" }
     ]
@@ -205,7 +211,7 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
 };
 
 export function rolePrimaryTabs(role: HubNavRole): AdminTab[] {
-  return ROLE_HUB_NAV[role].primary.map((item) => item.tab);
+  return ROLE_HUB_NAV[role].primary.flatMap((item) => (item.tab ? [item.tab] : []));
 }
 
 export function roleUsesHubTab(role: string | null | undefined, tab: string): boolean {

@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import {
   accessFromLegacyRole,
-  canAccessAdminTab
+  canAccessAdminTab,
+  canAccessGingrRouteGenerator
 } from "../lib/admin/permissions";
 import { buildAdminNav, buildStaffPanelNav } from "../lib/admin/nav-groups";
 import { ADMIN_TABS } from "../lib/admin/types";
@@ -101,6 +102,11 @@ assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "front_desk_coordinator"), "route_generator", "front_desk_coordinator", "staff"),
   false,
   "Front Desk Coordinators must not open Route Generator"
+);
+assert.equal(
+  canAccessGingrRouteGenerator(accessFromLegacyRole(null, null, "front_desk_coordinator"), "front_desk_coordinator"),
+  true,
+  "Front Desk Coordinators can open Gingr Route Generator"
 );
 assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "driver"), "route_generator", "driver", "staff"),

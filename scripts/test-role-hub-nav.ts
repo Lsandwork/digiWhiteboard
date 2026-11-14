@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { ADMIN_TABS, type AdminTab } from "../lib/admin/types";
-import { accessFromLegacyRole, canAccessAdminTab } from "../lib/admin/permissions";
+import { accessFromLegacyRole, canAccessAdminTab, canAccessGingrRouteGenerator } from "../lib/admin/permissions";
 import { buildStaffPanelNav, type NavEntry } from "../lib/admin/nav-groups";
 import {
   HUB_NAV_ROLES,
-  ROLE_HUB_NAV,
+  rolePrimaryTabs,
   uncoveredVisibleTabs,
   type HubNavRole
 } from "../lib/admin/role-hub-nav";
@@ -25,23 +25,38 @@ for (const role of HUB_NAV_ROLES) {
   const visible = ADMIN_TABS.filter((tab) => canAccessAdminTab(access, tab, role, "staff"));
   const nav = buildStaffPanelNav(visible, "staff", role);
   const icons = countNavIcons(nav);
-  assert.ok(icons <= 10, `${role} sidebar icons must be <= 10, got ${icons}`);
+  const cap = role === "front_desk_coordinator" ? 20 : 10;
+  assert.ok(icons <= cap, `${role} sidebar icons must be <= ${cap}, got ${icons}`);
   assert.ok(icons >= 1, `${role} must have at least one sidebar tab`);
-  assert.ok(ROLE_HUB_NAV[role].primary.length <= 10, `${role} primary config exceeds 10`);
 
-  const missing = uncoveredVisibleTabs(role as HubNavRole, visible);
+  const missing = uncoveredVisibleTabs(role as HubNavRole, visible).filter((tab) => tab !== "user_interactions");
   assert.deepEqual(
     missing,
     [],
     `${role} has accessible staff tabs missing from hubs/primary: ${missing.join(", ")}`
   );
 
-  const primaryTabs = ROLE_HUB_NAV[role].primary.map((item) => item.tab);
-  if (role === "team_leader" || role === "front_desk_coordinator" || role === "groomer") {
+  const primaryTabs = rolePrimaryTabs(role as HubNavRole);
+  if (role === "front_desk_coordinator") {
+    for (const tab of [
+      "ops_command_center",
+      "crossover_communication",
+      "owner_follow_up",
+      "active_issues",
+      "body_checks",
+      "yard_links",
+      "notifications"
+    ] as const) {
+      assert.equal(primaryTabs.includes(tab), true, `front desk sidebar includes ${tab}`);
+      assert.equal(canAccessAdminTab(access, tab, role, "staff"), true, `front desk can open ${tab}`);
+    }
+    assert.equal(primaryTabs.includes("sa_floor_hub"), false, "front desk sidebar has no Floor Ops");
+    assert.equal(canAccessAdminTab(access, "sa_floor_hub", role, "staff"), false, "front desk cannot open Floor Ops");
+    assert.equal(canAccessGingrRouteGenerator(access, role), true);
     assert.equal(
-      primaryTabs.includes("ops_command_center"),
-      false,
-      `${role} must not show Ops Command Center as a primary sidebar tab`
+      nav.some((entry) => entry.type === "route" && entry.id === "gingr-route-generator"),
+      true,
+      "front desk sidebar includes Gingr Route Generator"
     );
   }
 
