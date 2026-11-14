@@ -170,7 +170,13 @@ export const SUPER_ADMIN_HUBS: Record<(typeof SUPER_ADMIN_HUB_TABS)[number], Sup
         links: [
           tabLink("staff_directory", "Staff Directory", "Edit staff names, roles, and contact info."),
           tabLink("staff_create_user", "Create User", "Create a new staff admin login."),
-          tabLink("users", "User Accounts", "Manage admin users, roles, and permissions.")
+          tabLink("users", "User Accounts", "Manage admin users, roles, and permissions."),
+          tabLink(
+            "staff_training",
+            "Staff Training",
+            "Front Desk and Overnight video courses, progress, and completion reports."
+          ),
+          tabLink("team_engagement", "Team Engagement", "Bark outs, recognition, and team programs.")
         ]
       },
       {

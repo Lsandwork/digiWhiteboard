@@ -50,6 +50,7 @@ import { StaffCreateUserPage } from "@/components/admin/StaffCreateUserPage";
 import { IntegrationsPanel } from "@/components/admin/IntegrationsPanel";
 import { NotificationsPanel } from "@/components/admin/NotificationsPanel";
 import { AdminHelpCenter } from "@/components/admin/AdminHelpCenter";
+import { StaffTrainingPanel } from "@/components/admin/staff-training/StaffTrainingPanel";
 import { YardLinksPanel } from "@/components/admin/YardLinksPanel";
 import { YardPushNoticesPanel } from "@/components/admin/YardPushNoticesPanel";
 import { ManagementSupportPanel } from "@/components/admin/ManagementSupportPanel";
@@ -684,7 +685,7 @@ export function AdminDashboard() {
     : isFrontDeskCoordinatorLoginEmail(data.username)
       ? "Front Desk Coordinator"
       : userAccess.displayLabel;
-  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "user_interactions", "crossover_communication", "owner_follow_up", "active_issues", "fitdog_alerts", "vip_auto_book", "whiteboard_preview", "yard_links", "walks_board", "package_group_walks", "ruffops_checklist", "body_checks", "tl_digi_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "track_incidents", "vet_visits", "route_generator", "live_fleet", "my_shift", "ops_command_center", "front_desk_command", "yard_command", "driver_mode", "overnight_command", "trainer_ops", "ops_system_health", "shift_handoff", "sa_floor_hub", "sa_whiteboard_hub", "sa_people_hub", "sa_apps_hub", "sa_admin_hub", "analytics", "reports", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "media_library", "handler_shift_entry", "team_engagement"].includes(tab);
+  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "user_interactions", "crossover_communication", "owner_follow_up", "active_issues", "fitdog_alerts", "vip_auto_book", "whiteboard_preview", "yard_links", "walks_board", "package_group_walks", "ruffops_checklist", "body_checks", "tl_digi_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "track_incidents", "vet_visits", "route_generator", "live_fleet", "my_shift", "ops_command_center", "front_desk_command", "yard_command", "driver_mode", "overnight_command", "trainer_ops", "ops_system_health", "shift_handoff", "sa_floor_hub", "sa_whiteboard_hub", "sa_people_hub", "sa_apps_hub", "sa_admin_hub", "analytics", "reports", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "media_library", "handler_shift_entry", "team_engagement", "staff_training"].includes(tab);
   const hubNavRole = currentRole;
   const showRoleHubNav = isHubNavRole(hubNavRole) && board === "staff";
   // Plain filter (not useMemo): this block runs only after the `if (!data)` early return.
@@ -1107,6 +1108,9 @@ export function AdminDashboard() {
               setActiveTab(nextTab);
             }}
           />
+        ) : null}
+        {tab === "staff_training" ? (
+          <StaffTrainingPanel onOpenTab={(nextTab) => setActiveTab(nextTab)} />
         ) : null}
         </TabErrorBoundary>
       </AdminShell>

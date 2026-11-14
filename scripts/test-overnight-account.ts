@@ -66,6 +66,7 @@ function itemLabels(entries: NavEntry[]): string[] {
 const nav = buildStaffPanelNav(visible, "staff", "overnight");
 assert.deepEqual(itemLabels(nav), [
   "My Shift",
+  "Training",
   "Team Log",
   "Body Checks",
   "Submit Request",

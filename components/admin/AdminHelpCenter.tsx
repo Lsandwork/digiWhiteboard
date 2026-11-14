@@ -30,6 +30,7 @@ const QUICK_LINKS: QuickLinkItem[] = [
   { href: "/admin?board=staff&tab=my_shift", label: "My Shift", roles: ["admin", "staff_ops", "handler"] },
   { href: "/admin?board=staff&tab=ops_command_center", label: "Ops Command Center", roles: ["admin", "staff_ops"] },
   { href: "/admin?board=staff&tab=crossover_communication", label: "Team Log", roles: ["admin", "staff_ops", "handler"] },
+  { href: "/admin?board=staff&tab=staff_training", label: "Staff Training", roles: ["admin", "staff_ops"] },
   { href: "/admin?board=staff&tab=grooming_push", label: "Grooming Push", roles: ["admin", "staff_ops"] },
   { href: "/admin?board=staff&tab=package_commissions", label: "Commissions", roles: ["admin", "staff_ops"] },
   { href: "/admin?board=staff&tab=route_generator", label: "Route Generator", roles: ["admin", "staff_ops"] },

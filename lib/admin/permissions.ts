@@ -103,6 +103,8 @@ export type PermissionKey =
   | "export_reports"
   | "view_admin_logs"
   | "view_my_shift"
+  | "view_staff_training"
+  | "view_staff_training_reports"
   | "view_ops_command_center"
   | "view_ops_dog_profile"
   | "manage_ops_tasks"
@@ -561,6 +563,7 @@ const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "ruffly.leads.edit",
   "ruffly.reviews.view",
   "view_my_shift",
+  "view_staff_training",
   "view_ops_command_center",
   "view_ops_dog_profile",
   "manage_ops_tasks",
@@ -623,6 +626,7 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "use_hr_consult",
   "view_analytics",
   "export_reports",
+  "view_staff_training_reports",
   "manage_photo_upload_queue",
   "download_photo_uploads",
   ...STAFF_NOTIFICATION_PERMISSIONS,
@@ -848,6 +852,7 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
 
 export const FRONT_DESK_COORDINATOR_TABS = [
   "my_shift",
+  "staff_training",
   "user_interactions",
   "front_desk_command",
   "ops_command_center",
@@ -944,6 +949,7 @@ export const DOG_HANDLER_TABS = [
 /** Overnight staff panel — core overnight tools plus floor body checks. */
 export const OVERNIGHT_TABS = [
   "my_shift",
+  "staff_training",
   "crossover_communication",
   "body_checks",
   "management_support",
@@ -981,6 +987,7 @@ export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   overnight: [
     "view_admin_panel",
     "view_my_shift",
+    "view_staff_training",
     "view_front_desk_log",
     "create_front_desk_log",
     "edit_front_desk_log",
@@ -1710,6 +1717,16 @@ export function canAccessAdminTab(
   if (tab === "team_engagement") {
     if (board !== "staff" || options?.isDemo) return false;
     return canUseTeamEngagement(access, legacyRole);
+  }
+
+  if (tab === "staff_training") {
+    if (board !== "staff" || options?.isDemo) return false;
+    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+    if (isFullAdminLegacyRole(legacyRole) || isAdminOrManagementLegacyRole(legacyRole)) return true;
+    if (legacyRole === "front_desk_coordinator" || legacyRole === "overnight") {
+      return hasPermission(effective, "view_staff_training");
+    }
+    return hasPermission(effective, "view_staff_training_reports");
   }
 
   // Retired entry tools — deny before the full-admin early return so they leave admin/management nav.
