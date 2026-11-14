@@ -8,6 +8,7 @@ import type { GingrReservation } from "@/lib/integrations/gingr/types";
 import { parseCsv } from "@/lib/route-generator/parser";
 import { extractPdfText, isPdfBuffer } from "@/lib/gingr-route-generator/pdf-text";
 import { buildGingrRouteSchedulePayload, type GingrRouteSchedulePayload } from "@/lib/gingr-route-generator/normalize";
+import { splitAppointmentOptionParts } from "@/lib/gingr-route-generator/transportation";
 
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 
@@ -46,10 +47,11 @@ function pickHeader(headers: string[], patterns: RegExp[]): string | null {
   return null;
 }
 
+/** Gingr names use "|" inside one name ("Cool Tricks | Group Training"), so only , ; and new lines separate. */
 function splitList(value: string | null): string[] {
   if (!value) return [];
   return value
-    .split(/\s*[|;,\n]\s*/)
+    .split(/\s*[;,\n]\s*/)
     .map((part) => part.trim())
     .filter(Boolean);
 }
@@ -90,7 +92,7 @@ function mapCsvRows(text: string): MappedRow[] {
       const ownerLast = lastH ? String(row[lastH] ?? "").trim() : "";
       const reservationType = typeH ? String(row[typeH] ?? "").trim() : "";
       const services = splitList(serviceH ? String(row[serviceH] ?? "") : "");
-      const addons = splitList(addonH ? String(row[addonH] ?? "") : "");
+      const addons = splitAppointmentOptionParts(addonH ? String(row[addonH] ?? "") : "");
       return {
         dogName,
         ownerName,

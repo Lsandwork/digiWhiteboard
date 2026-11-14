@@ -135,6 +135,10 @@ async function ensurePickupRoute(params: {
   return route;
 }
 
+function dogCount(stop: GingrPickupTrackingStop): number {
+  return Math.max(1, stop.dogIds?.length ?? 1);
+}
+
 function stopNotes(stop: GingrPickupTrackingStop): string {
   const lines = [stop.dogName];
   if (stop.ownerPhone) lines.push(`Phone: ${stop.ownerPhone}`);
@@ -173,8 +177,8 @@ async function upsertPickupStops(params: {
       address: stop.address,
       latitude: stop.latitude,
       longitude: stop.longitude,
-      dog_count: 1,
-      load_units: 1,
+      dog_count: dogCount(stop),
+      load_units: dogCount(stop),
       owner_phone_display: stop.ownerPhone,
       driver_notes: stopNotes(stop),
       household_key: householdKey,
@@ -196,12 +200,13 @@ async function upsertPickupStops(params: {
     }
   }
 
+  const totalDogs = params.stops.reduce((sum, stop) => sum + dogCount(stop), 0);
   await supabase
     .from("route_plan_routes")
     .update({
       total_stops: params.stops.length,
-      total_dogs: params.stops.length,
-      capacity_used: params.stops.length,
+      total_dogs: totalDogs,
+      capacity_used: totalDogs,
       status: "exported"
     })
     .eq("id", params.routeId);
