@@ -67,6 +67,25 @@ import {
 } from "@/lib/team-engagement/permissions";
 import { packDashboard } from "@/lib/team-engagement/pack-dashboard";
 import {
+  answerFunQuestion,
+  answerFunTrivia,
+  clearSpotlight,
+  congratulateMilestone,
+  createBarkOutComment,
+  deleteBarkOutComment,
+  editBarkOutComment,
+  featureSpotlight,
+  funZoneView,
+  listBarkOutComments,
+  milestonesView,
+  publishFunPoll,
+  publishFunQuestion,
+  saveFunPoll,
+  saveFunQuestion,
+  syncPackMilestones,
+  voteFunPoll
+} from "@/lib/team-engagement/pack-features";
+import {
   announcementsForEmployee,
   archiveAnnouncement,
   assignDepartmentManager,
@@ -296,6 +315,22 @@ export async function runLeadershipAction(ctx: ServiceContext, action: Leadershi
       return changeRole(ctx, body);
     case "set_role_permission":
       return setRolePermission(ctx, body);
+    case "feature_spotlight":
+      return featureSpotlight(ctx, body);
+    case "clear_spotlight":
+      return clearSpotlight(ctx, body);
+    case "remove_bark_out_comment":
+      return deleteBarkOutComment(ctx, { id: body.id });
+    case "save_fun_question":
+      return saveFunQuestion(ctx, body);
+    case "publish_fun_question":
+      return publishFunQuestion(ctx, body);
+    case "save_fun_poll":
+      return saveFunPoll(ctx, body);
+    case "publish_fun_poll":
+      return publishFunPoll(ctx, body);
+    case "sync_pack_milestones":
+      return syncPackMilestones(ctx, ctx.loadStaffHr ? await ctx.loadStaffHr() : []);
   }
 }
 
@@ -303,7 +338,7 @@ export async function runLeadershipAction(ctx: ServiceContext, action: Leadershi
 // Employee Bark Outs & suggestions (every staff role)
 // ---------------------------------------------------------------------------------------------
 
-export const PARTICIPANT_VIEWS = ["home", "pack", "feed", "mine", "feedback"] as const;
+export const PARTICIPANT_VIEWS = ["home", "pack", "feed", "mine", "feedback", "milestones", "fun_zone", "comments"] as const;
 export type ParticipantView = (typeof PARTICIPANT_VIEWS)[number];
 
 export function isParticipantView(value: string): value is ParticipantView {
@@ -369,6 +404,12 @@ export async function runParticipantView(ctx: ServiceContext, view: ParticipantV
       return myBarkOuts(ctx);
     case "feedback":
       return myFeedback(ctx);
+    case "milestones":
+      return milestonesView(ctx);
+    case "fun_zone":
+      return funZoneView(ctx);
+    case "comments":
+      return listBarkOutComments(ctx, { barkOutId: params.barkOutId });
   }
 }
 
@@ -392,5 +433,19 @@ export async function runParticipantAction(ctx: ServiceContext, action: Particip
       return submitFeedback(ctx, body);
     case "save_preferences":
       return savePreferences(ctx, body);
+    case "create_bark_out_comment":
+      return createBarkOutComment(ctx, body);
+    case "edit_bark_out_comment":
+      return editBarkOutComment(ctx, body);
+    case "delete_bark_out_comment":
+      return deleteBarkOutComment(ctx, body);
+    case "congratulate_milestone":
+      return congratulateMilestone(ctx, body);
+    case "answer_fun_question":
+      return answerFunQuestion(ctx, body);
+    case "vote_fun_poll":
+      return voteFunPoll(ctx, body);
+    case "answer_fun_trivia":
+      return answerFunTrivia(ctx, body);
   }
 }

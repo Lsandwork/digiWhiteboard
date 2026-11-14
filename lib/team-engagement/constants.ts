@@ -1,6 +1,25 @@
 import type { DepartmentKey } from "@/lib/admin/permissions";
 
 export const TEAM_ENGAGEMENT_MIGRATION = "supabase/migrations/103_team_engagement.sql";
+export const PACK_PRIORITY2_MIGRATION = "supabase/migrations/105_pack_priority2.sql";
+
+export const SPOTLIGHT_CATEGORIES = [
+  "above_and_beyond",
+  "behind_the_scenes",
+  "team_player",
+  "problem_solver",
+  "quiet_achiever",
+  "made_someones_day"
+] as const;
+export type SpotlightCategory = (typeof SPOTLIGHT_CATEGORIES)[number];
+export const SPOTLIGHT_CATEGORY_LABELS: Record<SpotlightCategory, string> = {
+  above_and_beyond: "Above & Beyond",
+  behind_the_scenes: "Behind-the-Scenes Hero",
+  team_player: "Ultimate Team Player",
+  problem_solver: "Problem Solver",
+  quiet_achiever: "Quiet Achiever",
+  made_someones_day: "Made Someone's Day"
+};
 
 export const ENGAGEMENT_DEPARTMENTS: DepartmentKey[] = [
   "front_desk",
@@ -201,15 +220,30 @@ export const FEEDBACK_CATEGORY_LABELS: Record<FeedbackCategory, string> = {
   other: "Other"
 };
 
-export const FEEDBACK_STATUSES = ["submitted", "under_review", "planned", "resolved", "declined"] as const;
+export const FEEDBACK_STATUSES = [
+  "submitted",
+  "under_review",
+  "approved",
+  "in_progress",
+  "implemented",
+  "declined",
+  "planned",
+  "resolved"
+] as const;
 export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number];
 export const FEEDBACK_STATUS_LABELS: Record<FeedbackStatus, string> = {
   submitted: "Submitted",
   under_review: "Under review",
+  approved: "Approved",
+  in_progress: "In progress",
+  implemented: "Implemented",
+  declined: "Not moving forward",
   planned: "Planned",
-  resolved: "Resolved",
-  declined: "Not moving forward"
+  resolved: "Resolved"
 };
+
+export const BARK_OUT_COMMENT_MAX = 500;
+export const MILESTONE_MESSAGE_MAX = 400;
 
 export const PROGRAM_TYPES = [
   "employee_of_the_month",

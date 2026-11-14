@@ -11,7 +11,7 @@ import { dispatchPersonalStaffEmailNotification, listStaffOps } from "@/lib/staf
 import type { EngagementContext } from "@/lib/team-engagement/authorize";
 import { once, type AccessControlPort, type SecurityEvent, type ServiceContext } from "@/lib/team-engagement/context";
 import { loadEngagementDirectory, type EngagementDirectory } from "@/lib/team-engagement/directory";
-import { EngagementError, mapDbError, notFoundError } from "@/lib/team-engagement/errors";
+import { EngagementError, isMissingRelationError, mapDbError, notFoundError } from "@/lib/team-engagement/errors";
 import { createGeminiModerationAi } from "@/lib/team-engagement/moderation";
 import { operationsSnapshotFromState } from "@/lib/team-engagement/operations";
 import { loadEngagementSettings } from "@/lib/team-engagement/settings";
@@ -163,6 +163,16 @@ export function createServiceContext(context: EngagementContext): ServiceContext
       if (error) throw mapDbError(error);
       const value = (data as { avatar_url?: string | null } | null)?.avatar_url ?? null;
       return typeof value === "string" && (value.startsWith("data:image/") || value.startsWith("https://")) ? value : null;
-    }
+    },
+    loadStaffHr: once(async () => {
+      const { data, error } = await supabase
+        .from("staff_directory")
+        .select("admin_user_id, name, hire_date, birthday_month, birthday_day, show_birthday");
+      if (error) {
+        if (isMissingRelationError(error) || error.message?.includes("hire_date")) return [];
+        throw mapDbError(error);
+      }
+      return (data ?? []) as import("@/lib/team-engagement/context").StaffHrSnapshot[];
+    })
   };
 }
