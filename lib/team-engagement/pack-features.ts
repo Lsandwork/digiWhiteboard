@@ -15,6 +15,7 @@ import {
   text,
   type ServiceContext
 } from "@/lib/team-engagement/context";
+import { assertCommunityText } from "@/lib/team-engagement/community-content";
 import { EngagementError, forbiddenError, notFoundError, validationError } from "@/lib/team-engagement/errors";
 import type { BarkOutRow, DbOp } from "@/lib/team-engagement/types";
 
@@ -175,6 +176,7 @@ export async function createBarkOutComment(
   const barkOut = await publishedBarkOut(ctx, barkOutId);
   const body = multilineText(input.body, BARK_OUT_COMMENT_MAX + 1);
   if (!body.trim()) throw validationError("Say something in your comment.");
+  assertCommunityText(body, "comment");
   if (body.length > BARK_OUT_COMMENT_MAX) throw validationError(`Keep comments under ${BARK_OUT_COMMENT_MAX} characters.`);
 
   let parent: CommentRow | null = null;
@@ -248,6 +250,7 @@ export async function editBarkOutComment(ctx: ServiceContext, input: { id?: unkn
   const body = multilineText(input.body, BARK_OUT_COMMENT_MAX + 1);
   if (!body.trim()) throw validationError("Comment cannot be empty.");
   if (body.length > BARK_OUT_COMMENT_MAX) throw validationError(`Keep comments under ${BARK_OUT_COMMENT_MAX} characters.`);
+  assertCommunityText(body, "comment");
   const { rows } = await ctx.db.select<CommentRow>("team_engagement_bark_out_comments", {
     filters: [{ column: "id", op: "eq", value: id }, { column: "status", op: "eq", value: "active" }],
     limit: 1
@@ -350,6 +353,7 @@ export async function congratulateMilestone(ctx: ServiceContext, input: { milest
   const message = multilineText(input.body, MILESTONE_MESSAGE_MAX + 1);
   if (!message.trim()) throw validationError("Add a short congratulation.");
   if (message.length > MILESTONE_MESSAGE_MAX) throw validationError(`Keep messages under ${MILESTONE_MESSAGE_MAX} characters.`);
+  assertCommunityText(message, "milestone");
   const { rows } = await ctx.db.select<MilestoneRow>("team_engagement_milestones", {
     filters: [{ column: "id", op: "eq", value: milestoneId }, { column: "status", op: "eq", value: "active" }],
     limit: 1
@@ -529,6 +533,7 @@ export async function answerFunQuestion(ctx: ServiceContext, input: { questionId
   const questionId = requireUuid(input.questionId, "questionId");
   const body = multilineText(input.body, 600);
   if (!body.trim()) throw validationError("Share your answer.");
+  assertCommunityText(body, "fun");
   const { rows } = await ctx.db.select<FunQuestionRow>("team_engagement_fun_questions", {
     filters: [{ column: "id", op: "eq", value: questionId }],
     limit: 1

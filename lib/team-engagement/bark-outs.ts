@@ -29,6 +29,7 @@ import {
   type ServiceContext
 } from "@/lib/team-engagement/context";
 import { EngagementError, conflictError, forbiddenError, notFoundError, validationError } from "@/lib/team-engagement/errors";
+import { assertCommunityText } from "@/lib/team-engagement/community-content";
 import { PUBLISHED_NOTICE, REVIEW_NOTICE, authorNoticeFor, barkOutFingerprint, moderateBarkOut } from "@/lib/team-engagement/moderation";
 import { tierRank } from "@/lib/team-engagement/permissions";
 import type {
@@ -482,6 +483,7 @@ export async function reportBarkOut(ctx: ServiceContext, input: { id?: unknown; 
   await requireFeature(ctx, "concern_reports");
   const reason = multilineText(input.reason, 600);
   if (reason.length < 3) throw validationError("Tell the moderators briefly what concerns you.");
+  assertCommunityText(reason, "report");
   const row = await getBarkOut(ctx, requireUuid(input.id, "Bark Out"));
   if (row.status !== "published") throw notFoundError("That Bark Out");
   if (row.author_user_id === ctx.actor.userId) throw validationError("You can withdraw your own Bark Out instead of reporting it.");

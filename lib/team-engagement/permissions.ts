@@ -366,6 +366,18 @@ const ADMIN_NAV: EngagementNavGroup[] = [
       item("audit", "Audit History", "audit-log"),
       item("settings", "Engagement Settings", "settings")
     ]
+  },
+  {
+    id: "the_pack",
+    label: "The Pack",
+    items: [
+      item("pack_overview", "Engagement Overview", "team-overview", "pack_overview"),
+      item("pack_goals_admin", "Pack Goals", "analytics", "pack_goals_admin"),
+      item("employee_voice_admin", "Employee Voice", "feedback", "employee_voice_admin"),
+      item("fun_zone_admin", "Fun Zone", "check", "fun_zone_admin"),
+      item("pack_ideas_admin", "Ideas for the Pack", "feedback", "pack_ideas_admin"),
+      item("pack_milestones_admin", "Milestones", "calendar-shift", "pack_milestones_admin")
+    ]
   }
 ];
 
@@ -403,6 +415,18 @@ const SUPER_ADMIN_NAV: EngagementNavGroup[] = [
       item("feedback", "Feedback & Suggestions", "feedback"),
       item("announcements", "Announcements", "announcements"),
       item("reports", "Reports & Exports", "export")
+    ]
+  },
+  {
+    id: "the_pack",
+    label: "The Pack",
+    items: [
+      item("pack_overview", "Engagement Overview", "team-overview", "pack_overview"),
+      item("pack_goals_admin", "Pack Goals", "analytics", "pack_goals_admin"),
+      item("employee_voice_admin", "Employee Voice", "feedback", "employee_voice_admin"),
+      item("fun_zone_admin", "Fun Zone", "check", "fun_zone_admin"),
+      item("pack_ideas_admin", "Ideas for the Pack", "feedback", "pack_ideas_admin"),
+      item("pack_milestones_admin", "Milestones", "calendar-shift", "pack_milestones_admin")
     ]
   }
 ];

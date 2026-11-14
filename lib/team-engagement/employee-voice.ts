@@ -6,6 +6,7 @@ import {
   type VoiceQuestionType,
   type VoiceSurveyStatus
 } from "@/lib/team-engagement/constants";
+import { assertCommunityText } from "@/lib/team-engagement/community-content";
 import { multilineText, nowIso, oneOf, optionalText, requireStorage, requireUuid, text, type ServiceContext } from "@/lib/team-engagement/context";
 import { EngagementError, forbiddenError, notFoundError, validationError } from "@/lib/team-engagement/errors";
 import { scopeIncludesDepartments } from "@/lib/team-engagement/permissions";
@@ -169,6 +170,9 @@ export async function submitVoiceSurvey(ctx: ServiceContext, input: { surveyId?:
     for (const question of questions) {
       const parsed = parseAnswer(question, answers[question.id]);
       if (question.required && (parsed === null || parsed === "")) throw validationError(`Answer “${question.prompt}”.`);
+      if (question.question_type === "text" && typeof parsed === "string" && parsed.trim()) {
+        assertCommunityText(parsed, "voice");
+      }
       ops.push({
         op: "insert",
         table: "team_engagement_voice_anonymous_responses",
@@ -198,6 +202,9 @@ export async function submitVoiceSurvey(ctx: ServiceContext, input: { surveyId?:
     for (const question of questions) {
       const parsed = parseAnswer(question, answers[question.id]);
       if (question.required && (parsed === null || parsed === "")) throw validationError(`Answer “${question.prompt}”.`);
+      if (question.question_type === "text" && typeof parsed === "string" && parsed.trim()) {
+        assertCommunityText(parsed, "voice");
+      }
       ops.push({
         op: "insert",
         table: "team_engagement_voice_responses",

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { screenCommunityText } from "@/lib/team-engagement/community-content";
 import type { AiPolicySettings, ModerationReasonCode } from "@/lib/team-engagement/constants";
 
 /**
@@ -108,6 +109,13 @@ const SEVERITY_RANK: Record<RuleVerdict, number> = { clear: 0, ambiguous: 1, rev
 
 export function screenBarkOutText(message: string, context?: string | null): RuleScreening {
   const text = `${message}\n${context ?? ""}`;
+  const community = screenCommunityText(text, "bark_out");
+  if (!community.allowed) {
+    return {
+      verdict: "prohibited",
+      findings: [{ code: "personal_attack", severity: "prohibited", phrase: "inappropriate language" }]
+    };
+  }
   const findings: RuleFinding[] = [];
   for (const rule of RULES) {
     const match = rule.pattern.exec(text);
@@ -132,7 +140,8 @@ export function barkOutFingerprint(message: string) {
 
 const AUTHOR_NOTICES: Partial<Record<ModerationReasonCode, string>> = {
   threat: "This Bark Out can't be posted because part of it reads as a threat.",
-  personal_attack: "This Bark Out can't be posted because part of it reads as a personal attack.",
+  personal_attack:
+    "Let's keep The Pack positive and respectful. Please revise your message before posting.",
   harassment: "This Bark Out can't be posted because part of it reads as harassment.",
   bullying: "This Bark Out can't be posted because part of it reads as bullying.",
   retaliation: "This Bark Out can't be posted because part of it reads as retaliation.",
