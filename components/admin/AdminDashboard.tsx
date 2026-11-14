@@ -33,7 +33,7 @@ import { VipAutoBookPanel } from "@/components/admin/VipAutoBookPanel";
 import { RouteGeneratorPanel } from "@/components/admin/RouteGeneratorPanel";
 import { LiveFleetPanel } from "@/components/admin/live-fleet/LiveFleetPanel";
 import { OpsCommandCenterPanel } from "@/components/admin/ops-command-center/OpsCommandCenterPanel";
-import { OpsLiveCommandCenter } from "@/components/admin/ops-command-center/OpsLiveCommandCenter";
+import { OpsFloorWorkstation } from "@/components/admin/ops-command-center/OpsFloorWorkstation";
 import {
   DriverModePanel,
   FrontDeskCommandPanel,
@@ -978,7 +978,11 @@ export function AdminDashboard() {
           />
         ) : null}
         {tab === "ops_command_center" ? (
-          <OpsLiveCommandCenter onNavigate={(nextTab) => setActiveTab(nextTab as AdminTab)} />
+          <OpsFloorWorkstation
+            displayName={displayLabel}
+            roleLabel={userAccess.displayLabel}
+            onNavigate={(nextTab) => setActiveTab(nextTab as AdminTab)}
+          />
         ) : null}
         {tab === "front_desk_command" ? (
           <FrontDeskCommandPanel onNavigate={(nextTab) => setActiveTab(nextTab as AdminTab)} />
