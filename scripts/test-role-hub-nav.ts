@@ -39,6 +39,7 @@ for (const role of HUB_NAV_ROLES) {
   const primaryTabs = rolePrimaryTabs(role as HubNavRole);
   if (role === "front_desk_coordinator") {
     for (const tab of [
+      "staff_training",
       "ops_command_center",
       "crossover_communication",
       "owner_follow_up",

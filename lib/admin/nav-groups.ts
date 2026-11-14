@@ -199,6 +199,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   logs: "Activity Logs",
   integrations: "Integrations",
   help: "Help Center",
+  staff_training: "Staff Training",
   hr_hub: "HR Records",
   hr_consult: "HR Consult",
   bulk_photo_upload: "Bulk Photo Upload",

@@ -66,6 +66,7 @@
     "test:gingr-samsara-export": "tsx scripts/test-gingr-samsara-export.ts",
     "test:gingr-route-generator": "tsx scripts/test-gingr-route-generator.ts",
     "test:gingr-appointment-routes": "tsx scripts/test-gingr-appointment-option-routes.ts",
+    "test:staff-training": "tsx scripts/test-staff-training.ts",
     "test:route-generator": "tsx scripts/test-route-generator.ts",
     "test:live-fleet": "tsx scripts/test-live-fleet.ts",
     "test:sms-cost": "tsx scripts/test-sms-cost-phase1.ts && tsx scripts/test-super-admin-sms.ts",
