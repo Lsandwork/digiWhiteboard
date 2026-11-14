@@ -1766,7 +1766,7 @@ export function canAccessAdminTab(
     // Avoid circular imports: mirror role-hub-nav primary membership.
     if (legacyRole === "assistant_manager") return true;
     if (legacyRole === "front_desk_coordinator") {
-      return tab === "sa_whiteboard_hub" || tab === "sa_apps_hub";
+      return tab === "sa_whiteboard_hub";
     }
     if (legacyRole === "team_leader") {
       return tab === "sa_floor_hub" || tab === "sa_whiteboard_hub" || tab === "sa_apps_hub";

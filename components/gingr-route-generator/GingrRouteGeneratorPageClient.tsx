@@ -113,7 +113,14 @@ export function GingrRouteGeneratorPageClient({ username, role, access }: Props)
             <MobileMenuButton onClick={() => setMobileOpen(true)} />
             <ThemeToggle />
           </div>
-          <GingrRouteGeneratorWorkspace />
+          <GingrRouteGeneratorWorkspace
+            backHref={
+              role === "front_desk_coordinator"
+                ? "/admin?board=staff&tab=my_shift"
+                : "/admin?board=staff&tab=sa_apps_hub"
+            }
+            backLabel={role === "front_desk_coordinator" ? "My Shift" : "Apps"}
+          />
         </div>
       </div>
     </div>

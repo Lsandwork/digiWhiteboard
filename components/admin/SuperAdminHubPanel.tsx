@@ -39,17 +39,12 @@ export function SuperAdminHubPanel({
   marketingAppsOnly?: boolean;
 }) {
   if (!isSuperAdminHubTab(hubTab)) return null;
-  const hub = withCoordinatorFloorTools(
-    hubDefinitionForTab(hubTab, visibleTabs.length ? visibleTabs : [hubTab], {
-      includeRuffly: roleCanSeeRufflyNav(role),
-      includeBlog: roleCanSeeBlogNav(role, email, name),
-      includeRouteGenerator: visibleTabs.includes("route_generator"),
-      marketingAppsOnly
-    }),
-    hubTab,
-    role,
-    visibleTabs
-  );
+  const hub = hubDefinitionForTab(hubTab, visibleTabs.length ? visibleTabs : [hubTab], {
+    includeRuffly: roleCanSeeRufflyNav(role),
+    includeBlog: roleCanSeeBlogNav(role, email, name),
+    includeRouteGenerator: visibleTabs.includes("route_generator"),
+    marketingAppsOnly
+  });
   if (!hub || !hub.sections.length) {
     return (
       <section className="rounded-2xl border border-admin-border bg-black/20 p-5 text-sm text-admin-muted">
@@ -71,7 +66,12 @@ export function SuperAdminNestedReturnBar({
 }) {
   const parent = parentHubForTab(tab);
   if (!parent) return null;
-  if (role === "front_desk_coordinator" && parent === "sa_floor_hub") return null;
+  if (
+    role === "front_desk_coordinator" &&
+    (parent === "sa_floor_hub" || parent === "sa_apps_hub")
+  ) {
+    return null;
+  }
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-admin-border bg-black/20 px-3 py-2">
       <button
@@ -88,38 +88,6 @@ export function SuperAdminNestedReturnBar({
       </span>
     </div>
   );
-}
-
-const COORDINATOR_APPS_FLOOR_TABS: AdminTab[] = [
-  "vip_auto_book",
-  "walks_board",
-  "package_group_walks",
-  "shift_handoff",
-  "bulk_photo_upload",
-  "media_library"
-];
-
-function withCoordinatorFloorTools(
-  hub: SuperAdminHubDefinition | null,
-  hubTab: AdminTab,
-  role: string | null,
-  visibleTabs: AdminTab[]
-): SuperAdminHubDefinition | null {
-  if (!hub || role !== "front_desk_coordinator" || hubTab !== "sa_apps_hub") return hub;
-  const visible = new Set(visibleTabs);
-  const links: SuperAdminHubLink[] = COORDINATOR_APPS_FLOOR_TABS.filter((tab) => visible.has(tab)).map(
-    (tab) => ({
-      kind: "tab",
-      tab,
-      label: getTabLabel(tab),
-      description: "Still available after Floor Ops left the sidebar."
-    })
-  );
-  if (!links.length) return hub;
-  return {
-    ...hub,
-    sections: [...hub.sections, { id: "coordinator_floor", title: "Floor tools", links }]
-  };
 }
 
 function HubLauncher({

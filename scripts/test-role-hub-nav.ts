@@ -52,6 +52,13 @@ for (const role of HUB_NAV_ROLES) {
     }
     assert.equal(primaryTabs.includes("sa_floor_hub"), false, "front desk sidebar has no Floor Ops");
     assert.equal(canAccessAdminTab(access, "sa_floor_hub", role, "staff"), false, "front desk cannot open Floor Ops");
+    assert.equal(primaryTabs.includes("sa_apps_hub"), false, "front desk sidebar has no Apps");
+    assert.equal(canAccessAdminTab(access, "sa_apps_hub", role, "staff"), false, "front desk cannot open Apps");
+    assert.equal(
+      nav.some((entry) => entry.type === "item" && entry.tab === "sa_apps_hub"),
+      false,
+      "front desk nav does not render Apps"
+    );
     assert.equal(canAccessGingrRouteGenerator(access, role), true);
     assert.equal(
       nav.some((entry) => entry.type === "route" && entry.id === "gingr-route-generator"),
