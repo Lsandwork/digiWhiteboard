@@ -99,7 +99,6 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
       { tab: "notifications" },
       { routeId: "gingr-route-generator" },
       { tab: "sa_whiteboard_hub" },
-      { tab: "sa_apps_hub", label: "Apps" },
       { tab: "staff_directory" },
       { tab: "management_support", label: "Submit Request" },
       { tab: "settings" },

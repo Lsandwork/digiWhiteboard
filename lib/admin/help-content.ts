@@ -212,11 +212,11 @@ export const HELP_ARTICLES: HelpArticle[] = [
     category: "Admin Dashboard",
     keywords: ["front desk", "menu", "coordinator", "body checks", "gingr route generator", "whiteboard"],
     steps: [
-      "Primary tabs: My Shift, Ops Command Center, Team Log, Owner Follow Up, Active Issues, Body Checks, Video Links, Notifications, Gingr Route Generator, Whiteboard, Apps, Staff Directory, Submit Request, Settings, Help.",
+      "Primary tabs: My Shift, Ops Command Center, Team Log, Owner Follow Up, Active Issues, Body Checks, Video Links, Notifications, Gingr Route Generator, Whiteboard, Staff Directory, Submit Request, Settings, Help.",
       "My Shift Needs Attention includes today’s Gingr facility-calendar services (group walk, puzzle playtime, private training, daily enrichment, club food, taxi, bath/nails/grooming — Free Daily Walk excluded) plus dogs scheduled or checked in with a birthday today from the Gingr dog profile. Previous Front Desk Notes replace Live board on My Shift.",
-      "VIP Auto Book, Walks, photos, and Shift Handoff open from Apps.",
+      "Floor Ops and Apps are not on the Front Desk Coordinator sidebar.",
       "Whiteboard opens Standard Notices, Grooming Push, Yard Camera Push, and display tools your login allows.",
-      "Apps also opens Gingr, Ruffly, and Live Fleet when your login includes them."
+      "Gingr Route Generator is on the sidebar. Gingr, Ruffly, and Live Fleet are not listed under an Apps tab for this login."
     ],
     adminTab: "front_desk_command",
     adminBoard: "staff",
@@ -888,12 +888,12 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Sign in at Fitdog Digi-Board with your assigned email and password.",
-      "Front Desk Coordinators: Team Log, Owner Follow Up, Active Issues, Body Checks, Video Links, Notifications, Ops Command Center, and Gingr Route Generator are on the sidebar. Floor Ops is not.",
+      "Front Desk Coordinators: Team Log, Owner Follow Up, Active Issues, Body Checks, Video Links, Notifications, Ops Command Center, and Gingr Route Generator are on the sidebar. Floor Ops and Apps are not.",
       "Team Leads still use Floor Ops, Whiteboard, and Apps hubs (see “Where did my menu items go?”).",
       "Start from My Shift or Ops Command Center for live dogs and Gingr connection status. Team Leads can also open Yard Command.",
       "Team Lead dashboard: My Shift Needs Attention is assigned Open Log + Active Issues, plus previous Team Lead Team Log notes. Coordinator dashboards still see the full desk view.",
-      "Team Leads open Floor Ops for Team Log, Owner Follow Up, Active Issues, Walks Board, and photos. Coordinators open those desk tools from the sidebar, and Walks, photos, VIP Auto Book, and Shift Handoff from Apps.",
-      "Open Whiteboard for Push Notices and related live alerts; open Apps for Gingr / Ruffly when enabled.",
+      "Team Leads open Floor Ops for Team Log, Owner Follow Up, Active Issues, Walks Board, and photos. Coordinators open Team Log, Owner Follow Up, Active Issues, Body Checks, and Video Links from the sidebar.",
+      "Open Whiteboard for Push Notices and related live alerts. Team Leads open Apps for Gingr / Ruffly when enabled. Front Desk Coordinators do not have an Apps tab.",
       "Staff Directory is view-only for Front Desk — search and review staff, but you cannot add, edit, or delete directory rows.",
       "You can delete only Team Log entries you created (Super Admin, Admin, and Management can delete any).",
       "You cannot access Lobby content tools, global settings, logs, integrations, or the full Admin Users area."

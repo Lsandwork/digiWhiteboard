@@ -140,7 +140,13 @@ const DogRow = memo(function DogRow({ dog }: { dog: GingrRouteDog }) {
   );
 });
 
-export function GingrRouteGeneratorWorkspace() {
+export function GingrRouteGeneratorWorkspace({
+  backHref = "/admin?board=staff&tab=sa_apps_hub",
+  backLabel = "Apps"
+}: {
+  backHref?: string;
+  backLabel?: string;
+}) {
   const todayKey = useMemo(() => todayPacificDateKey(), []);
   const [dateKey, setDateKey] = useState(todayKey);
   const [payload, setPayload] = useState<GingrRouteSchedulePayload | null>(null);
@@ -427,8 +433,8 @@ export function GingrRouteGeneratorWorkspace() {
     <div className="grg-page">
       <header className="grg-header">
         <div className="grg-header-left">
-          <Link href="/admin?board=staff&tab=sa_apps_hub" className="grg-back">
-            ← Apps
+          <Link href={backHref} className="grg-back">
+            ← {backLabel}
           </Link>
           <h1 className="grg-title">Gingr Route Generator</h1>
         </div>
