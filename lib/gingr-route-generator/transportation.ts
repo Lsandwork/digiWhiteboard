@@ -1252,7 +1252,8 @@ export function resolveGingrTransportPlan(input: {
     finalDestination = UNKNOWN_END;
   }
 
-  if (journey === "activity" && !isBoarding) {
+  const unreadable = options.some((option) => option.phase === "UNKNOWN" && option.issue);
+  if (journey === "activity" && !isBoarding && !unreadable) {
     const noBefore = !before.blocked && !before.end;
     const noAfter = !after.blocked && !after.end;
     if (noBefore && noAfter) {
