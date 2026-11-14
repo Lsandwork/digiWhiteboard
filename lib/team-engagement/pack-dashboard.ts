@@ -112,14 +112,26 @@ export async function packDashboard(ctx: ServiceContext) {
   const pack3Ready = goalsCatalog.ready && voiceCatalog.ready;
 
   const awaiting = mine.sent.filter((row) => row.status === "awaiting_confirmation" || row.status === "pending_review");
+  const avatarUrl = await ctx.loadAvatar(ctx.actor.userId);
+  const now = new Date(ctx.now());
+  const dateLabel = now.toLocaleDateString("en-US", {
+    timeZone: "America/Los_Angeles",
+    weekday: "long",
+    month: "long",
+    day: "numeric"
+  });
+  const activeGoalsCount = goalsCatalog.ready ? goalsCatalog.active.length : 0;
+  const comingUp = milestones.ready ? milestones.upcoming.slice(0, 5) : [];
 
   return {
     storageReady: true as const,
     features: settings.features,
-    greeting: pacificGreeting(new Date(ctx.now())),
+    greeting: pacificGreeting(now),
+    dateLabel,
     me: {
       userId: ctx.actor.userId,
       name: ctx.actor.name,
+      avatarUrl,
       canPost: posting.canPost,
       postingBlockedReason: posting.blockedReason,
       postingBlockedMessage: posting.blockedMessage,
@@ -131,9 +143,12 @@ export async function packDashboard(ctx: ServiceContext) {
       barkOutsThisWeek: weekCount,
       participationPercent,
       teamSize: activeEmployees,
+      teammatesRecognizedThisMonth: authorsThisMonth,
       newForMeThisWeek: pendingForMe,
-      pendingMyPosts: awaiting.length
+      pendingMyPosts: awaiting.length,
+      activePackGoals: activeGoalsCount
     },
+    comingUp,
     activityFeed,
     spotlight: resolvedSpotlight.barkOut,
     spotlightMeta: resolvedSpotlight.curated,

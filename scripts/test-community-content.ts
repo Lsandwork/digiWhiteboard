@@ -28,6 +28,9 @@ async function main() {
   );
   assert.equal(respectful.allowed, true, "constructive criticism without profanity");
 
+  const attack = screenCommunityText("You are such an idiot on the floor.", "comment");
+  assert.equal(attack.allowed, false, "personal attack on public surface");
+
   const groomer = serviceContextFor(seededDb(), actorFor(PEOPLE.groomer));
 
   const prohibited = await createBarkOut(groomer, {

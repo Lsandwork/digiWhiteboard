@@ -891,6 +891,7 @@ export async function saveFunQuestion(
   await assertPackTable(ctx, "team_engagement_fun_questions");
   const prompt = multilineText(input.prompt, 401);
   if (prompt.length < 5) throw validationError("Add a question prompt.");
+  assertCommunityText(prompt, "fun");
   const cadence = input.cadence === "weekly" ? "weekly" : "daily";
   const now = nowIso(ctx);
   const id = typeof input.id === "string" ? input.id : randomUUID();
@@ -943,10 +944,12 @@ export async function saveFunPoll(
   await assertPackTable(ctx, "team_engagement_fun_polls");
   const prompt = multilineText(input.prompt, 301);
   if (prompt.length < 5) throw validationError("Add a poll question.");
+  assertCommunityText(prompt, "fun");
   const labels = Array.isArray(input.options)
     ? input.options.map((value) => multilineText(value, 121).trim()).filter(Boolean)
     : [];
   if (labels.length < 2) throw validationError("Polls need at least two options.");
+  for (const label of labels) assertCommunityText(label, "fun");
   const now = nowIso(ctx);
   const pollId = typeof input.id === "string" ? input.id : randomUUID();
   const ops: DbOp[] = [

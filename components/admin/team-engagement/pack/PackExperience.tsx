@@ -40,9 +40,12 @@ type CommentItem = {
 type PackPayload = {
   storageReady: boolean;
   greeting: string;
+  dateLabel?: string;
+  comingUp?: MilestoneItem[];
   me: {
     userId: string;
     name: string;
+    avatarUrl?: string | null;
     canPost: boolean;
     postingBlockedReason?: string;
     postingBlockedMessage?: string;
@@ -54,8 +57,10 @@ type PackPayload = {
     barkOutsThisWeek: number;
     participationPercent: number;
     teamSize: number;
+    teammatesRecognizedThisMonth?: number;
     newForMeThisWeek: number;
     pendingMyPosts: number;
+    activePackGoals?: number;
   };
   activityFeed: BarkOutItem[];
   spotlight: BarkOutItem | null;
@@ -269,6 +274,12 @@ export default function PackExperience() {
   const [pack, setPack] = useState<PackPayload | null>(null);
   const [home, setHome] = useState<HomePayload | null>(null);
   const [feed, setFeed] = useState<BarkOutItem[]>([]);
+  const [feedOffset, setFeedOffset] = useState(0);
+  const [feedTotal, setFeedTotal] = useState(0);
+  const [feedPageSize, setFeedPageSize] = useState(20);
+  const [barkSubview, setBarkSubview] = useState<"team" | "received" | "sent">("team");
+  const [mineReceived, setMineReceived] = useState<BarkOutItem[]>([]);
+  const [mineSentPublished, setMineSentPublished] = useState<BarkOutItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -297,12 +308,18 @@ export default function PackExperience() {
         canWithdraw: boolean;
         message: string;
         statusLabel: string;
+        recipient?: { name: string };
+        category?: { label: string };
+        publishedAt?: string | null;
       }>;
+      received: BarkOutItem[];
     }>("/api/admin/bark-outs?view=mine");
     if (ok) {
       setPendingSent(body.sent.filter((row) => row.status === "awaiting_confirmation" || row.status === "pending_review"));
+      setMineReceived(body.received ?? []);
+      setMineSentPublished(body.sent.filter((row) => row.status === "published") as unknown as BarkOutItem[]);
     }
-  }, []);
+  }, [pack?.me.avatarUrl, pack?.me.name, pack?.me.userId]);
 
   const loadPack = useCallback(async () => {
     const { ok, body } = await fetchAdminJson<PackPayload & { error?: string }>("/api/admin/bark-outs?view=pack");
@@ -315,9 +332,17 @@ export default function PackExperience() {
     setError(null);
   }, []);
 
-  const loadFeed = useCallback(async () => {
-    const { ok, body } = await fetchAdminJson<{ items: BarkOutItem[] }>("/api/admin/bark-outs?view=feed");
-    if (ok) setFeed(body.items);
+  const loadFeed = useCallback(async (opts?: { append?: boolean; offset?: number }) => {
+    const offset = opts?.offset ?? 0;
+    const { ok, body } = await fetchAdminJson<{ items: BarkOutItem[]; total: number; offset: number; pageSize: number }>(
+      `/api/admin/bark-outs?view=feed&offset=${offset}`
+    );
+    if (ok) {
+      setFeed((prev) => (opts?.append ? [...prev, ...body.items] : body.items));
+      setFeedOffset(body.offset);
+      setFeedTotal(body.total);
+      setFeedPageSize(body.pageSize);
+    }
   }, []);
 
   const loadHome = useCallback(async () => {
@@ -472,9 +497,19 @@ export default function PackExperience() {
       <header className="pack-hero">
         <div className="pack-hero__inner">
           <div>
-            <p className="pack-muted" style={{ color: "rgba(255,255,255,0.85)", margin: "0 0 4px" }}>
-              {pack.greeting}, {pack.me.name.split(" ")[0] ?? pack.me.name}
-            </p>
+            <div className="pack-people" style={{ marginBottom: 10 }}>
+              <Avatar name={pack.me.name} url={pack.me.avatarUrl ?? null} size={52} />
+              <div>
+                <p className="pack-muted" style={{ color: "rgba(255,255,255,0.85)", margin: "0 0 2px" }}>
+                  {pack.greeting}, {pack.me.name.split(" ")[0] ?? pack.me.name}
+                </p>
+                {pack.dateLabel ? (
+                  <p className="pack-muted" style={{ color: "rgba(255,255,255,0.75)", margin: 0, fontSize: 13 }}>
+                    {pack.dateLabel}
+                  </p>
+                ) : null}
+              </div>
+            </div>
             <h1 className="pack-hero__title">The Pack</h1>
             <p className="pack-hero__lede">
               {pack.tagline} Celebrate the people who make the difference. Every contribution matters.
@@ -485,7 +520,11 @@ export default function PackExperience() {
                 <div className="pack-stat__value">{pack.stats.barkOutsThisMonth}</div>
               </div>
               <div className="pack-stat">
-                <div className="pack-stat__label">Team participation</div>
+                <div className="pack-stat__label">Teammates recognized</div>
+                <div className="pack-stat__value">{pack.stats.teammatesRecognizedThisMonth ?? 0}</div>
+              </div>
+              <div className="pack-stat">
+                <div className="pack-stat__label">Participation</div>
                 <div className="pack-stat__value">{pack.stats.participationPercent}%</div>
               </div>
               <div className="pack-stat">
@@ -501,11 +540,27 @@ export default function PackExperience() {
           <div className="pack-hero__actions">
             <span className="pack-pill">{pack.stats.barkOutsThisWeek} new this week</span>
             {pack.stats.pendingMyPosts > 0 ? <span className="pack-pill">{pack.stats.pendingMyPosts} awaiting review</span> : null}
-            {pack.me.canPost ? (
-              <button type="button" className="pack-btn pack-btn--primary" onClick={() => setModalOpen(true)}>
-                + Give a Bark Out
-              </button>
-            ) : null}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+              {pack.me.canPost ? (
+                <button type="button" className="pack-btn pack-btn--primary" onClick={() => setModalOpen(true)}>
+                  + Give a Bark Out
+                </button>
+              ) : null}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "flex-end" }}>
+                <button type="button" className="pack-btn pack-btn--ghost" onClick={() => setSection("milestones")}>
+                  Milestones
+                </button>
+                <button type="button" className="pack-btn pack-btn--ghost" onClick={() => setSection("fun")}>
+                  Fun Zone
+                </button>
+                <button type="button" className="pack-btn pack-btn--ghost" onClick={() => setSection("goals")}>
+                  Goals
+                </button>
+                <button type="button" className="pack-btn pack-btn--ghost" onClick={() => setSection("ideas")}>
+                  Ideas
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -638,6 +693,37 @@ export default function PackExperience() {
             </section>
           ) : null}
 
+          {pack.comingUp && pack.comingUp.length > 0 ? (
+            <section className="pack-card">
+              <h2 className="pack-card__title">Coming up</h2>
+              <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                {pack.comingUp.map((milestone) => (
+                  <li key={milestone.id} style={{ marginBottom: 10, fontSize: 14 }}>
+                    <strong>{milestone.title}</strong>
+                    <span className="pack-muted">
+                      {" "}
+                      · {milestone.celebrationOn} · {milestone.employee.name}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <button type="button" className="pack-btn pack-btn--ghost" style={{ marginTop: 8 }} onClick={() => setSection("milestones")}>
+                View all milestones
+              </button>
+            </section>
+          ) : null}
+
+          {typeof pack.stats.activePackGoals === "number" ? (
+            <section className="pack-card pack-muted" style={{ fontSize: 14 }}>
+              <strong>{pack.stats.activePackGoals}</strong> active Pack {pack.stats.activePackGoals === 1 ? "Goal" : "Goals"}
+              {pack.stats.activePackGoals > 0 ? (
+                <button type="button" className="pack-btn pack-btn--ghost" style={{ marginLeft: 8 }} onClick={() => setSection("goals")}>
+                  View
+                </button>
+              ) : null}
+            </section>
+          ) : null}
+
           <aside className="pack-card">
             <h2 className="pack-card__title">Your activity</h2>
             <ul className="pack-muted" style={{ margin: 0, paddingLeft: 18 }}>
@@ -664,7 +750,7 @@ export default function PackExperience() {
 
       {section === "bark_outs" ? (
         <section className="pack-card">
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
             <h2 className="pack-card__title" style={{ margin: 0 }}>
               Bark Outs
             </h2>
@@ -674,11 +760,59 @@ export default function PackExperience() {
               </button>
             ) : null}
           </div>
-          {feedItems.length === 0 ? (
-            <SectionEmpty title="No Bark Outs yet" body="Be the first to celebrate a teammate today." />
-          ) : (
-            feedItems.map((item) => <BarkOutCard key={item.id} item={item} onReact={react} onReport={reportBarkOut} />)
-          )}
+          <div className="pack-nav" style={{ marginBottom: 16 }}>
+            {(
+              [
+                ["team", "Team feed"],
+                ["received", `Received (${mineReceived.length})`],
+                ["sent", `Given (${mineSentPublished.length})`]
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={`pack-nav__btn ${barkSubview === id ? "pack-nav__btn--active" : ""}`}
+                onClick={() => setBarkSubview(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {barkSubview === "team" ? (
+            feed.length === 0 ? (
+              <SectionEmpty title="No Bark Outs yet" body="Be the first to celebrate a teammate today." />
+            ) : (
+              <>
+                {feed.map((item) => (
+                  <BarkOutCard key={item.id} item={item} onReact={react} onReport={reportBarkOut} />
+                ))}
+                {feed.length < feedTotal ? (
+                  <button
+                    type="button"
+                    className="pack-btn pack-btn--ghost"
+                    style={{ marginTop: 12 }}
+                    onClick={() => void loadFeed({ append: true, offset: feedOffset + feedPageSize })}
+                  >
+                    Load more
+                  </button>
+                ) : null}
+              </>
+            )
+          ) : null}
+          {barkSubview === "received" ? (
+            mineReceived.length === 0 ? (
+              <SectionEmpty title="No recognition yet" body="When teammates celebrate you, Bark Outs appear here." />
+            ) : (
+              mineReceived.map((item) => <BarkOutCard key={item.id} item={item} onReact={react} onReport={reportBarkOut} />)
+            )
+          ) : null}
+          {barkSubview === "sent" ? (
+            mineSentPublished.length === 0 ? (
+              <SectionEmpty title="No Bark Outs sent" body="Recognize a teammate to start your giving history." />
+            ) : (
+              mineSentPublished.map((item) => <BarkOutCard key={item.id} item={item} onReact={react} onReport={reportBarkOut} />)
+            )
+          ) : null}
         </section>
       ) : null}
 

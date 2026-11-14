@@ -102,6 +102,23 @@ function containsHarmful(spaced: string): boolean {
   return false;
 }
 
+/** Public community surfaces — not Employee Voice, where process criticism stays welcome. */
+const PUBLIC_SURFACES = new Set<CommunitySurface>(["bark_out", "comment", "fun", "idea", "milestone"]);
+
+const PERSONAL_ATTACK_PATTERNS: RegExp[] = [
+  /\byou\s+(are|re)\s+(?:\w+\s+){0,4}(?:an?\s+)?(idiot|stupid|dumb|loser|pathetic|worthless|useless|garbage|trash)\b/i,
+  /\b(i\s+hate\s+you|hate\s+you)\b/i,
+  /\byou\s+suck\b/i,
+  /\bkill\s+yourself\b/i
+];
+
+function containsPersonalAttack(spaced: string): boolean {
+  for (const pattern of PERSONAL_ATTACK_PATTERNS) {
+    if (pattern.test(spaced)) return true;
+  }
+  return false;
+}
+
 export function screenCommunityText(
   text: string,
   surface: CommunitySurface
@@ -121,6 +138,13 @@ export function screenCommunityText(
       allowed: false,
       code: "harmful",
       message: surface === "voice" ? VOICE_CONTENT_BLOCKED_MESSAGE : CONTENT_BLOCKED_MESSAGE
+    };
+  }
+  if (PUBLIC_SURFACES.has(surface) && containsPersonalAttack(spaced)) {
+    return {
+      allowed: false,
+      code: "harmful",
+      message: CONTENT_NOT_CONSTRUCTIVE_MESSAGE
     };
   }
   return { allowed: true };
