@@ -8,14 +8,18 @@ import {
   sortGingrRouteActivities
 } from "@/lib/gingr-route-generator/activities";
 import {
+  classifyGingrVisit,
+  classifyHalfDayPeriod,
   collectReservationAppointmentOptions,
+  formatGingrVisitLabel,
   logTransportationClassification,
   gingrTimestampDateKey,
   isInternalBoardingTaxiMarker,
   normalizeReservationTransportation,
   resolveBoardingOccupancy,
   resolveTransportLifecycle,
-  type GingrTransportationType
+  type GingrTransportationType,
+  type GingrVisitKind
 } from "@/lib/gingr-route-generator/transportation";
 import {
   collectAssignedToLabels,
@@ -61,6 +65,12 @@ export type GingrRouteDog = {
   notes: string | null;
   /** Booking comments visible to the client — shown as Pick Up Instructions. */
   pickupInstructions: string | null;
+  /** Owner drop-off instructions. The full text is shown when a dispatcher opens the note. */
+  dropoffInstructions: string | null;
+  /** Stay and Play, half-day, full-day, or overnight when that visit is on the reservation. */
+  visitKind: GingrVisitKind | null;
+  /** Dispatcher label for the visit, including half-day period and overnight check-in or checkout. */
+  visitLabel: string | null;
   reservationIds: number[];
   /** Full owner/home postal address when transport is required. */
   homeAddress: string | null;
@@ -243,58 +253,76 @@ function formatTimeLabel(iso: string | null): string | null {
   return `${h12}:${min} ${ampm}`;
 }
 
+function visitRank(kind: GingrVisitKind): number {
+  if (kind === "overnight") return 4;
+  if (kind === "full_day") return 3;
+  if (kind === "half_day") return 2;
+  return 1;
+}
+
 function clipText(value: string, max: number): string {
   if (value.length <= max) return value;
   return `${value.slice(0, Math.max(0, max - 1))}…`;
 }
 
-/** Notes marked/stored as visible to the client on the Gingr reservation. */
-function extractClientNotes(reservation: GingrReservation): string | null {
+const INSTRUCTION_CAP = 4000;
+
+function instructionFrom(reservation: GingrReservation, keys: string[]): string | null {
   const notesObj = asRecord(reservation.notes);
   const raw = stripHtml(
     pickString(
-      notesObj.owner_notes,
-      notesObj.client_notes,
-      notesObj.public_notes,
-      notesObj.reservation_notes,
-      reservation.owner_notes,
-      reservation.client_notes,
-      reservation.public_notes,
-      reservation.o_notes,
-      reservation.reservation_notes,
-      reservation.r_notes,
-      reservation.a_notes,
-      typeof reservation.notes === "string" ? reservation.notes : null
+      ...keys.map((key) => (key in notesObj ? notesObj[key] : (reservation as Record<string, unknown>)[key]))
     )
   );
   if (!raw) return null;
-  return clipText(raw, 280);
+  return clipText(raw, INSTRUCTION_CAP);
 }
 
-/**
- * Comments the client enters when booking (visible to them) —
- * mapped to the Pick Up Instructions column for drivers.
- */
-function extractPickupInstructions(reservation: GingrReservation): string | null {
-  const notesObj = asRecord(reservation.notes);
-  const raw = stripHtml(
-    pickString(
-      notesObj.comments,
-      notesObj.booking_comments,
-      notesObj.owner_comments,
-      notesObj.instructions,
-      notesObj.pickup_instructions,
-      reservation.r_comments,
-      reservation.comments,
-      reservation.booking_comments,
-      reservation.owner_comments,
-      reservation.r_instructions,
-      reservation.pickup_instructions,
-      reservation.special_instructions
-    )
-  );
-  if (!raw) return null;
-  return clipText(raw, 400);
+/** Notes marked/stored as visible to the client on the Gingr reservation. */
+function extractClientNotes(reservation: GingrReservation): string | null {
+  const fromFields = instructionFrom(reservation, [
+    "owner_notes",
+    "client_notes",
+    "public_notes",
+    "reservation_notes",
+    "o_notes",
+    "r_notes",
+    "a_notes"
+  ]);
+  if (fromFields) return fromFields;
+  if (typeof reservation.notes === "string") {
+    const raw = stripHtml(reservation.notes);
+    return raw ? clipText(raw, INSTRUCTION_CAP) : null;
+  }
+  return null;
+}
+
+/** Pickup-only instruction fields. Shared booking comments fill this when no pickup field exists. */
+function extractPickupSpecific(reservation: GingrReservation): string | null {
+  return instructionFrom(reservation, ["pickup_instructions", "pick_up_instructions", "pickup_notes"]);
+}
+
+/** Drop-off Instructions from the owner list and the matching Gingr fields. */
+function extractDropoffSpecific(reservation: GingrReservation): string | null {
+  return instructionFrom(reservation, [
+    "dropoff_instructions",
+    "drop_off_instructions",
+    "dropoff_notes",
+    "drop_off_notes"
+  ]);
+}
+
+/** Booking comments that apply to the ride when Gingr does not split pickup and drop-off. */
+function extractSharedInstructions(reservation: GingrReservation): string | null {
+  return instructionFrom(reservation, [
+    "comments",
+    "booking_comments",
+    "owner_comments",
+    "instructions",
+    "r_comments",
+    "r_instructions",
+    "special_instructions"
+  ]);
 }
 
 function animalKey(reservation: GingrReservation): string {
@@ -558,6 +586,11 @@ type Acc = {
   scheduledTime: string | null;
   notes: string | null;
   pickupInstructions: string | null;
+  dropoffInstructions: string | null;
+  visitKind: GingrVisitKind | null;
+  halfPeriod: "morning" | "afternoon" | null;
+  checkInDate: string | null;
+  checkOutDate: string | null;
   reservationIds: Set<number>;
   hasEligibleActivity: boolean;
   /** An explicit Fitdog home van leg dated to this route date. */
@@ -617,6 +650,11 @@ export function normalizeGingrRouteReservations(
           scheduledTime: null,
           notes: null,
           pickupInstructions: null,
+          dropoffInstructions: null,
+          visitKind: null,
+          halfPeriod: null,
+          checkInDate: null,
+          checkOutDate: null,
           reservationIds: new Set(),
           hasEligibleActivity: false,
           hasRouteTransportLeg: false,
@@ -725,12 +763,32 @@ export function normalizeGingrRouteReservations(
 
       const clientNotes = extractClientNotes(reservation);
       if (clientNotes && !acc.notes) acc.notes = clientNotes;
-      const pickupInstructions = extractPickupInstructions(reservation);
-      if (pickupInstructions && !acc.pickupInstructions) {
-        acc.pickupInstructions = pickupInstructions;
-      }
+      const sharedInstructions = extractSharedInstructions(reservation);
+      const pickupInstructions = extractPickupSpecific(reservation) || sharedInstructions;
+      const dropoffInstructions = extractDropoffSpecific(reservation) || sharedInstructions;
+      if (pickupInstructions && !acc.pickupInstructions) acc.pickupInstructions = pickupInstructions;
+      if (dropoffInstructions && !acc.dropoffInstructions) acc.dropoffInstructions = dropoffInstructions;
       if (acc.notes && acc.pickupInstructions && acc.notes === acc.pickupInstructions) {
         acc.notes = null;
+      }
+      if (acc.notes && acc.dropoffInstructions && acc.notes === acc.dropoffInstructions) {
+        acc.notes = null;
+      }
+
+      const visit =
+        classifyGingrVisit(typeName) ||
+        services.map((service) => classifyGingrVisit(serviceName(service))).find((kind) => kind) ||
+        null;
+      if (visit && (!acc.visitKind || visitRank(visit) >= visitRank(acc.visitKind))) {
+        acc.visitKind = visit;
+      }
+      if (visit === "half_day" && !acc.halfPeriod) {
+        acc.halfPeriod = classifyHalfDayPeriod(typeName, reservation.start_date || extractTimeIso(reservation));
+      }
+      if (occupancy.checkInDate && !acc.checkInDate) acc.checkInDate = occupancy.checkInDate;
+      if (occupancy.checkOutDate && !acc.checkOutDate) acc.checkOutDate = occupancy.checkOutDate;
+      if (occupancy.isOvernight && (!acc.visitKind || visitRank("overnight") >= visitRank(acc.visitKind))) {
+        acc.visitKind = "overnight";
       }
 
       const nextAddress = extractHomeAddressFromReservation(reservation);
@@ -805,6 +863,15 @@ export function normalizeGingrRouteReservations(
       scheduledTimeLabel: formatTimeLabel(acc.scheduledTime),
       notes: acc.notes,
       pickupInstructions: acc.pickupInstructions,
+      dropoffInstructions: acc.dropoffInstructions,
+      visitKind: acc.visitKind,
+      visitLabel: formatGingrVisitLabel({
+        visit: acc.visitKind,
+        halfPeriod: acc.halfPeriod,
+        routeDate: date,
+        checkInDate: acc.checkInDate,
+        checkOutDate: acc.checkOutDate
+      }),
       reservationIds: Array.from(acc.reservationIds),
       homeAddress: needsHomeAddress ? acc.homeAddress : null,
       homeStreet1: needsHomeAddress ? acc.homeStreet1 : null,
