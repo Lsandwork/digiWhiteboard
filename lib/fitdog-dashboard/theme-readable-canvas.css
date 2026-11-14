@@ -864,3 +864,24 @@ html[data-theme="clear"] .admin-theme :is(
   ) :is(.text-white, [class*="text-white/"], .admin-text-emphasis, .text-admin-muted, .admin-muted) {
   color: #f8fafc !important;
 }
+
+/*
+ * Notifications detail modal — fixed dark surface on top of Clear/Light page theme.
+ * Without this, Clear's navy page text inherits into the brown modal and body copy disappears.
+ */
+html[data-theme="light"] .admin-theme .notif-response-modal,
+html[data-theme="clear"] .admin-theme .notif-response-modal {
+  --fitdog-text: #f2f5f9;
+  --fitdog-text-secondary: #c5d0dc;
+  --admin-muted: #c5d0dc;
+  --crossover-text: #f2f5f9;
+  --crossover-muted: #c5d0dc;
+  color: #f2f5f9;
+}
+
+html[data-theme="light"] .admin-theme .notif-response-portal,
+html[data-theme="clear"] .admin-theme .notif-response-portal {
+  background: transparent !important;
+  min-height: 0;
+  color: #f2f5f9;
+}

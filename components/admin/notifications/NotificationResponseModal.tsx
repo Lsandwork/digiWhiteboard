@@ -163,7 +163,7 @@ export function NotificationResponseModal({
     "—";
 
   const modal = (
-    <div className="admin-theme">
+    <div className="admin-theme notif-response-portal">
       <div
         className="notif-response-backdrop"
         onMouseDown={(event) => {
@@ -230,7 +230,14 @@ export function NotificationResponseModal({
                       <SummaryRow label="Related Owner" value={report?.related_owner_name ?? notification.linkedCrossover?.related_owner_name} />
                       <SummaryRow label="Department / Area" value={report?.department ?? notification.linkedCrossover?.from_department} />
                       <SummaryRow label="Source Page" value={sourceTabLabel(notification.source_tab)} />
-                      <SummaryRow label="Submission ID" value={report ? report.id : notification.source_id} />
+                      <SummaryRow
+                        label="Submission ID"
+                        value={
+                          <span className="notif-response-table__mono">
+                            {report ? report.id : notification.source_id}
+                          </span>
+                        }
+                      />
                       <SummaryRow label="Related To" value={relatedTo} />
                     </tbody>
                   </table>
@@ -247,33 +254,33 @@ export function NotificationResponseModal({
                       <p><strong>Documented by:</strong> {report.write_up_details.documented_by ?? report.created_by}</p>
                       <div className="notif-response-details__full">
                         <strong>Statement:</strong>{" "}
-                        <RichText value={report.write_up_details.statement_of_violation} empty="" />
+                        <RichText className="notif-response-rich-text" value={report.write_up_details.statement_of_violation} empty="" />
                       </div>
                       {report.management_response ? (
                         <div className="notif-response-details__full notif-response-details__highlight">
                           <strong>Management response:</strong>{" "}
-                          <RichText value={report.management_response} empty="" />
+                          <RichText className="notif-response-rich-text" value={report.management_response} empty="" />
                         </div>
                       ) : null}
                     </div>
                   ) : report?.groomer_submission_details ? (
                     <div className="notif-response-details__full">
-                      <RichText value={report.groomer_submission_details.description} />
+                      <RichText className="notif-response-rich-text" value={report.groomer_submission_details.description} />
                     </div>
                   ) : report ? (
                     <div className="notif-response-details__full">
-                      <RichText value={report.summary} />
+                      <RichText className="notif-response-rich-text" value={report.summary} />
                     </div>
                   ) : notification.linkedCrossover ? (
                     <div className="notif-response-details__grid">
                       <p><strong>Subject:</strong> {notification.linkedCrossover.subject}</p>
                       <div className="notif-response-details__full">
-                        <RichText value={notification.linkedCrossover.message} />
+                        <RichText className="notif-response-rich-text" value={notification.linkedCrossover.message} />
                       </div>
                     </div>
                   ) : (
                     <div className="notif-response-details__full">
-                      <RichText value={notification.body ?? notification.preview} />
+                      <RichText className="notif-response-rich-text" value={notification.body ?? notification.preview} />
                     </div>
                   )}
                 </div>
