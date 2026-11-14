@@ -66,7 +66,10 @@ function mapGoal(row: GoalRow) {
 
 export async function packGoalsEmployeeView(ctx: ServiceContext) {
   requireStorage(ctx);
-  await assertGoalsTable(ctx);
+  const status = await ctx.db.tableStatus().catch(() => null);
+  if (!status?.team_engagement_pack_goals) {
+    return { ready: false as const, active: [], completed: [] };
+  }
   const { rows } = await ctx.db.select<GoalRow>("team_engagement_pack_goals", {
     filters: [{ column: "status", op: "in", value: ["active", "completed"] }],
     order: [{ column: "ends_on", ascending: true }],
@@ -74,6 +77,7 @@ export async function packGoalsEmployeeView(ctx: ServiceContext) {
   });
   const visible = rows.filter((row) => goalVisibleToEmployee(ctx, row));
   return {
+    ready: true as const,
     active: visible.filter((row) => row.status === "active").map(mapGoal),
     completed: visible.filter((row) => row.status === "completed").map(mapGoal)
   };

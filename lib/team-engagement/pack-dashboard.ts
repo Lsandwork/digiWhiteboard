@@ -5,7 +5,9 @@ import type { BarkOutView } from "@/lib/team-engagement/bark-outs";
 import type { ServiceContext } from "@/lib/team-engagement/context";
 import { commentCounts, milestonesView, packTablesReady, resolvePackSpotlight, funZoneView } from "@/lib/team-engagement/pack-features";
 import type { DbFilter } from "@/lib/team-engagement/types";
-import { PACK_PRIORITY2_MIGRATION } from "@/lib/team-engagement/constants";
+import { PACK_PRIORITY2_MIGRATION, PACK_PRIORITY3_MIGRATION } from "@/lib/team-engagement/constants";
+import { packGoalsEmployeeView } from "@/lib/team-engagement/pack-goals";
+import { employeeVoiceCatalog } from "@/lib/team-engagement/employee-voice";
 
 function pacificGreeting(now: Date): string {
   const hour = Number(
@@ -97,7 +99,15 @@ export async function packDashboard(ctx: ServiceContext) {
     commentCount: commentMap.get(item.id) ?? 0
   }));
 
-  const [milestones, funZone, packReady] = await Promise.all([milestonesView(ctx), funZoneView(ctx), packTablesReady(ctx)]);
+  const [milestones, funZone, packReady, goalsCatalog, voiceCatalog] = await Promise.all([
+    milestonesView(ctx),
+    funZoneView(ctx),
+    packTablesReady(ctx),
+    packGoalsEmployeeView(ctx).catch(() => ({ ready: false as const, active: [], completed: [] })),
+    employeeVoiceCatalog(ctx).catch(() => ({ ready: false as const, items: [] }))
+  ]);
+  const pack2Ready = Object.values(packReady).every(Boolean);
+  const pack3Ready = goalsCatalog.ready && voiceCatalog.ready;
 
   const awaiting = mine.sent.filter((row) => row.status === "awaiting_confirmation" || row.status === "pending_review");
 
@@ -124,8 +134,15 @@ export async function packDashboard(ctx: ServiceContext) {
     spotlightMeta: resolvedSpotlight.curated,
     milestonesPreview: milestones,
     funZonePreview: funZone,
-    packMigration: PACK_PRIORITY2_MIGRATION,
-    packStorageReady: Object.values(packReady).every(Boolean),
+    packSetup: {
+      priority2Ready: pack2Ready,
+      priority3Ready: pack3Ready,
+      migrations: [
+        ...(pack2Ready ? [] : [PACK_PRIORITY2_MIGRATION, "supabase/migrations/106_team_engagement_commit_pack_tables.sql"]),
+        ...(pack3Ready ? [] : [PACK_PRIORITY3_MIGRATION, "supabase/migrations/108_team_engagement_commit_priority3.sql"])
+      ]
+    },
+    packStorageReady: pack2Ready,
     personal: {
       receivedCount: mine.received.length,
       sentCount: mine.sent.length,
@@ -140,11 +157,15 @@ export async function packDashboard(ctx: ServiceContext) {
       milestones: milestones.ready
         ? { ready: true }
         : { ready: false, message: `Apply ${PACK_PRIORITY2_MIGRATION} and sync milestones from staff hire dates.` },
-      packGoals: { ready: true, message: "Published team goals appear in Pack Goals when migration 107 is applied." },
+      packGoals: pack3Ready
+        ? { ready: true }
+        : { ready: false, message: `Apply ${PACK_PRIORITY3_MIGRATION}, then publish goals from Manage Team Engagement → Pack Goals.` },
       funZone: funZone.ready
         ? { ready: true }
         : { ready: false, message: `Fun Zone opens after ${PACK_PRIORITY2_MIGRATION} is applied.` },
-      employeeVoice: { ready: true, message: "Employee Voice surveys appear here when leadership publishes them." },
+      employeeVoice: pack3Ready
+        ? { ready: true }
+        : { ready: false, message: `Apply ${PACK_PRIORITY3_MIGRATION}, then publish surveys under Employee Voice (leadership).` },
       ideas: { ready: settings.features.feedback }
     }
   };

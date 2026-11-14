@@ -65,6 +65,11 @@ type PackPayload = {
     awaitingConfirmation: { id: string; recipientName: string; statusLabel: string }[];
   };
   sectionStatus: Record<string, { ready: boolean; message?: string }>;
+  packSetup?: {
+    priority2Ready: boolean;
+    priority3Ready: boolean;
+    migrations: string[];
+  };
 };
 
 type MilestoneItem = {
@@ -238,6 +243,11 @@ function SectionEmpty({ title, body }: { title: string; body: string }) {
   );
 }
 
+type PackGoalsState = {
+  active: Array<{ id: string; title: string; description: string; progressPercent: number; endsOn: string | null }>;
+  completed: Array<{ id: string; title: string; description: string; progressPercent: number; endsOn: string | null }>;
+};
+
 export default function PackExperience() {
   const [section, setSection] = useState<PackSection>("pack");
   const [pack, setPack] = useState<PackPayload | null>(null);
@@ -251,7 +261,7 @@ export default function PackExperience() {
   const [message, setMessage] = useState("");
   const [ideas, setIdeas] = useState<FeedbackItem[] | null>(null);
   const [funZone, setFunZone] = useState<PackPayload["funZonePreview"] | null>(null);
-  const [packGoals, setPackGoals] = useState<{ active: Array<{ id: string; title: string; description: string; progressPercent: number; endsOn: string | null }> } | null>(null);
+  const [packGoals, setPackGoals] = useState<PackGoalsState | null>(null);
   const [voiceSurveys, setVoiceSurveys] = useState<
     Array<{ id: string; title: string; introduction: string | null; completed: boolean; questions: Array<{ id: string; prompt: string; questionType: string; options: unknown[] }> }>
   | null>(null);
@@ -306,16 +316,18 @@ export default function PackExperience() {
     if (ok) setFunZone(body);
   }
 
-  type PackGoalsState = { active: Array<{ id: string; title: string; description: string; progressPercent: number; endsOn: string | null }> };
-
   const loadPackGoals = useCallback(async () => {
-    const { ok, body } = await fetchAdminJson<PackGoalsState>("/api/admin/bark-outs?view=pack_goals");
-    if (ok) setPackGoals(body);
+    const { ok, body } = await fetchAdminJson<PackGoalsState & { ready?: boolean }>("/api/admin/bark-outs?view=pack_goals");
+    if (ok) {
+      if (body.ready === false) setPackGoals({ active: [], completed: [] });
+      else setPackGoals({ active: body.active ?? [], completed: body.completed ?? [] });
+    } else setPackGoals({ active: [], completed: [] });
   }, []);
 
   const loadVoice = useCallback(async () => {
-    const { ok, body } = await fetchAdminJson<{ items: NonNullable<typeof voiceSurveys> }>("/api/admin/bark-outs?view=employee_voice");
-    if (ok) setVoiceSurveys(body.items);
+    const { ok, body } = await fetchAdminJson<{ ready?: boolean; items: NonNullable<typeof voiceSurveys> }>("/api/admin/bark-outs?view=employee_voice");
+    if (ok) setVoiceSurveys(body.ready === false ? [] : body.items ?? []);
+    else setVoiceSurveys([]);
   }, []);
 
   useEffect(() => {
@@ -424,6 +436,15 @@ export default function PackExperience() {
           </div>
         </div>
       </header>
+
+      {pack.packSetup && pack.packSetup.migrations.length > 0 ? (
+        <div className="pack-card" style={{ marginBottom: 16, borderColor: "var(--pack-blue)" }}>
+          <strong>Database setup still needed</strong>
+          <p className="pack-muted" style={{ margin: "6px 0 0", fontSize: 13 }}>
+            Run these SQL migrations on Supabase (SQL Editor), in order, then refresh: {pack.packSetup.migrations.join(" → ")}
+          </p>
+        </div>
+      ) : null}
 
       <nav className="pack-nav" aria-label="Team Engagement sections">
         {NAV.map((item) => (
@@ -562,7 +583,9 @@ export default function PackExperience() {
         )
       ) : null}
       {section === "goals" ? (
-        packGoals === null ? (
+        !pack.sectionStatus.packGoals?.ready ? (
+          <SectionEmpty title="Pack Goals" body={pack.sectionStatus.packGoals?.message ?? "Pack Goals need migration 107."} />
+        ) : packGoals === null ? (
           <p className="pack-muted">Loading Pack Goals…</p>
         ) : packGoals.active.length === 0 ? (
           <SectionEmpty title="Pack Goals" body="When leadership publishes a team goal, progress will show here." />
@@ -596,6 +619,32 @@ export default function PackExperience() {
                     {(funZone ?? pack.funZonePreview)!.question!.responseCount} responses
                     {(funZone ?? pack.funZonePreview)!.question!.responded ? " · You responded" : ""}
                   </p>
+                  {!(funZone ?? pack.funZonePreview)!.question!.responded ? (
+                    <form
+                      className="pack-comments__composer"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        const value = (event.currentTarget.elements.namedItem("daily-answer") as HTMLTextAreaElement).value;
+                        void (async () => {
+                          await fetchAdminJson("/api/admin/bark-outs", {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify({
+                              action: "answer_fun_question",
+                              questionId: (funZone ?? pack.funZonePreview)!.question!.id,
+                              body: value
+                            })
+                          });
+                          await loadFunZone();
+                        })();
+                      }}
+                    >
+                      <textarea name="daily-answer" required maxLength={600} placeholder="Your answer…" />
+                      <button type="submit" className="pack-btn pack-btn--primary">
+                        Submit
+                      </button>
+                    </form>
+                  ) : null}
                 </>
               ) : (
                 <SectionEmpty title="No active questions" body="Check back for the next Pack question." />
@@ -633,7 +682,9 @@ export default function PackExperience() {
         )
       ) : null}
       {section === "voice" ? (
-        voiceSurveys === null ? (
+        !pack.sectionStatus.employeeVoice?.ready ? (
+          <SectionEmpty title="Employee Voice" body={pack.sectionStatus.employeeVoice?.message ?? "Apply migration 107."} />
+        ) : voiceSurveys === null ? (
           <p className="pack-muted">Loading surveys…</p>
         ) : voiceSurveys.length === 0 ? (
           <SectionEmpty title="Employee Voice" body="When a survey is published, you can respond here. Anonymous surveys never show your name to leadership." />

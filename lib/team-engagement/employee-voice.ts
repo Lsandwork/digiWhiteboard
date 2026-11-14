@@ -59,7 +59,10 @@ function employeeEligible(ctx: ServiceContext, row: SurveyRow) {
 
 export async function employeeVoiceCatalog(ctx: ServiceContext) {
   requireStorage(ctx);
-  await assertVoiceTables(ctx);
+  const status = await ctx.db.tableStatus().catch(() => null);
+  if (!status?.team_engagement_voice_surveys) {
+    return { ready: false as const, items: [] };
+  }
   const now = nowIso(ctx);
   const { rows } = await ctx.db.select<SurveyRow>("team_engagement_voice_surveys", {
     filters: [{ column: "status", op: "eq", value: "active" }],
@@ -110,7 +113,7 @@ export async function employeeVoiceCatalog(ctx: ServiceContext) {
       };
     })
   );
-  return { items };
+  return { ready: true as const, items };
 }
 
 function parseAnswer(question: QuestionRow, raw: unknown) {

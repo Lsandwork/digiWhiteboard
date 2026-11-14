@@ -107,6 +107,17 @@ export function EmployeeVoiceAdminBody({ data, onRefresh }: { data: Record<strin
   const items = (data.items as Array<Record<string, unknown>>) ?? [];
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resultsFor, setResultsFor] = useState<string | null>(null);
+  const [results, setResults] = useState<Record<string, unknown> | null>(null);
+  async function openResults(id: string) {
+    setResultsFor(id);
+    setResults(null);
+    const { ok, body } = await fetchAdminJson<Record<string, unknown>>(
+      `/api/admin/team-engagement?view=voice_survey_results&id=${encodeURIComponent(id)}`
+    );
+    if (ok) setResults(body);
+    else setResults({ error: "Could not load results." });
+  }
   async function createSurvey() {
     setBusy(true);
     try {
@@ -146,14 +157,52 @@ export function EmployeeVoiceAdminBody({ data, onRefresh }: { data: Record<strin
             <li key={String(row.id)} className="ro-te-list__item">
               {String(row.title)} <span className="ro-te-muted">· {String(row.status)} · {String(row.anonymityMode)}</span>
               <div>
-                <a className="ro-te-link" href={`/api/admin/team-engagement?view=voice_survey_results&id=${encodeURIComponent(String(row.id))}`}>
+                <button type="button" className="ro-te-btn ro-te-btn--ghost" onClick={() => void openResults(String(row.id))}>
                   View aggregate results
-                </a>
+                </button>
               </div>
             </li>
           ))}
         </ul>
       </section>
+      {resultsFor ? (
+        <section className="ro-te-card ro-te-section">
+          <h3 className="ro-te-section__title">Aggregate results</h3>
+          {results === null ? <p className="ro-te-muted">Loading…</p> : null}
+          {results?.error ? <p className="ro-te-muted">{String(results.error)}</p> : null}
+          {Array.isArray(results?.questions) ? (
+            <ul className="ro-te-list">
+              {(results.questions as Array<Record<string, unknown>>).map((q) => (
+                <li key={String(q.questionId)} className="ro-te-list__item">
+                  <strong>{String(q.prompt)}</strong>
+                  <span className="ro-te-muted">
+                    {" "}
+                    · {String(q.responseCount)} responses
+                    {q.suppressed ? " · hidden (below minimum)" : ""}
+                  </span>
+                  {q.distribution ? (
+                    <pre className="ro-te-muted" style={{ fontSize: 12, whiteSpace: "pre-wrap" }}>
+                      {JSON.stringify(q.distribution, null, 2)}
+                    </pre>
+                  ) : null}
+                  {Array.isArray(q.samples) && q.samples.length ? (
+                    <ul className="ro-te-list">
+                      {(q.samples as string[]).slice(0, 5).map((sample, index) => (
+                        <li key={index} className="ro-te-muted">
+                          {sample}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <button type="button" className="ro-te-btn ro-te-btn--ghost" style={{ marginTop: 8 }} onClick={() => setResultsFor(null)}>
+            Close
+          </button>
+        </section>
+      ) : null}
     </div>
   );
 }
