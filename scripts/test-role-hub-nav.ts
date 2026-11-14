@@ -25,7 +25,7 @@ for (const role of HUB_NAV_ROLES) {
   const visible = ADMIN_TABS.filter((tab) => canAccessAdminTab(access, tab, role, "staff"));
   const nav = buildStaffPanelNav(visible, "staff", role);
   const icons = countNavIcons(nav);
-  const cap = role === "front_desk_coordinator" ? 20 : 10;
+  const cap = role === "front_desk_coordinator" ? 20 : role === "assistant_manager" ? 11 : 10;
   assert.ok(icons <= cap, `${role} sidebar icons must be <= ${cap}, got ${icons}`);
   assert.ok(icons >= 1, `${role} must have at least one sidebar tab`);
 

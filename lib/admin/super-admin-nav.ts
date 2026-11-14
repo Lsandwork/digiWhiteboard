@@ -184,6 +184,17 @@ export const SUPER_ADMIN_HUBS: Record<(typeof SUPER_ADMIN_HUB_TABS)[number], Sup
           tabLink("write_up_review", "Write Up Review", "Review all submitted write-ups."),
           tabLink("complaint_review", "Complaint Review", "Review staff and client complaints.")
         ]
+      },
+      {
+        id: "engagement",
+        title: "Team engagement",
+        links: [
+          tabLink(
+            "team_engagement",
+            "Manage Team Engagement",
+            "Bark Outs, recognition, moderation, development, and engagement analytics for your teams."
+          )
+        ]
       }
     ]
   },

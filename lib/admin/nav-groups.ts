@@ -817,7 +817,12 @@ export function buildRoleHubStaffNav(visibleTabs: AdminTab[], role: string): Nav
   if (!isHubNavRole(role)) return [];
   const config = ROLE_HUB_NAV[role];
   const visible = new Set(visibleTabs);
-  const cap = role === "front_desk_coordinator" ? 20 : 10;
+  const cap =
+    role === "front_desk_coordinator"
+      ? 20
+      : role === "assistant_manager"
+        ? 11
+        : 10;
   const leaves: NavEntry[] = [];
   for (const item of config.primary) {
     if (leaves.length >= cap) break;
