@@ -5,7 +5,11 @@ import type { BarkOutView } from "@/lib/team-engagement/bark-outs";
 import type { ServiceContext } from "@/lib/team-engagement/context";
 import { commentCounts, milestonesView, packTablesReady, resolvePackSpotlight, funZoneView } from "@/lib/team-engagement/pack-features";
 import type { DbFilter } from "@/lib/team-engagement/types";
-import { PACK_PRIORITY2_MIGRATION } from "@/lib/team-engagement/constants";
+import { barkOutPostingState } from "@/lib/team-engagement/bark-out-posting";
+import { PACK_PHASE4_COMMIT, PACK_PHASE4_MIGRATION, PACK_PRIORITY2_MIGRATION, PACK_PRIORITY3_MIGRATION } from "@/lib/team-engagement/constants";
+import { packPhase4Ready } from "@/lib/team-engagement/pack-phase4";
+import { packGoalsEmployeeView } from "@/lib/team-engagement/pack-goals";
+import { employeeVoiceCatalog } from "@/lib/team-engagement/employee-voice";
 
 function pacificGreeting(now: Date): string {
   const hour = Number(
@@ -57,6 +61,7 @@ async function distinctAuthorsSince(ctx: ServiceContext, since: string): Promise
 /** Staff landing dashboard for The Pack — real counts only, no fabricated posts. */
 export async function packDashboard(ctx: ServiceContext) {
   const settings = await ctx.settings();
+  const posting = barkOutPostingState(ctx.actor, { barkOutsEnabled: settings.features.bark_outs });
   if (!ctx.storageReady) {
     return { storageReady: false as const, features: settings.features };
   }
@@ -97,18 +102,43 @@ export async function packDashboard(ctx: ServiceContext) {
     commentCount: commentMap.get(item.id) ?? 0
   }));
 
-  const [milestones, funZone, packReady] = await Promise.all([milestonesView(ctx), funZoneView(ctx), packTablesReady(ctx)]);
+  const [milestones, funZone, packReady, goalsCatalog, voiceCatalog] = await Promise.all([
+    milestonesView(ctx),
+    funZoneView(ctx),
+    packTablesReady(ctx),
+    packGoalsEmployeeView(ctx).catch(() => ({ ready: false as const, active: [], completed: [] })),
+    employeeVoiceCatalog(ctx).catch(() => ({ ready: false as const, items: [] }))
+  ]);
+  const pack2Ready = Object.values(packReady).every(Boolean);
+  const pack3Ready = goalsCatalog.ready && voiceCatalog.ready;
+  const phase4Tables = await packPhase4Ready(ctx);
+  const pack4Ready = Object.values(phase4Tables).every(Boolean);
 
   const awaiting = mine.sent.filter((row) => row.status === "awaiting_confirmation" || row.status === "pending_review");
+  const avatarUrl = await ctx.loadAvatar(ctx.actor.userId);
+  const now = new Date(ctx.now());
+  const dateLabel = now.toLocaleDateString("en-US", {
+    timeZone: "America/Los_Angeles",
+    weekday: "long",
+    month: "long",
+    day: "numeric"
+  });
+  const activeGoalsCount = goalsCatalog.ready ? goalsCatalog.active.length : 0;
+  const comingUp = milestones.ready ? milestones.upcoming.slice(0, 5) : [];
 
   return {
     storageReady: true as const,
     features: settings.features,
-    greeting: pacificGreeting(new Date(ctx.now())),
+    greeting: pacificGreeting(now),
+    dateLabel,
     me: {
       userId: ctx.actor.userId,
       name: ctx.actor.name,
-      canPost: ctx.actor.permissions.includes("engagement.create_bark_out") && !ctx.actor.impersonated
+      avatarUrl,
+      canPost: posting.canPost,
+      postingBlockedReason: posting.blockedReason,
+      postingBlockedMessage: posting.blockedMessage,
+      impersonated: ctx.actor.impersonated
     },
     tagline: "Good things happen when we work together.",
     stats: {
@@ -116,16 +146,28 @@ export async function packDashboard(ctx: ServiceContext) {
       barkOutsThisWeek: weekCount,
       participationPercent,
       teamSize: activeEmployees,
+      teammatesRecognizedThisMonth: authorsThisMonth,
       newForMeThisWeek: pendingForMe,
-      pendingMyPosts: awaiting.length
+      pendingMyPosts: awaiting.length,
+      activePackGoals: activeGoalsCount
     },
+    comingUp,
     activityFeed,
     spotlight: resolvedSpotlight.barkOut,
     spotlightMeta: resolvedSpotlight.curated,
     milestonesPreview: milestones,
     funZonePreview: funZone,
-    packMigration: PACK_PRIORITY2_MIGRATION,
-    packStorageReady: Object.values(packReady).every(Boolean),
+    packSetup: {
+      priority2Ready: pack2Ready,
+      priority3Ready: pack3Ready,
+      migrations: [
+        ...(pack2Ready ? [] : [PACK_PRIORITY2_MIGRATION, "supabase/migrations/106_team_engagement_commit_pack_tables.sql"]),
+        ...(pack3Ready ? [] : [PACK_PRIORITY3_MIGRATION, "supabase/migrations/108_team_engagement_commit_priority3.sql"]),
+        ...(pack4Ready ? [] : [PACK_PHASE4_MIGRATION, PACK_PHASE4_COMMIT])
+      ],
+      priority4Ready: pack4Ready
+    },
+    packStorageReady: pack2Ready,
     personal: {
       receivedCount: mine.received.length,
       sentCount: mine.sent.length,
@@ -140,11 +182,15 @@ export async function packDashboard(ctx: ServiceContext) {
       milestones: milestones.ready
         ? { ready: true }
         : { ready: false, message: `Apply ${PACK_PRIORITY2_MIGRATION} and sync milestones from staff hire dates.` },
-      packGoals: { ready: true, message: "Published team goals appear in Pack Goals when migration 107 is applied." },
+      packGoals: pack3Ready
+        ? { ready: true }
+        : { ready: false, message: `Apply ${PACK_PRIORITY3_MIGRATION}, then publish goals from Manage Team Engagement → Pack Goals.` },
       funZone: funZone.ready
         ? { ready: true }
         : { ready: false, message: `Fun Zone opens after ${PACK_PRIORITY2_MIGRATION} is applied.` },
-      employeeVoice: { ready: true, message: "Employee Voice surveys appear here when leadership publishes them." },
+      employeeVoice: pack3Ready
+        ? { ready: true }
+        : { ready: false, message: `Apply ${PACK_PRIORITY3_MIGRATION}, then publish surveys under Employee Voice (leadership).` },
       ideas: { ready: settings.features.feedback }
     }
   };

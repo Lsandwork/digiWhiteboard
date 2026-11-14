@@ -6,6 +6,7 @@ import {
   type VoiceQuestionType,
   type VoiceSurveyStatus
 } from "@/lib/team-engagement/constants";
+import { assertCommunityText } from "@/lib/team-engagement/community-content";
 import { multilineText, nowIso, oneOf, optionalText, requireStorage, requireUuid, text, type ServiceContext } from "@/lib/team-engagement/context";
 import { EngagementError, forbiddenError, notFoundError, validationError } from "@/lib/team-engagement/errors";
 import { scopeIncludesDepartments } from "@/lib/team-engagement/permissions";
@@ -59,7 +60,10 @@ function employeeEligible(ctx: ServiceContext, row: SurveyRow) {
 
 export async function employeeVoiceCatalog(ctx: ServiceContext) {
   requireStorage(ctx);
-  await assertVoiceTables(ctx);
+  const status = await ctx.db.tableStatus().catch(() => null);
+  if (!status?.team_engagement_voice_surveys) {
+    return { ready: false as const, items: [] };
+  }
   const now = nowIso(ctx);
   const { rows } = await ctx.db.select<SurveyRow>("team_engagement_voice_surveys", {
     filters: [{ column: "status", op: "eq", value: "active" }],
@@ -110,7 +114,7 @@ export async function employeeVoiceCatalog(ctx: ServiceContext) {
       };
     })
   );
-  return { items };
+  return { ready: true as const, items };
 }
 
 function parseAnswer(question: QuestionRow, raw: unknown) {
@@ -166,6 +170,9 @@ export async function submitVoiceSurvey(ctx: ServiceContext, input: { surveyId?:
     for (const question of questions) {
       const parsed = parseAnswer(question, answers[question.id]);
       if (question.required && (parsed === null || parsed === "")) throw validationError(`Answer “${question.prompt}”.`);
+      if (question.question_type === "text" && typeof parsed === "string" && parsed.trim()) {
+        assertCommunityText(parsed, "voice");
+      }
       ops.push({
         op: "insert",
         table: "team_engagement_voice_anonymous_responses",
@@ -195,6 +202,9 @@ export async function submitVoiceSurvey(ctx: ServiceContext, input: { surveyId?:
     for (const question of questions) {
       const parsed = parseAnswer(question, answers[question.id]);
       if (question.required && (parsed === null || parsed === "")) throw validationError(`Answer “${question.prompt}”.`);
+      if (question.question_type === "text" && typeof parsed === "string" && parsed.trim()) {
+        assertCommunityText(parsed, "voice");
+      }
       ops.push({
         op: "insert",
         table: "team_engagement_voice_responses",

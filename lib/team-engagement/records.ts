@@ -34,6 +34,7 @@ import {
   text,
   type ServiceContext
 } from "@/lib/team-engagement/context";
+import { assertCommunityText } from "@/lib/team-engagement/community-content";
 import { EngagementError, conflictError, forbiddenError, notFoundError, validationError } from "@/lib/team-engagement/errors";
 import { tierRank } from "@/lib/team-engagement/permissions";
 import type {
@@ -222,6 +223,7 @@ export async function submitFeedback(ctx: ServiceContext, input: Record<string, 
   const details = multilineText(input.details, 3000);
   if (subject.length < 3) throw validationError("Add a short subject.");
   if (details.length < 10) throw validationError("Share a few more details so leadership can follow up.");
+  assertCommunityText(`${subject}\n${details}`, "idea");
 
   const { total } = await ctx.db.select<FeedbackRow>("team_engagement_feedback", {
     filters: [

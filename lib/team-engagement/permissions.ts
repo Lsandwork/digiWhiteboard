@@ -211,7 +211,10 @@ export const LEADERSHIP_ACTION_RULES = {
   update_pack_goal_progress: { permission: "engagement.manage_team" },
   archive_pack_goal: { permission: "engagement.manage_team" },
   save_voice_survey: { permission: "engagement.manage_team" },
-  publish_voice_survey: { permission: "engagement.manage_team" }
+  publish_voice_survey: { permission: "engagement.manage_team" },
+  save_voice_outcome: { permission: "engagement.manage_team" },
+  publish_would_you_rather: { permission: "engagement.manage_team" },
+  publish_pack_event: { permission: "engagement.manage_team" }
 } as const satisfies Record<string, ActionRule>;
 export type LeadershipAction = keyof typeof LEADERSHIP_ACTION_RULES;
 
@@ -232,7 +235,11 @@ export const PARTICIPANT_ACTION_RULES = {
   answer_fun_question: { permission: "engagement.participate" },
   vote_fun_poll: { permission: "engagement.participate" },
   answer_fun_trivia: { permission: "engagement.participate" },
-  submit_voice_survey: { permission: "engagement.participate" }
+  submit_voice_survey: { permission: "engagement.participate" },
+  join_pack_goal: { permission: "engagement.participate" },
+  submit_team_pulse: { permission: "engagement.participate" },
+  vote_would_you_rather: { permission: "engagement.participate" },
+  rsvp_pack_event: { permission: "engagement.participate" }
 } as const satisfies Record<string, ActionRule>;
 export type ParticipantAction = keyof typeof PARTICIPANT_ACTION_RULES;
 
@@ -366,6 +373,18 @@ const ADMIN_NAV: EngagementNavGroup[] = [
       item("audit", "Audit History", "audit-log"),
       item("settings", "Engagement Settings", "settings")
     ]
+  },
+  {
+    id: "the_pack",
+    label: "The Pack",
+    items: [
+      item("pack_overview", "Engagement Overview", "team-overview", "pack_overview"),
+      item("pack_goals_admin", "Pack Goals", "analytics", "pack_goals_admin"),
+      item("employee_voice_admin", "Employee Voice", "feedback", "employee_voice_admin"),
+      item("fun_zone_admin", "Fun Zone", "check", "fun_zone_admin"),
+      item("pack_ideas_admin", "Ideas for the Pack", "feedback", "pack_ideas_admin"),
+      item("pack_milestones_admin", "Milestones", "calendar-shift", "pack_milestones_admin")
+    ]
   }
 ];
 
@@ -403,6 +422,18 @@ const SUPER_ADMIN_NAV: EngagementNavGroup[] = [
       item("feedback", "Feedback & Suggestions", "feedback"),
       item("announcements", "Announcements", "announcements"),
       item("reports", "Reports & Exports", "export")
+    ]
+  },
+  {
+    id: "the_pack",
+    label: "The Pack",
+    items: [
+      item("pack_overview", "Engagement Overview", "team-overview", "pack_overview"),
+      item("pack_goals_admin", "Pack Goals", "analytics", "pack_goals_admin"),
+      item("employee_voice_admin", "Employee Voice", "feedback", "employee_voice_admin"),
+      item("fun_zone_admin", "Fun Zone", "check", "fun_zone_admin"),
+      item("pack_ideas_admin", "Ideas for the Pack", "feedback", "pack_ideas_admin"),
+      item("pack_milestones_admin", "Milestones", "calendar-shift", "pack_milestones_admin")
     ]
   }
 ];

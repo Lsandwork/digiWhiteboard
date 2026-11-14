@@ -107,6 +107,17 @@ export function EmployeeVoiceAdminBody({ data, onRefresh }: { data: Record<strin
   const items = (data.items as Array<Record<string, unknown>>) ?? [];
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resultsFor, setResultsFor] = useState<string | null>(null);
+  const [results, setResults] = useState<Record<string, unknown> | null>(null);
+  async function openResults(id: string) {
+    setResultsFor(id);
+    setResults(null);
+    const { ok, body } = await fetchAdminJson<Record<string, unknown>>(
+      `/api/admin/team-engagement?view=voice_survey_results&id=${encodeURIComponent(id)}`
+    );
+    if (ok) setResults(body);
+    else setResults({ error: "Could not load results." });
+  }
   async function createSurvey() {
     setBusy(true);
     try {
@@ -146,14 +157,93 @@ export function EmployeeVoiceAdminBody({ data, onRefresh }: { data: Record<strin
             <li key={String(row.id)} className="ro-te-list__item">
               {String(row.title)} <span className="ro-te-muted">· {String(row.status)} · {String(row.anonymityMode)}</span>
               <div>
-                <a className="ro-te-link" href={`/api/admin/team-engagement?view=voice_survey_results&id=${encodeURIComponent(String(row.id))}`}>
+                <button type="button" className="ro-te-btn ro-te-btn--ghost" onClick={() => void openResults(String(row.id))}>
                   View aggregate results
-                </a>
+                </button>
               </div>
             </li>
           ))}
         </ul>
       </section>
+      {resultsFor ? (
+        <section className="ro-te-card ro-te-section">
+          <h3 className="ro-te-section__title">Aggregate results</h3>
+          {results === null ? <p className="ro-te-muted">Loading…</p> : null}
+          {results?.error ? <p className="ro-te-muted">{String(results.error)}</p> : null}
+          {Array.isArray(results?.questions) ? (
+            <ul className="ro-te-list">
+              {(results.questions as Array<Record<string, unknown>>).map((q) => (
+                <li key={String(q.questionId)} className="ro-te-list__item">
+                  <strong>{String(q.prompt)}</strong>
+                  <span className="ro-te-muted">
+                    {" "}
+                    · {String(q.responseCount)} responses
+                    {q.suppressed ? " · hidden (below minimum)" : ""}
+                  </span>
+                  {q.distribution ? (
+                    <pre className="ro-te-muted" style={{ fontSize: 12, whiteSpace: "pre-wrap" }}>
+                      {JSON.stringify(q.distribution, null, 2)}
+                    </pre>
+                  ) : null}
+                  {Array.isArray(q.samples) && q.samples.length ? (
+                    <ul className="ro-te-list">
+                      {(q.samples as string[]).slice(0, 5).map((sample, index) => (
+                        <li key={index} className="ro-te-muted">
+                          {sample}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <button type="button" className="ro-te-btn ro-te-btn--ghost" style={{ marginTop: 8 }} onClick={() => setResultsFor(null)}>
+            Close
+          </button>
+        </section>
+      ) : null}
+      <section className="ro-te-card ro-te-section">
+        <h3 className="ro-te-section__title">You said, we did</h3>
+        <p className="ro-te-muted">Publish a follow-up employees can read on the Voice tab after surveys close.</p>
+        <VoiceOutcomeForm onRefresh={onRefresh} />
+      </section>
+    </div>
+  );
+}
+
+function VoiceOutcomeForm({ onRefresh }: { onRefresh: () => void }) {
+  const [theme, setTheme] = useState("");
+  const [response, setResponse] = useState("");
+  const [action, setAction] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="ro-te-stack" style={{ marginTop: 8 }}>
+      <label className="ro-te-field">
+        Theme
+        <input value={theme} onChange={(e) => setTheme(e.target.value)} placeholder="Scheduling flexibility" />
+      </label>
+      <label className="ro-te-field">
+        What we heard
+        <textarea value={response} rows={3} onChange={(e) => setResponse(e.target.value)} />
+      </label>
+      <label className="ro-te-field">
+        What we did (optional)
+        <textarea value={action} rows={2} onChange={(e) => setAction(e.target.value)} />
+      </label>
+      <button
+        type="button"
+        className="ro-te-btn ro-te-btn--primary"
+        disabled={busy || !theme.trim() || !response.trim()}
+        onClick={() => {
+          setBusy(true);
+          void post("save_voice_outcome", { theme, managementResponse: response, actionTaken: action || undefined, publish: true })
+            .then(onRefresh)
+            .finally(() => setBusy(false));
+        }}
+      >
+        Publish update
+      </button>
     </div>
   );
 }
@@ -194,7 +284,94 @@ export function FunZoneAdminBody({ data, onRefresh }: { data: Record<string, unk
         <h3 className="ro-te-section__title">Drafts & activities</h3>
         <p className="ro-te-muted">{questions.length} questions · {polls.length} polls</p>
       </section>
+      <WouldYouRatherAdmin onRefresh={onRefresh} />
+      <PackEventAdmin onRefresh={onRefresh} />
     </div>
+  );
+}
+
+function WouldYouRatherAdmin({ onRefresh }: { onRefresh: () => void }) {
+  const [a, setA] = useState("");
+  const [b, setB] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <section className="ro-te-card ro-te-section">
+      <h3 className="ro-te-section__title">Would you rather?</h3>
+      <label className="ro-te-field">
+        Option A
+        <input value={a} onChange={(e) => setA(e.target.value)} />
+      </label>
+      <label className="ro-te-field">
+        Option B
+        <input value={b} onChange={(e) => setB(e.target.value)} />
+      </label>
+      <button
+        type="button"
+        className="ro-te-btn ro-te-btn--primary"
+        disabled={busy || !a.trim() || !b.trim()}
+        onClick={() => {
+          setBusy(true);
+          void post("publish_would_you_rather", { optionA: a, optionB: b })
+            .then(() => {
+              setA("");
+              setB("");
+              onRefresh();
+            })
+            .finally(() => setBusy(false));
+        }}
+      >
+        Publish question
+      </button>
+    </section>
+  );
+}
+
+function PackEventAdmin({ onRefresh }: { onRefresh: () => void }) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [location, setLocation] = useState("");
+  const [startsAt, setStartsAt] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <section className="ro-te-card ro-te-section">
+      <h3 className="ro-te-section__title">Team event</h3>
+      <label className="ro-te-field">
+        Title
+        <input value={title} onChange={(e) => setTitle(e.target.value)} />
+      </label>
+      <label className="ro-te-field">
+        Description
+        <textarea value={description} rows={2} onChange={(e) => setDescription(e.target.value)} />
+      </label>
+      <label className="ro-te-field">
+        Location
+        <input value={location} onChange={(e) => setLocation(e.target.value)} />
+      </label>
+      <label className="ro-te-field">
+        Starts (local)
+        <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+      </label>
+      <button
+        type="button"
+        className="ro-te-btn ro-te-btn--primary"
+        disabled={busy || !title.trim()}
+        onClick={() => {
+          setBusy(true);
+          const iso = startsAt ? new Date(startsAt).toISOString() : new Date().toISOString();
+          void post("publish_pack_event", { title, description, location, startsAt: iso })
+            .then(() => {
+              setTitle("");
+              setDescription("");
+              setLocation("");
+              setStartsAt("");
+              onRefresh();
+            })
+            .finally(() => setBusy(false));
+        }}
+      >
+        Publish event
+      </button>
+    </section>
   );
 }
 

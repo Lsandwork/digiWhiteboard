@@ -13,6 +13,7 @@ import {
   type BarkOutReaction,
   type FeedbackStatus
 } from "@/lib/team-engagement/constants";
+import { COMMUNITY_GUIDELINE } from "@/lib/team-engagement/community-content";
 
 type BarkOutItem = {
   id: string;
@@ -39,15 +40,27 @@ type CommentItem = {
 type PackPayload = {
   storageReady: boolean;
   greeting: string;
-  me: { userId: string; name: string; canPost: boolean };
+  dateLabel?: string;
+  comingUp?: MilestoneItem[];
+  me: {
+    userId: string;
+    name: string;
+    avatarUrl?: string | null;
+    canPost: boolean;
+    postingBlockedReason?: string;
+    postingBlockedMessage?: string;
+    impersonated?: boolean;
+  };
   tagline: string;
   stats: {
     barkOutsThisMonth: number;
     barkOutsThisWeek: number;
     participationPercent: number;
     teamSize: number;
+    teammatesRecognizedThisMonth?: number;
     newForMeThisWeek: number;
     pendingMyPosts: number;
+    activePackGoals?: number;
   };
   activityFeed: BarkOutItem[];
   spotlight: BarkOutItem | null;
@@ -65,6 +78,12 @@ type PackPayload = {
     awaitingConfirmation: { id: string; recipientName: string; statusLabel: string }[];
   };
   sectionStatus: Record<string, { ready: boolean; message?: string }>;
+  packSetup?: {
+    priority2Ready: boolean;
+    priority3Ready: boolean;
+    migrations: string[];
+  };
+  announcements?: Array<{ id: string; title: string; body: string; publishedAt: string }>;
 };
 
 type MilestoneItem = {
@@ -116,10 +135,12 @@ function Avatar({ name, url, size = 40 }: { name: string; url: string | null; si
 
 function BarkOutCard({
   item,
-  onReact
+  onReact,
+  onReport
 }: {
   item: BarkOutItem;
   onReact: (id: string, reaction: BarkOutReaction, add: boolean) => void;
+  onReport?: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [comments, setComments] = useState<CommentItem[] | null>(null);
@@ -189,6 +210,11 @@ function BarkOutCard({
           );
         })}
       </div>
+      {onReport ? (
+        <button type="button" className="pack-btn pack-btn--ghost" style={{ marginTop: 8, fontSize: 12 }} onClick={() => onReport(item.id)}>
+          Report concern
+        </button>
+      ) : null}
       <div className="pack-comments">
         <button type="button" className="pack-comments__toggle" onClick={() => void toggleComments()}>
           {open ? "Hide" : "View"} {count > 0 ? `${count} comment${count === 1 ? "" : "s"}` : "comments"}
@@ -238,11 +264,22 @@ function SectionEmpty({ title, body }: { title: string; body: string }) {
   );
 }
 
+type PackGoalsState = {
+  active: Array<{ id: string; title: string; description: string; progressPercent: number; endsOn: string | null }>;
+  completed: Array<{ id: string; title: string; description: string; progressPercent: number; endsOn: string | null }>;
+};
+
 export default function PackExperience() {
   const [section, setSection] = useState<PackSection>("pack");
   const [pack, setPack] = useState<PackPayload | null>(null);
   const [home, setHome] = useState<HomePayload | null>(null);
   const [feed, setFeed] = useState<BarkOutItem[]>([]);
+  const [feedOffset, setFeedOffset] = useState(0);
+  const [feedTotal, setFeedTotal] = useState(0);
+  const [feedPageSize, setFeedPageSize] = useState(20);
+  const [barkSubview, setBarkSubview] = useState<"team" | "received" | "sent">("team");
+  const [mineReceived, setMineReceived] = useState<BarkOutItem[]>([]);
+  const [mineSentPublished, setMineSentPublished] = useState<BarkOutItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -251,12 +288,42 @@ export default function PackExperience() {
   const [message, setMessage] = useState("");
   const [ideas, setIdeas] = useState<FeedbackItem[] | null>(null);
   const [funZone, setFunZone] = useState<PackPayload["funZonePreview"] | null>(null);
-  const [packGoals, setPackGoals] = useState<{ active: Array<{ id: string; title: string; description: string; progressPercent: number; endsOn: string | null }> } | null>(null);
+  const [packGoals, setPackGoals] = useState<PackGoalsState | null>(null);
   const [voiceSurveys, setVoiceSurveys] = useState<
     Array<{ id: string; title: string; introduction: string | null; completed: boolean; questions: Array<{ id: string; prompt: string; questionType: string; options: unknown[] }> }>
   | null>(null);
   const [ideaTitle, setIdeaTitle] = useState("");
   const [ideaBody, setIdeaBody] = useState("");
+  const [teamPulse, setTeamPulse] = useState<{ ready: boolean; submitted: boolean; weekStart: string } | null>(null);
+  const [youSaidWeDid, setYouSaidWeDid] = useState<
+    Array<{ id: string; theme: string; managementResponse: string; actionTaken: string | null; status: string }>
+  >([]);
+  const [pendingSent, setPendingSent] = useState<
+    Array<{ id: string; status: string; authorPrompt: string | null; canConfirm: boolean; canWithdraw: boolean; message: string; statusLabel: string }>
+  >([]);
+
+  const loadMine = useCallback(async () => {
+    const { ok, body } = await fetchAdminJson<{
+      sent: Array<{
+        id: string;
+        status: string;
+        authorPrompt: string | null;
+        canConfirm: boolean;
+        canWithdraw: boolean;
+        message: string;
+        statusLabel: string;
+        recipient?: { name: string };
+        category?: { label: string };
+        publishedAt?: string | null;
+      }>;
+      received: BarkOutItem[];
+    }>("/api/admin/bark-outs?view=mine");
+    if (ok) {
+      setPendingSent(body.sent.filter((row) => row.status === "awaiting_confirmation" || row.status === "pending_review"));
+      setMineReceived(body.received ?? []);
+      setMineSentPublished(body.sent.filter((row) => row.status === "published") as unknown as BarkOutItem[]);
+    }
+  }, [pack?.me.avatarUrl, pack?.me.name, pack?.me.userId]);
 
   const loadPack = useCallback(async () => {
     const { ok, body } = await fetchAdminJson<PackPayload & { error?: string }>("/api/admin/bark-outs?view=pack");
@@ -269,9 +336,17 @@ export default function PackExperience() {
     setError(null);
   }, []);
 
-  const loadFeed = useCallback(async () => {
-    const { ok, body } = await fetchAdminJson<{ items: BarkOutItem[] }>("/api/admin/bark-outs?view=feed");
-    if (ok) setFeed(body.items);
+  const loadFeed = useCallback(async (opts?: { append?: boolean; offset?: number }) => {
+    const offset = opts?.offset ?? 0;
+    const { ok, body } = await fetchAdminJson<{ items: BarkOutItem[]; total: number; offset: number; pageSize: number }>(
+      `/api/admin/bark-outs?view=feed&offset=${offset}`
+    );
+    if (ok) {
+      setFeed((prev) => (opts?.append ? [...prev, ...body.items] : body.items));
+      setFeedOffset(body.offset);
+      setFeedTotal(body.total);
+      setFeedPageSize(body.pageSize);
+    }
   }, []);
 
   const loadHome = useCallback(async () => {
@@ -279,9 +354,25 @@ export default function PackExperience() {
     if (ok) setHome(body);
   }, []);
 
+  const loadTeamPulse = useCallback(async () => {
+    const { ok, body } = await fetchAdminJson<{ ready: boolean; submitted: boolean; weekStart: string }>(
+      "/api/admin/bark-outs?view=team_pulse"
+    );
+    if (ok) setTeamPulse(body);
+  }, []);
+
+  const loadYouSaidWeDid = useCallback(async () => {
+    const { ok, body } = await fetchAdminJson<{ ready: boolean; items: typeof youSaidWeDid }>(
+      "/api/admin/bark-outs?view=you_said_we_did"
+    );
+    if (ok && body.ready) setYouSaidWeDid(body.items);
+  }, []);
+
   useEffect(() => {
     void loadPack();
-  }, [loadPack]);
+    void loadMine();
+    void loadTeamPulse();
+  }, [loadPack, loadMine, loadTeamPulse]);
 
   useEffect(() => {
     if (section === "bark_outs") void loadFeed();
@@ -297,6 +388,24 @@ export default function PackExperience() {
     if (ok) setFunZone(body);
   }, []);
 
+  async function voteWouldYou(questionId: string, choice: "a" | "b") {
+    const { ok } = await fetchAdminJson("/api/admin/bark-outs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "vote_would_you_rather", questionId, choice })
+    });
+    if (ok) await loadFunZone();
+  }
+
+  async function rsvpEvent(eventId: string, response: "going" | "maybe" | "cant") {
+    const { ok } = await fetchAdminJson("/api/admin/bark-outs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "rsvp_pack_event", eventId, response })
+    });
+    if (ok) await loadFunZone();
+  }
+
   async function votePoll(pollId: string, optionId: string) {
     const { ok, body } = await fetchAdminJson<PackPayload["funZonePreview"]>("/api/admin/bark-outs", {
       method: "POST",
@@ -306,24 +415,29 @@ export default function PackExperience() {
     if (ok) setFunZone(body);
   }
 
-  type PackGoalsState = { active: Array<{ id: string; title: string; description: string; progressPercent: number; endsOn: string | null }> };
-
   const loadPackGoals = useCallback(async () => {
-    const { ok, body } = await fetchAdminJson<PackGoalsState>("/api/admin/bark-outs?view=pack_goals");
-    if (ok) setPackGoals(body);
+    const { ok, body } = await fetchAdminJson<PackGoalsState & { ready?: boolean }>("/api/admin/bark-outs?view=pack_goals");
+    if (ok) {
+      if (body.ready === false) setPackGoals({ active: [], completed: [] });
+      else setPackGoals({ active: body.active ?? [], completed: body.completed ?? [] });
+    } else setPackGoals({ active: [], completed: [] });
   }, []);
 
   const loadVoice = useCallback(async () => {
-    const { ok, body } = await fetchAdminJson<{ items: NonNullable<typeof voiceSurveys> }>("/api/admin/bark-outs?view=employee_voice");
-    if (ok) setVoiceSurveys(body.items);
+    const { ok, body } = await fetchAdminJson<{ ready?: boolean; items: NonNullable<typeof voiceSurveys> }>("/api/admin/bark-outs?view=employee_voice");
+    if (ok) setVoiceSurveys(body.ready === false ? [] : body.items ?? []);
+    else setVoiceSurveys([]);
   }, []);
 
   useEffect(() => {
     if (section === "ideas") void loadIdeas();
     if (section === "fun") void loadFunZone();
     if (section === "goals") void loadPackGoals();
-    if (section === "voice") void loadVoice();
-  }, [section, loadIdeas, loadFunZone, loadPackGoals, loadVoice]);
+    if (section === "voice") {
+      void loadVoice();
+      void loadYouSaidWeDid();
+    }
+  }, [section, loadIdeas, loadFunZone, loadPackGoals, loadVoice, loadYouSaidWeDid]);
 
   useEffect(() => {
     if (modalOpen && !home) void loadHome();
@@ -337,6 +451,42 @@ export default function PackExperience() {
       body: JSON.stringify({ action, id, reaction })
     });
     await Promise.all([loadPack(), section === "bark_outs" ? loadFeed() : Promise.resolve()]);
+  }
+
+  async function reportBarkOut(id: string) {
+    const reason = window.prompt("Briefly tell moderators what concerns you about this Bark Out:");
+    if (!reason?.trim()) return;
+    const { ok, body } = await fetchAdminJson("/api/admin/bark-outs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "report_bark_out", id, reason: reason.trim() })
+    });
+    if (!ok) setError((body as { error?: string }).error ?? "Could not send report.");
+    else setError(null);
+  }
+
+  async function confirmBarkOut(id: string) {
+    const { ok, body } = await fetchAdminJson("/api/admin/bark-outs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "confirm_bark_out", id })
+    });
+    if (!ok) setError((body as { error?: string }).error ?? "Could not confirm.");
+    else {
+      await Promise.all([loadPack(), loadMine(), loadFeed()]);
+    }
+  }
+
+  async function withdrawBarkOut(id: string) {
+    const { ok, body } = await fetchAdminJson("/api/admin/bark-outs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "withdraw_bark_out", id })
+    });
+    if (!ok) setError((body as { error?: string }).error ?? "Could not withdraw.");
+    else {
+      await Promise.all([loadPack(), loadMine(), loadFeed()]);
+    }
   }
 
   async function submitBarkOut(event: React.FormEvent) {
@@ -353,7 +503,7 @@ export default function PackExperience() {
       if (!ok) throw new Error((body as { error?: string }).error ?? "Could not send Bark Out.");
       setModalOpen(false);
       setMessage("");
-      await Promise.all([loadPack(), loadFeed()]);
+      await Promise.all([loadPack(), loadFeed(), loadMine()]);
     } catch (err) {
       setError(humanizeUnknownError(err, "Could not send Bark Out."));
     } finally {
@@ -387,9 +537,19 @@ export default function PackExperience() {
       <header className="pack-hero">
         <div className="pack-hero__inner">
           <div>
-            <p className="pack-muted" style={{ color: "rgba(255,255,255,0.85)", margin: "0 0 4px" }}>
-              {pack.greeting}, {pack.me.name.split(" ")[0] ?? pack.me.name}
-            </p>
+            <div className="pack-people" style={{ marginBottom: 10 }}>
+              <Avatar name={pack.me.name} url={pack.me.avatarUrl ?? null} size={52} />
+              <div>
+                <p className="pack-muted" style={{ color: "rgba(255,255,255,0.85)", margin: "0 0 2px" }}>
+                  {pack.greeting}, {pack.me.name.split(" ")[0] ?? pack.me.name}
+                </p>
+                {pack.dateLabel ? (
+                  <p className="pack-muted" style={{ color: "rgba(255,255,255,0.75)", margin: 0, fontSize: 13 }}>
+                    {pack.dateLabel}
+                  </p>
+                ) : null}
+              </div>
+            </div>
             <h1 className="pack-hero__title">The Pack</h1>
             <p className="pack-hero__lede">
               {pack.tagline} Celebrate the people who make the difference. Every contribution matters.
@@ -400,7 +560,11 @@ export default function PackExperience() {
                 <div className="pack-stat__value">{pack.stats.barkOutsThisMonth}</div>
               </div>
               <div className="pack-stat">
-                <div className="pack-stat__label">Team participation</div>
+                <div className="pack-stat__label">Teammates recognized</div>
+                <div className="pack-stat__value">{pack.stats.teammatesRecognizedThisMonth ?? 0}</div>
+              </div>
+              <div className="pack-stat">
+                <div className="pack-stat__label">Participation</div>
                 <div className="pack-stat__value">{pack.stats.participationPercent}%</div>
               </div>
               <div className="pack-stat">
@@ -416,14 +580,56 @@ export default function PackExperience() {
           <div className="pack-hero__actions">
             <span className="pack-pill">{pack.stats.barkOutsThisWeek} new this week</span>
             {pack.stats.pendingMyPosts > 0 ? <span className="pack-pill">{pack.stats.pendingMyPosts} awaiting review</span> : null}
-            {pack.me.canPost ? (
-              <button type="button" className="pack-btn pack-btn--primary" onClick={() => setModalOpen(true)}>
-                + Give a Bark Out
-              </button>
-            ) : null}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+              {pack.me.canPost ? (
+                <button type="button" className="pack-btn pack-btn--primary" onClick={() => setModalOpen(true)}>
+                  + Give a Bark Out
+                </button>
+              ) : null}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "flex-end" }}>
+                <button type="button" className="pack-btn pack-btn--ghost" onClick={() => setSection("milestones")}>
+                  Milestones
+                </button>
+                <button type="button" className="pack-btn pack-btn--ghost" onClick={() => setSection("fun")}>
+                  Fun Zone
+                </button>
+                <button type="button" className="pack-btn pack-btn--ghost" onClick={() => setSection("goals")}>
+                  Goals
+                </button>
+                <button type="button" className="pack-btn pack-btn--ghost" onClick={() => setSection("ideas")}>
+                  Ideas
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </header>
+
+      {pack.me.impersonated && pack.me.postingBlockedMessage ? (
+        <div className="pack-card" style={{ marginBottom: 16, borderColor: "#c77d2d" }}>
+          <strong>Viewing as {pack.me.name}</strong>
+          <p className="pack-muted" style={{ margin: "6px 0 0", fontSize: 13 }}>
+            {pack.me.postingBlockedMessage}
+          </p>
+        </div>
+      ) : null}
+      {!pack.me.canPost && !pack.me.impersonated && pack.me.postingBlockedMessage ? (
+        <div className="pack-card" style={{ marginBottom: 16, borderColor: "#c77d2d" }}>
+          <strong>Bark Outs unavailable</strong>
+          <p className="pack-muted" style={{ margin: "6px 0 0", fontSize: 13 }}>
+            {pack.me.postingBlockedMessage}
+          </p>
+        </div>
+      ) : null}
+
+      {pack.packSetup && pack.packSetup.migrations.length > 0 ? (
+        <div className="pack-card" style={{ marginBottom: 16, borderColor: "var(--pack-blue)" }}>
+          <strong>Database setup still needed</strong>
+          <p className="pack-muted" style={{ margin: "6px 0 0", fontSize: 13 }}>
+            Run these SQL migrations on Supabase (SQL Editor), in order, then refresh: {pack.packSetup.migrations.join(" → ")}
+          </p>
+        </div>
+      ) : null}
 
       <nav className="pack-nav" aria-label="Team Engagement sections">
         {NAV.map((item) => (
@@ -440,17 +646,53 @@ export default function PackExperience() {
 
       {error ? <p className="ro-te-error">{error}</p> : null}
 
+      {pendingSent.length > 0 ? (
+        <section className="pack-card" style={{ marginBottom: 16 }}>
+          <h2 className="pack-card__title">Your Bark Outs in progress</h2>
+          <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+            {pendingSent.map((row) => (
+              <li key={row.id} style={{ padding: "10px 0", borderTop: "1px solid #e3eef3" }}>
+                <span className="pack-pill" style={{ fontSize: 11 }}>
+                  {row.statusLabel}
+                </span>
+                <p style={{ margin: "6px 0 0", fontSize: 14 }}>{row.message}</p>
+                {row.authorPrompt ? <p className="pack-muted" style={{ fontSize: 13 }}>{row.authorPrompt}</p> : null}
+                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                  {row.canConfirm ? (
+                    <button type="button" className="pack-btn pack-btn--primary" onClick={() => void confirmBarkOut(row.id)}>
+                      Post as written
+                    </button>
+                  ) : null}
+                  {row.canWithdraw ? (
+                    <button type="button" className="pack-btn pack-btn--ghost" onClick={() => void withdrawBarkOut(row.id)}>
+                      Withdraw
+                    </button>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       {section === "pack" ? (
         <div className="pack-grid">
           <section className="pack-card">
             <h2 className="pack-card__title">Your Team Feed</h2>
             {feedItems.length === 0 ? (
-              <SectionEmpty
-                title="Every great team has moments worth celebrating"
-                body="Give someone their first Bark Out — recognition starts with you."
-              />
+              <div>
+                <SectionEmpty
+                  title="Every great team has moments worth celebrating"
+                  body="Give someone their first Bark Out — recognition starts with you."
+                />
+                {pack.me.canPost ? (
+                  <button type="button" className="pack-btn pack-btn--primary" style={{ marginTop: 12 }} onClick={() => setModalOpen(true)}>
+                    Give a Bark Out
+                  </button>
+                ) : null}
+              </div>
             ) : (
-              feedItems.map((item) => <BarkOutCard key={item.id} item={item} onReact={react} />)
+              feedItems.map((item) => <BarkOutCard key={item.id} item={item} onReact={react} onReport={reportBarkOut} />)
             )}
           </section>
 
@@ -474,6 +716,89 @@ export default function PackExperience() {
               <p className="pack-muted">When teammates recognize each other, a standout post may appear here.</p>
             )}
           </section>
+
+          {pack.announcements && pack.announcements.length > 0 ? (
+            <section className="pack-card">
+              <h2 className="pack-card__title">Announcements</h2>
+              <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                {pack.announcements.map((item) => (
+                  <li key={item.id} style={{ marginBottom: 12 }}>
+                    <strong>{item.title}</strong>
+                    <p className="pack-muted" style={{ margin: "4px 0 0", fontSize: 13, whiteSpace: "pre-wrap" }}>
+                      {item.body}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          {pack.comingUp && pack.comingUp.length > 0 ? (
+            <section className="pack-card">
+              <h2 className="pack-card__title">Coming up</h2>
+              <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                {pack.comingUp.map((milestone) => (
+                  <li key={milestone.id} style={{ marginBottom: 10, fontSize: 14 }}>
+                    <strong>{milestone.title}</strong>
+                    <span className="pack-muted">
+                      {" "}
+                      · {milestone.celebrationOn} · {milestone.employee.name}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <button type="button" className="pack-btn pack-btn--ghost" style={{ marginTop: 8 }} onClick={() => setSection("milestones")}>
+                View all milestones
+              </button>
+            </section>
+          ) : null}
+
+          {typeof pack.stats.activePackGoals === "number" ? (
+            <section className="pack-card pack-muted" style={{ fontSize: 14 }}>
+              <strong>{pack.stats.activePackGoals}</strong> active Pack {pack.stats.activePackGoals === 1 ? "Goal" : "Goals"}
+              {pack.stats.activePackGoals > 0 ? (
+                <button type="button" className="pack-btn pack-btn--ghost" style={{ marginLeft: 8 }} onClick={() => setSection("goals")}>
+                  View
+                </button>
+              ) : null}
+            </section>
+          ) : null}
+
+          {teamPulse?.ready ? (
+            <section className="pack-card">
+              <h2 className="pack-card__title">Team Pulse</h2>
+              <p className="pack-muted" style={{ fontSize: 13 }}>Week of {teamPulse.weekStart}. Optional check-in — not a performance score.</p>
+              {teamPulse.submitted ? (
+                <p className="pack-muted">Thanks — you already checked in this week.</p>
+              ) : (
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const form = event.currentTarget;
+                    const workload = Number((form.elements.namedItem("pulse-workload") as HTMLInputElement).value);
+                    const support = Number((form.elements.namedItem("pulse-support") as HTMLInputElement).value);
+                    const connection = Number((form.elements.namedItem("pulse-connection") as HTMLInputElement).value);
+                    const note = (form.elements.namedItem("pulse-note") as HTMLTextAreaElement).value;
+                    void (async () => {
+                      const { ok, body } = await fetchAdminJson("/api/admin/bark-outs", {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ action: "submit_team_pulse", workload, support, connection, note })
+                      });
+                      if (!ok) setError((body as { error?: string }).error ?? "Could not save check-in.");
+                      else await loadTeamPulse();
+                    })();
+                  }}
+                >
+                  <label className="pack-field">Workload (1–5)<input name="pulse-workload" type="number" min={1} max={5} required defaultValue={3} /></label>
+                  <label className="pack-field">Support (1–5)<input name="pulse-support" type="number" min={1} max={5} required defaultValue={3} /></label>
+                  <label className="pack-field">Connection (1–5)<input name="pulse-connection" type="number" min={1} max={5} required defaultValue={3} /></label>
+                  <label className="pack-field">Optional note<textarea name="pulse-note" maxLength={400} rows={2} /></label>
+                  <button type="submit" className="pack-btn pack-btn--primary">Submit check-in</button>
+                </form>
+              )}
+            </section>
+          ) : null}
 
           <aside className="pack-card">
             <h2 className="pack-card__title">Your activity</h2>
@@ -501,7 +826,7 @@ export default function PackExperience() {
 
       {section === "bark_outs" ? (
         <section className="pack-card">
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
             <h2 className="pack-card__title" style={{ margin: 0 }}>
               Bark Outs
             </h2>
@@ -511,11 +836,59 @@ export default function PackExperience() {
               </button>
             ) : null}
           </div>
-          {feedItems.length === 0 ? (
-            <SectionEmpty title="No Bark Outs yet" body="Be the first to celebrate a teammate today." />
-          ) : (
-            feedItems.map((item) => <BarkOutCard key={item.id} item={item} onReact={react} />)
-          )}
+          <div className="pack-nav" style={{ marginBottom: 16 }}>
+            {(
+              [
+                ["team", "Team feed"],
+                ["received", `Received (${mineReceived.length})`],
+                ["sent", `Given (${mineSentPublished.length})`]
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={`pack-nav__btn ${barkSubview === id ? "pack-nav__btn--active" : ""}`}
+                onClick={() => setBarkSubview(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {barkSubview === "team" ? (
+            feed.length === 0 ? (
+              <SectionEmpty title="No Bark Outs yet" body="Be the first to celebrate a teammate today." />
+            ) : (
+              <>
+                {feed.map((item) => (
+                  <BarkOutCard key={item.id} item={item} onReact={react} onReport={reportBarkOut} />
+                ))}
+                {feed.length < feedTotal ? (
+                  <button
+                    type="button"
+                    className="pack-btn pack-btn--ghost"
+                    style={{ marginTop: 12 }}
+                    onClick={() => void loadFeed({ append: true, offset: feedOffset + feedPageSize })}
+                  >
+                    Load more
+                  </button>
+                ) : null}
+              </>
+            )
+          ) : null}
+          {barkSubview === "received" ? (
+            mineReceived.length === 0 ? (
+              <SectionEmpty title="No recognition yet" body="When teammates celebrate you, Bark Outs appear here." />
+            ) : (
+              mineReceived.map((item) => <BarkOutCard key={item.id} item={item} onReact={react} onReport={reportBarkOut} />)
+            )
+          ) : null}
+          {barkSubview === "sent" ? (
+            mineSentPublished.length === 0 ? (
+              <SectionEmpty title="No Bark Outs sent" body="Recognize a teammate to start your giving history." />
+            ) : (
+              mineSentPublished.map((item) => <BarkOutCard key={item.id} item={item} onReact={react} onReport={reportBarkOut} />)
+            )
+          ) : null}
         </section>
       ) : null}
 
@@ -539,6 +912,30 @@ export default function PackExperience() {
                       </div>
                     </div>
                     {milestone.summary ? <p style={{ fontSize: 14, margin: "8px 0 0" }}>{milestone.summary}</p> : null}
+                    <form
+                      className="pack-comments__composer"
+                      style={{ marginTop: 8 }}
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        const value = (event.currentTarget.elements.namedItem(`msg-${milestone.id}`) as HTMLTextAreaElement).value;
+                        void (async () => {
+                          const { ok, body } = await fetchAdminJson("/api/admin/bark-outs", {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify({ action: "congratulate_milestone", milestoneId: milestone.id, body: value })
+                          });
+                          if (!ok) setError((body as { error?: string }).error ?? "Could not send message.");
+                          else {
+                            (event.currentTarget.elements.namedItem(`msg-${milestone.id}`) as HTMLTextAreaElement).value = "";
+                          }
+                        })();
+                      }}
+                    >
+                      <textarea name={`msg-${milestone.id}`} maxLength={400} placeholder="Send a congratulation…" rows={2} />
+                      <button type="submit" className="pack-btn pack-btn--primary">
+                        Celebrate
+                      </button>
+                    </form>
                   </article>
                 ))
               )}
@@ -562,13 +959,17 @@ export default function PackExperience() {
         )
       ) : null}
       {section === "goals" ? (
-        packGoals === null ? (
+        !pack.sectionStatus.packGoals?.ready ? (
+          <SectionEmpty title="Pack Goals" body={pack.sectionStatus.packGoals?.message ?? "Pack Goals need migration 107."} />
+        ) : packGoals === null ? (
           <p className="pack-muted">Loading Pack Goals…</p>
-        ) : packGoals.active.length === 0 ? (
+        ) : packGoals.active.length === 0 && packGoals.completed.length === 0 ? (
           <SectionEmpty title="Pack Goals" body="When leadership publishes a team goal, progress will show here." />
         ) : (
+          <>
           <section className="pack-card">
             <h2 className="pack-card__title">Active Pack Goals</h2>
+            {packGoals.active.length === 0 ? <p className="pack-muted">No active goals right now.</p> : null}
             {packGoals.active.map((goal) => (
               <article key={goal.id} style={{ marginBottom: 16 }}>
                 <strong>{goal.title}</strong>
@@ -579,9 +980,37 @@ export default function PackExperience() {
                 <div className="pack-progress" style={{ marginTop: 8, height: 8, background: "#e8f2f7", borderRadius: 8 }}>
                   <div style={{ width: `${goal.progressPercent}%`, height: "100%", background: "var(--pack-blue)", borderRadius: 8 }} />
                 </div>
+                <button
+                  type="button"
+                  className="pack-btn pack-btn--ghost"
+                  style={{ marginTop: 8 }}
+                  onClick={() =>
+                    void fetchAdminJson("/api/admin/bark-outs", {
+                      method: "POST",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ action: "join_pack_goal", goalId: goal.id })
+                    })
+                  }
+                >
+                  Join this goal
+                </button>
               </article>
             ))}
           </section>
+          {packGoals.completed.length > 0 ? (
+            <section className="pack-card" style={{ marginTop: 16 }}>
+              <h2 className="pack-card__title">Completed</h2>
+              {packGoals.completed.map((goal) => (
+                <article key={goal.id} style={{ marginBottom: 12 }}>
+                  <strong>{goal.title}</strong>
+                  <p className="pack-muted" style={{ margin: "4px 0 0", fontSize: 13 }}>
+                    {goal.progressPercent}% · {goal.description}
+                  </p>
+                </article>
+              ))}
+            </section>
+          ) : null}
+          </>
         )
       ) : null}
       {section === "fun" ? (
@@ -596,6 +1025,32 @@ export default function PackExperience() {
                     {(funZone ?? pack.funZonePreview)!.question!.responseCount} responses
                     {(funZone ?? pack.funZonePreview)!.question!.responded ? " · You responded" : ""}
                   </p>
+                  {!(funZone ?? pack.funZonePreview)!.question!.responded ? (
+                    <form
+                      className="pack-comments__composer"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        const value = (event.currentTarget.elements.namedItem("daily-answer") as HTMLTextAreaElement).value;
+                        void (async () => {
+                          await fetchAdminJson("/api/admin/bark-outs", {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify({
+                              action: "answer_fun_question",
+                              questionId: (funZone ?? pack.funZonePreview)!.question!.id,
+                              body: value
+                            })
+                          });
+                          await loadFunZone();
+                        })();
+                      }}
+                    >
+                      <textarea name="daily-answer" required maxLength={600} placeholder="Your answer…" />
+                      <button type="submit" className="pack-btn pack-btn--primary">
+                        Submit
+                      </button>
+                    </form>
+                  ) : null}
                 </>
               ) : (
                 <SectionEmpty title="No active questions" body="Check back for the next Pack question." />
@@ -627,13 +1082,99 @@ export default function PackExperience() {
                 <SectionEmpty title="No active polls" body="Polls go live when leadership publishes one." />
               )}
             </section>
+            {(funZone ?? pack.funZonePreview)?.trivia ? (
+              <section className="pack-card">
+                <h2 className="pack-card__title">{(funZone ?? pack.funZonePreview)!.trivia!.title}</h2>
+                <p>{(funZone ?? pack.funZonePreview)!.trivia!.prompt}</p>
+                {(funZone ?? pack.funZonePreview)!.trivia!.answered ? (
+                  <p className="pack-muted">You already answered—thanks for playing.</p>
+                ) : (
+                  <form
+                    className="pack-comments__composer"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      const value = (event.currentTarget.elements.namedItem("trivia-answer") as HTMLInputElement).value;
+                      void (async () => {
+                        const { ok, body } = await fetchAdminJson<{ correct?: boolean }>("/api/admin/bark-outs", {
+                          method: "POST",
+                          headers: { "content-type": "application/json" },
+                          body: JSON.stringify({
+                            action: "answer_fun_trivia",
+                            triviaId: (funZone ?? pack.funZonePreview)!.trivia!.id,
+                            answer: value
+                          })
+                        });
+                        if (ok) {
+                          void loadFunZone();
+                          if (body.correct) setError(null);
+                        }
+                      })();
+                    }}
+                  >
+                    <input name="trivia-answer" required maxLength={200} placeholder="Your answer" />
+                    <button type="submit" className="pack-btn pack-btn--primary">
+                      Submit
+                    </button>
+                  </form>
+                )}
+              </section>
+            ) : null}
+            {(() => {
+              const p4 = (funZone ?? pack.funZonePreview) as { phase4?: { wouldYouRather: { id: string; optionA: string; optionB: string; voted: boolean; votesA: number; votesB: number } | null; events: Array<{ id: string; title: string; description: string | null; location: string | null; startsAt: string; goingCount: number; myRsvp: string | null }> } };
+              return p4.phase4?.wouldYouRather ? (
+              <section className="pack-card">
+                <h2 className="pack-card__title">Would you rather?</h2>
+                {(() => {
+                  const wyr = p4.phase4!.wouldYouRather!;
+                  return (
+                    <>
+                      <button type="button" className="pack-btn pack-btn--ghost" style={{ display: "block", marginBottom: 6 }} disabled={wyr.voted} onClick={() => void voteWouldYou(wyr.id, "a")}>
+                        A: {wyr.optionA} ({wyr.votesA})
+                      </button>
+                      <button type="button" className="pack-btn pack-btn--ghost" style={{ display: "block" }} disabled={wyr.voted} onClick={() => void voteWouldYou(wyr.id, "b")}>
+                        B: {wyr.optionB} ({wyr.votesB})
+                      </button>
+                    </>
+                  );
+                })()}
+              </section>
+            ) : null;
+            })()}
+            {(() => {
+              const p4 = (funZone ?? pack.funZonePreview) as { phase4?: { events: Array<{ id: string; title: string; description: string | null; location: string | null; startsAt: string; goingCount: number; myRsvp: string | null }> } };
+              return p4.phase4?.events?.length ? (
+              <section className="pack-card">
+                <h2 className="pack-card__title">Team events</h2>
+                {p4.phase4!.events.map((event) => (
+                  <article key={event.id} style={{ marginBottom: 14 }}>
+                    <strong>{event.title}</strong>
+                    <p className="pack-muted" style={{ fontSize: 13 }}>
+                      {new Date(event.startsAt).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })} · {event.goingCount} going
+                      {event.location ? ` · ${event.location}` : ""}
+                    </p>
+                    {event.description ? <p style={{ fontSize: 14 }}>{event.description}</p> : null}
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {(["going", "maybe", "cant"] as const).map((response) => (
+                        <button key={response} type="button" className="pack-btn pack-btn--ghost" onClick={() => void rsvpEvent(event.id, response)}>
+                          {response === "cant" ? "Can't make it" : response.charAt(0).toUpperCase() + response.slice(1)}
+                          {event.myRsvp === response ? " ✓" : ""}
+                        </button>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </section>
+            ) : null;
+            })()}
           </div>
         ) : (
           <SectionEmpty title="Fun Zone" body={pack.sectionStatus.funZone?.message ?? "Questions and polls are on the way."} />
         )
       ) : null}
       {section === "voice" ? (
-        voiceSurveys === null ? (
+        !pack.sectionStatus.employeeVoice?.ready ? (
+          <SectionEmpty title="Employee Voice" body={pack.sectionStatus.employeeVoice?.message ?? "Apply migration 107."} />
+        ) : voiceSurveys === null ? (
           <p className="pack-muted">Loading surveys…</p>
         ) : voiceSurveys.length === 0 ? (
           <SectionEmpty title="Employee Voice" body="When a survey is published, you can respond here. Anonymous surveys never show your name to leadership." />
@@ -677,6 +1218,19 @@ export default function PackExperience() {
                             </option>
                           ))}
                         </select>
+                      ) : q.questionType === "yes_no" ? (
+                        <select name={`q-${q.id}`} defaultValue="yes">
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      ) : q.questionType === "single" && q.options.length > 0 ? (
+                        <select name={`q-${q.id}`}>
+                          {q.options.map((opt, index) => (
+                            <option key={index} value={String(opt)}>
+                              {String(opt)}
+                            </option>
+                          ))}
+                        </select>
                       ) : (
                         <input name={`q-${q.id}`} />
                       )}
@@ -690,6 +1244,21 @@ export default function PackExperience() {
             </section>
           ))
         )
+      ) : null}
+      {section === "voice" && youSaidWeDid.length > 0 ? (
+        <section className="pack-card" style={{ marginTop: 16 }}>
+          <h2 className="pack-card__title">You said, we did</h2>
+          <p className="pack-muted">How leadership acted on employee voice themes (published updates only).</p>
+          <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+            {youSaidWeDid.map((item) => (
+              <li key={item.id} style={{ padding: "12px 0", borderTop: "1px solid #e3eef3" }}>
+                <strong>{item.theme}</strong>
+                <p style={{ margin: "6px 0", fontSize: 14 }}>{item.managementResponse}</p>
+                {item.actionTaken ? <p className="pack-muted" style={{ fontSize: 13 }}>{item.actionTaken}</p> : null}
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
       {section === "ideas" ? (
         pack.sectionStatus.ideas?.ready ? (
@@ -761,6 +1330,9 @@ export default function PackExperience() {
             <h2 id="pack-bark-out-title" style={{ marginTop: 0 }}>
               Give a Bark Out
             </h2>
+            <p className="pack-muted" style={{ fontSize: 13, lineHeight: 1.45 }}>
+              {COMMUNITY_GUIDELINE}
+            </p>
             {!home ? (
               <p className="pack-muted">Loading teammates…</p>
             ) : (

@@ -28,6 +28,8 @@
 .ro-te-sidebar__link:hover { background:rgba(4,146,194,.08); }
 .ro-te-sidebar__link--active { background:#fff; border:1px solid var(--ro-blue-border); color:var(--ro-blue-dark); font-weight:600; }
 .ro-te-main { min-width:0; }
+.ro-te-workspace__toggle { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+.ro-te-workspace .pack { margin-top:0; }
 .ro-te-main__title { margin:0 0 12px; font-size:1.1rem; color:var(--ro-navy); }
 .ro-te-stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:12px; }
 .ro-te-stat__label { font-size:12px; }

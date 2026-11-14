@@ -26,6 +26,7 @@ async function main() {
   await updatePackGoalProgress(manager, { id: goalId, currentValue: 500, complete: true });
 
   const employeeGoals = await packGoalsEmployeeView(groomer);
+  assert.equal(employeeGoals.ready, true);
   assert.equal(employeeGoals.active.length, 0);
   assert.ok(employeeGoals.completed.some((g) => g.id === goalId));
 
@@ -41,6 +42,7 @@ async function main() {
   await publishVoiceSurvey(manager, { id: surveyId });
   assert.equal(db.tables.team_engagement_voice_surveys[0]?.min_aggregate_responses, 1);
   const catalog = await employeeVoiceCatalog(groomer);
+  assert.equal(catalog.ready, true);
   assert.ok(catalog.items.some((s) => s.id === surveyId));
   await submitVoiceSurvey(groomer, { surveyId, answers: { [catalog.items[0].questions[0].id]: 4 } });
 
