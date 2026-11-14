@@ -135,12 +135,10 @@ function Avatar({ name, url, size = 40 }: { name: string; url: string | null; si
 
 function BarkOutCard({
   item,
-  onReact,
-  onReport
+  onReact
 }: {
   item: BarkOutItem;
   onReact: (id: string, reaction: BarkOutReaction, add: boolean) => void;
-  onReport?: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [comments, setComments] = useState<CommentItem[] | null>(null);
@@ -210,11 +208,6 @@ function BarkOutCard({
           );
         })}
       </div>
-      {onReport ? (
-        <button type="button" className="pack-btn pack-btn--ghost" style={{ marginTop: 8, fontSize: 12 }} onClick={() => onReport(item.id)}>
-          Report concern
-        </button>
-      ) : null}
       <div className="pack-comments">
         <button type="button" className="pack-comments__toggle" onClick={() => void toggleComments()}>
           {open ? "Hide" : "View"} {count > 0 ? `${count} comment${count === 1 ? "" : "s"}` : "comments"}
@@ -451,18 +444,6 @@ export default function PackExperience() {
       body: JSON.stringify({ action, id, reaction })
     });
     await Promise.all([loadPack(), section === "bark_outs" ? loadFeed() : Promise.resolve()]);
-  }
-
-  async function reportBarkOut(id: string) {
-    const reason = window.prompt("Briefly tell moderators what concerns you about this Bark Out:");
-    if (!reason?.trim()) return;
-    const { ok, body } = await fetchAdminJson("/api/admin/bark-outs", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action: "report_bark_out", id, reason: reason.trim() })
-    });
-    if (!ok) setError((body as { error?: string }).error ?? "Could not send report.");
-    else setError(null);
   }
 
   async function confirmBarkOut(id: string) {
@@ -724,7 +705,7 @@ export default function PackExperience() {
                 </button>
               </div>
             ) : (
-              feedItems.map((item) => <BarkOutCard key={item.id} item={item} onReact={react} onReport={reportBarkOut} />)
+              feedItems.map((item) => <BarkOutCard key={item.id} item={item} onReact={react} />)
             )}
           </section>
 
@@ -890,7 +871,7 @@ export default function PackExperience() {
             ) : (
               <>
                 {feed.map((item) => (
-                  <BarkOutCard key={item.id} item={item} onReact={react} onReport={reportBarkOut} />
+                  <BarkOutCard key={item.id} item={item} onReact={react} />
                 ))}
                 {feed.length < feedTotal ? (
                   <button
@@ -909,14 +890,14 @@ export default function PackExperience() {
             mineReceived.length === 0 ? (
               <SectionEmpty title="No recognition yet" body="When teammates celebrate you, Bark Outs appear here." />
             ) : (
-              mineReceived.map((item) => <BarkOutCard key={item.id} item={item} onReact={react} onReport={reportBarkOut} />)
+              mineReceived.map((item) => <BarkOutCard key={item.id} item={item} onReact={react} />)
             )
           ) : null}
           {barkSubview === "sent" ? (
             mineSentPublished.length === 0 ? (
               <SectionEmpty title="No Bark Outs sent" body="Recognize a teammate to start your giving history." />
             ) : (
-              mineSentPublished.map((item) => <BarkOutCard key={item.id} item={item} onReact={react} onReport={reportBarkOut} />)
+              mineSentPublished.map((item) => <BarkOutCard key={item.id} item={item} onReact={react} />)
             )
           ) : null}
         </section>
