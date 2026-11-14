@@ -28,7 +28,8 @@ export type StaffNotificationSourceTab =
   | "track_incidents"
   | "fitdog_alerts"
   | "vip_auto_book"
-  | "route_generator";
+  | "route_generator"
+  | "management_support";
 
 export type NotificationThreadStatus =
   | "open"
@@ -58,6 +59,8 @@ export type StaffNotification = {
   assigned_to?: string | null;
   category?: string | null;
   updated_at?: string | null;
+  /** When set, a second event with the same key is ignored. */
+  dedupe_key?: string | null;
 };
 
 export type StaffOpsNotificationEvent = {
@@ -76,6 +79,10 @@ export type StaffOpsNotificationEvent = {
   actor: string | null;
   /** Fan out personal alerts to active Front Desk Coordinators (they use personal inbox only). */
   notifyFrontDeskCoordinators?: boolean;
+  /** Skip a second delivery of the same logical event. */
+  dedupeKey?: string | null;
+  /** Alert management, admin, and super admin only. */
+  adminPoolOnly?: boolean;
 };
 
 const MAX_NOTIFICATIONS = 400;
@@ -239,11 +246,21 @@ function buildNotification(event: StaffOpsNotificationEvent, target: StaffNotifi
     source_tab: event.sourceTab,
     read_by: [],
     created_by: event.actor,
-    created_at: nowIso()
+    created_at: nowIso(),
+    dedupe_key: event.dedupeKey ?? null
   };
 }
 
+export function hasNotificationDedupeKey(
+  notifications: Array<{ dedupe_key?: string | null }>,
+  dedupeKey?: string | null
+) {
+  if (!dedupeKey) return false;
+  return notifications.some((notification) => notification.dedupe_key === dedupeKey);
+}
+
 export function dispatchStaffOpsNotifications(state: StaffOpsState, event: StaffOpsNotificationEvent): StaffOpsState {
+  if (hasNotificationDedupeKey(state.notifications ?? [], event.dedupeKey)) return state;
   const staffNames = state.staff_directory.filter((member) => member.status === "Active").map((member) => member.name);
   const created: StaffNotification[] = [];
   const isCrossover = event.sourceTab === "crossover_communication";
@@ -269,7 +286,7 @@ export function dispatchStaffOpsNotifications(state: StaffOpsState, event: Staff
     created.push(buildNotification(event, { kind: "staff_name", name }, "mention"));
   }
 
-  if (!isCrossover || shouldAlert) {
+  if (!event.adminPoolOnly && (!isCrossover || shouldAlert)) {
     created.push(buildNotification(event, { kind: "coordinator_pool" }, shouldAlert ? "escalation" : baseType));
   }
 
@@ -307,7 +324,12 @@ export function appendStaffEmailNotification(
   event: StaffOpsNotificationEvent,
   email: string
 ): StaffOpsState {
-  const notification = buildNotification(event, { kind: "staff_email", email: email.trim().toLowerCase() }, "update");
+  if (hasNotificationDedupeKey(state.notifications ?? [], event.dedupeKey)) return state;
+  const notification = buildNotification(
+    event,
+    { kind: "staff_email", email: email.trim().toLowerCase() },
+    event.eventType === "reply" ? "reply" : "update"
+  );
   return {
     ...state,
     notifications: [notification, ...(state.notifications ?? [])].slice(0, MAX_NOTIFICATIONS)

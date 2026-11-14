@@ -304,7 +304,11 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   media_library: "Browse all uploaded photos and videos in the RuffOps cloud archive.",
   write_ups: "Submit and review your own write-up forms.",
   write_up_review: "Review all submitted employee write-ups.",
-  complaint_review: "Review groomer, trainer, and staff complaints.",
+  complaint_review: "Review every filed complaint and request, respond to the employee, and track it to resolution.",
+  ms_groomer_complaints: "Review filed complaints, acknowledge them, respond to the employee, and track them to resolution.",
+  ms_groomer_requests: "Review filed requests, acknowledge them, respond to the employee, and track them to resolution.",
+  ms_trainer_complaints: "Review filed complaints, acknowledge them, respond to the employee, and track them to resolution.",
+  ms_trainer_requests: "Review filed requests, acknowledge them, respond to the employee, and track them to resolution.",
   hr_pip: "Supportive growth plans with AI coaching, California-aware documentation, and manager check-ins.",
   remote_cast: "Control lobby and staff whiteboards on building displays from anywhere."
 };

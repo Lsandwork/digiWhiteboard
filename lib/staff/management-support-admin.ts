@@ -4,8 +4,6 @@ import type {
   ManagementReport,
   ManagementReportType,
   SupportAdminStatus,
-  SupportAuditEntry,
-  SupportComment,
   SupportDepartment,
   SupportPriority
 } from "@/lib/staff/management-reports";
@@ -16,6 +14,16 @@ import {
 } from "@/lib/staff/management-reports";
 import { dispatchStaffOpsNotificationEvent, listStaffOps, dispatchPersonalStaffEmailNotification } from "@/lib/staff/admin-ops";
 import { caseDisplayTitle, caseSubjectLine, effectiveCategory } from "@/lib/staff/support-case-display";
+import {
+  canonicalSupportStatus,
+  isOpenWorkflowStatus,
+  managementAlertForNewSubmission,
+  planSupportAction,
+  redactSupportForSubmitter,
+  type SupportNotifyPlan
+} from "@/lib/staff/support-workflow";
+
+export { redactSupportForSubmitter };
 
 export type SupportInboxFilter = {
   query?: string;
@@ -70,11 +78,6 @@ const STAFF_SUPPORT_TYPES: ManagementReportType[] = [
   "team_lead_request"
 ];
 
-function newId(prefix: string) {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
-  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
 function detailsText(report: ManagementReport) {
   return report.groomer_submission_details?.description ?? report.summary ?? "";
 }
@@ -97,7 +100,7 @@ export function mapReportToInboxRow(report: ManagementReport): SupportInboxRow {
     category: normalized.category ?? effectiveCategory(normalized),
     subject: subjectForReport(normalized),
     priority: normalized.priority ?? "Normal",
-    status: normalized.admin_status ?? "Submitted",
+    status: canonicalSupportStatus(normalized.admin_status ?? normalized.status),
     assigned_to: normalized.assigned_to ?? null,
     last_updated: normalized.updated_at,
     report_type: normalized.report_type,
@@ -119,25 +122,25 @@ function isClosedThisWeek(iso: string | null | undefined) {
 }
 
 function isOpenStatus(status: SupportAdminStatus) {
-  return status !== "Closed" && status !== "Resolved";
+  return isOpenWorkflowStatus(canonicalSupportStatus(status));
 }
 
 export function computeSupportHubStats(rows: SupportInboxRow[]): SupportHubStats {
   return {
-    new_complaints: rows.filter((row) => row.item_type === "Complaint" && row.status === "Submitted").length,
-    new_requests: rows.filter((row) => row.item_type === "Request" && row.status === "Submitted").length,
-    needs_review: rows.filter((row) => row.status === "Submitted" || row.status === "In Review" || row.status === "Needs More Info").length,
-    urgent_items: rows.filter((row) => row.priority === "Urgent" || row.priority === "High").length,
+    new_complaints: rows.filter((row) => row.item_type === "Complaint" && row.status === "New").length,
+    new_requests: rows.filter((row) => row.item_type === "Request" && row.status === "New").length,
+    needs_review: rows.filter((row) => row.status === "New" || row.status === "Acknowledged" || row.status === "In Progress").length,
+    urgent_items: rows.filter((row) => (row.priority === "Urgent" || row.priority === "High") && isOpenStatus(row.status)).length,
     open_items: rows.filter((row) => isOpenStatus(row.status)).length,
-    closed_this_week: rows.filter((row) => row.status === "Closed" && isClosedThisWeek(row.report.closed_at ?? row.last_updated)).length
+    closed_this_week: rows.filter((row) => (row.status === "Resolved" || row.status === "Closed") && isClosedThisWeek(row.report.resolved_at ?? row.report.closed_at ?? row.last_updated)).length
   };
 }
 
 function matchesCard(row: SupportInboxRow, card?: string) {
   if (!card) return true;
-  if (card === "new_complaints") return row.item_type === "Complaint" && row.status === "Submitted";
-  if (card === "new_requests") return row.item_type === "Request" && row.status === "Submitted";
-  if (card === "needs_review") return row.status === "Submitted" || row.status === "In Review" || row.status === "Needs More Info";
+  if (card === "new_complaints") return row.item_type === "Complaint" && row.status === "New";
+  if (card === "new_requests") return row.item_type === "Request" && row.status === "New";
+  if (card === "needs_review") return row.status === "New" || row.status === "Acknowledged" || row.status === "In Progress";
   if (card === "urgent_items") return row.priority === "Urgent" || row.priority === "High";
   if (card === "open_items") return isOpenStatus(row.status);
   if (card === "closed_this_week") return row.status === "Closed" && isClosedThisWeek(row.report.closed_at ?? row.last_updated);
@@ -158,7 +161,7 @@ export function filterSupportInbox(rows: SupportInboxRow[], filters: SupportInbo
     if (filters.department && row.department !== filters.department) return false;
     if (filters.item_type && row.item_type.toLowerCase() !== filters.item_type.toLowerCase()) return false;
     if (filters.priority && row.priority !== filters.priority) return false;
-    if (filters.status && row.status !== filters.status) return false;
+    if (filters.status && canonicalSupportStatus(row.status) !== canonicalSupportStatus(filters.status)) return false;
     if (filters.assigned_to && (row.assigned_to ?? "") !== filters.assigned_to) return false;
     if (filters.submitted_by && !row.submitted_by.toLowerCase().includes(filters.submitted_by.toLowerCase())) return false;
     if (filters.date_from && new Date(row.date_submitted) < new Date(filters.date_from)) return false;
@@ -189,98 +192,80 @@ export async function loadStaffSupportInbox(supabase: SupabaseClient, filters: S
   return { stats, items, allItems: rows };
 }
 
-function appendAudit(
-  report: ManagementReport,
-  action: string,
-  previousValue: string | null,
-  newValue: string | null,
-  actor: string
-): SupportAuditEntry[] {
-  const entry: SupportAuditEntry = {
-    id: newId("audit"),
-    action,
-    previous_value: previousValue,
-    new_value: newValue,
-    performed_by: actor,
-    created_at: new Date().toISOString()
-  };
-  return [...(report.audit_history ?? []), entry];
-}
+export class SupportNotificationError extends Error {
+  report: ManagementReport;
 
-function responseAlertTitle(report: ManagementReport) {
-  if (report.report_type === "employee_write_up") return "Update on your write-up request";
-  if (report.item_type === "request") return "Response to your request";
-  if (report.item_type === "complaint") return "Response to your complaint";
-  if (report.report_type === "owner_complaint_dog_handler") return "Management replied to your submission";
-  return "Management responded to your submission";
-}
-
-function responseAlertBody(report: ManagementReport, message: string) {
-  const preview = message.slice(0, 200);
-  if (report.item_type === "request") {
-    return `There's a new response on your request. Open it to view and reply.\n\n${preview}`;
+  constructor(message: string, report: ManagementReport) {
+    super(message);
+    this.name = "SupportNotificationError";
+    this.report = report;
   }
-  if (report.item_type === "complaint") {
-    return `Management responded to your complaint. Open it to review the update.\n\n${preview}`;
-  }
-  if (report.report_type === "employee_write_up") {
-    return `Your write-up request has an update from management.\n\n${preview}`;
-  }
-  return `There's a new response on your submission. Open it to view and reply.\n\n${preview}`;
 }
 
-function statusAlertTitle(report: ManagementReport, status: string) {
-  if (report.report_type === "employee_write_up") return "Update on your write-up request";
-  if (report.item_type === "request") return "Update on your request";
-  if (report.item_type === "complaint") return "Update on your complaint";
-  return "Update on your submission";
+async function deliverNotification(run: () => Promise<unknown>) {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await run();
+      return true;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  console.error("Support notification failed", lastError);
+  return false;
 }
 
-async function notifySubmitter(
+async function sendSupportNotice(
   supabase: SupabaseClient,
   report: ManagementReport,
-  title: string,
-  body: string,
+  notice: SupportNotifyPlan,
   actor: string
 ) {
-  const email = report.created_by;
-  if (!email || !email.includes("@")) return;
-  await dispatchPersonalStaffEmailNotification(
-    supabase,
-    {
-      eventType: "reply",
-      sourceTable: "management_reports",
-      sourceId: report.id,
-      sourceTab: "push_notices",
-      title,
-      body,
-      priority: report.priority === "Urgent" ? "Urgent" : report.priority === "High" ? "High" : "Normal",
-      actor
-    },
-    email
-  );
-}
-
-async function notifyManagementOnSubmitterReply(
-  supabase: SupabaseClient,
-  report: ManagementReport,
-  body: string,
-  actor: string
-) {
-  const itemLabel = report.item_type === "request" ? "request" : report.item_type === "complaint" ? "complaint" : "submission";
-  await dispatchStaffOpsNotificationEvent(supabase, {
-    eventType: "reply",
+  const email = report.created_by?.trim().toLowerCase() ?? "";
+  if (notice.audience === "submitter" && !email.includes("@")) {
+    throw new SupportNotificationError("The submission was saved, but the employee has no email address for a notification.", report);
+  }
+  const event = {
+    eventType: notice.audience === "management" ? ("auto_issue" as const) : ("reply" as const),
     sourceTable: "management_reports",
     sourceId: report.id,
-    sourceTab: "push_notices",
-    title: `New reply on your ${itemLabel}: ${report.title}`,
-    body: `The submitter replied. Open Notifications to review and respond.\n\n${body.slice(0, 200)}`,
-    priority: report.priority === "Urgent" ? "Urgent" : report.priority === "High" ? "High" : "Normal",
-    urgent: report.priority === "Urgent",
-    needsManagementReview: true,
-    assignedTo: report.assigned_to ?? undefined,
-    actor
-  });
+    sourceTab: "management_support" as const,
+    title: notice.title,
+    body: notice.body,
+    priority: notice.priority,
+    urgent: notice.urgent,
+    needsManagementReview: notice.audience === "management",
+    actor,
+    dedupeKey: notice.dedupeKey,
+    adminPoolOnly: notice.audience === "management"
+  };
+  const delivered = await deliverNotification(() =>
+    notice.audience === "management"
+      ? dispatchStaffOpsNotificationEvent(supabase, event)
+      : dispatchPersonalStaffEmailNotification(supabase, event, email)
+  );
+  if (!delivered) {
+    throw new SupportNotificationError(
+      notice.audience === "management"
+        ? "The submission was saved, but the management alert did not send. Use Retry alert."
+        : "The update was saved, but the employee notification did not send. Use Resend notice.",
+      report
+    );
+  }
+  if (notice.audience === "management" && notice.dedupeKey.endsWith(":created")) {
+    await updateManagementReport(supabase, report.id, { management_notified_at: new Date().toISOString() });
+  }
+}
+
+export async function alertManagersOfNewSubmission(
+  supabase: SupabaseClient,
+  report: ManagementReport,
+  actor: string
+) {
+  const notice = managementAlertForNewSubmission(report, actor);
+  await sendSupportNotice(supabase, report, notice, actor);
+  return { ...(await getManagementReportById(supabase, report.id))! };
 }
 
 export async function applySubmitterSupportReply(
@@ -303,160 +288,22 @@ export async function applySupportItemAction(
   const report = await getManagementReportById(supabase, id);
   if (!report) throw new Error("Support item not found.");
 
-  const now = new Date().toISOString();
-  let patch: Partial<ManagementReport> = { updated_at: now };
-  let notifyTitle: string | null = null;
-  let notifyBody: string | null = null;
-
-  if (action === "assign") {
-    const assigned = String(input.assigned_to ?? "").trim();
-    patch = {
-      ...patch,
-      assigned_to: assigned || null,
-      assigned_to_user_id: String(input.assigned_to_user_id ?? "") || null,
-      admin_status: "In Review",
-      audit_history: appendAudit(report, "assign", report.assigned_to ?? null, assigned || null, actor)
-    };
-  } else if (action === "acknowledge") {
-    patch = {
-      ...patch,
-      acknowledged_at: report.acknowledged_at ?? now,
-      acknowledged_by: report.acknowledged_by ?? actor,
-      admin_status: report.admin_status === "Submitted" ? "In Review" : report.admin_status,
-      audit_history: appendAudit(report, "acknowledge", null, actor, actor)
-    };
-  } else if (action === "escalate") {
-    const destination = String(input.escalation_destination ?? "HR / Owner").trim() || "HR / Owner";
-    patch = {
-      ...patch,
-      escalated_at: now,
-      escalated_by: actor,
-      escalation_destination: destination,
-      priority: "Urgent",
-      admin_status: "In Review",
-      audit_history: appendAudit(report, "escalate", report.escalation_destination ?? null, destination, actor)
-    };
-  } else if (action === "change_status") {
-    const status = String(input.status ?? "") as SupportAdminStatus;
-    patch = {
-      ...patch,
-      admin_status: status,
-      status: status === "Closed" ? "Closed" : status === "Resolved" ? "Reviewed" : "Needs Review",
-      closed_at: status === "Closed" ? now : report.closed_at,
-      reviewed_by: actor,
-      reviewed_at: now,
-      audit_history: appendAudit(report, "change_status", report.admin_status ?? null, status, actor)
-    };
-    notifyTitle = statusAlertTitle(report, status);
-    notifyBody = `Your ${report.item_type ?? "submission"} status was updated to ${status}. Open Notifications to view details.`;
-  } else if (action === "add_internal_note") {
-    const body = String(input.body ?? "").trim();
-    if (!body) throw new Error("Internal note is required.");
-    const comment: SupportComment = {
-      id: newId("comment"),
-      user_id: String(input.user_id ?? "") || null,
-      user_name: actor,
-      user_role: String(input.user_role ?? "admin"),
-      body,
-      visibility: "internal",
-      created_at: now
-    };
-    patch = {
-      ...patch,
-      comments: [...(report.comments ?? []), comment],
-      audit_history: appendAudit(report, "add_internal_note", null, body.slice(0, 120), actor)
-    };
-  } else if (action === "add_response") {
-    const body = String(input.body ?? "").trim();
-    if (!body) throw new Error("Response is required.");
-    const comment: SupportComment = {
-      id: newId("comment"),
-      user_id: String(input.user_id ?? "") || null,
-      user_name: actor,
-      user_role: String(input.user_role ?? "admin"),
-      body,
-      visibility: "visible_to_submitter",
-      created_at: now
-    };
-    const nextStatus: SupportAdminStatus =
-      input.mark_resolved === true ? "Resolved" : "In Review";
-    patch = {
-      ...patch,
-      management_response: body,
-      comments: [...(report.comments ?? []), comment],
-      admin_status: input.mark_resolved === true ? "Resolved" : nextStatus,
-      status: input.mark_resolved === true ? "Reviewed" : report.status,
-      reviewed_by: actor,
-      reviewed_at: now,
-      audit_history: appendAudit(report, "add_response", null, body.slice(0, 120), actor)
-    };
-    notifyTitle = responseAlertTitle(report);
-    notifyBody = responseAlertBody(report, body);
-  } else if (action === "add_submitter_reply") {
-    const body = String(input.body ?? "").trim();
-    if (!body) throw new Error("Response is required.");
-    const submitterEmail = report.created_by?.trim().toLowerCase();
-    const actorEmail = actor.trim().toLowerCase();
-    if (!submitterEmail || submitterEmail !== actorEmail) {
-      throw new Error("You can only reply to your own submissions.");
-    }
-    const comment: SupportComment = {
-      id: newId("comment"),
-      user_id: String(input.user_id ?? "") || null,
-      user_name: report.submitted_by_name ?? actor,
-      user_role: String(input.user_role ?? report.submitted_by_role ?? "staff"),
-      body,
-      visibility: "visible_to_submitter",
-      created_at: now
-    };
-    patch = {
-      ...patch,
-      comments: [...(report.comments ?? []), comment],
-      admin_status: "Needs More Info",
-      status: "Needs Review",
-      audit_history: appendAudit(report, "add_submitter_reply", null, body.slice(0, 120), actor)
-    };
-    await notifyManagementOnSubmitterReply(supabase, report, body, actor);
-  } else if (action === "close") {
-    patch = {
-      ...patch,
-      admin_status: "Closed",
-      status: "Closed",
-      closed_at: now,
-      reviewed_by: actor,
-      reviewed_at: now,
-      audit_history: appendAudit(report, "close", report.admin_status ?? null, "Closed", actor)
-    };
-    notifyTitle = "Support item closed";
-    notifyBody = `Your ${report.item_type ?? "submission"} has been closed.`;
-  } else if (action === "reopen") {
-    patch = {
-      ...patch,
-      admin_status: "In Review",
-      status: "Needs Review",
-      closed_at: null,
-      audit_history: appendAudit(report, "reopen", report.admin_status ?? null, "In Review", actor)
-    };
-    notifyTitle = "Support item reopened";
-    notifyBody = `Your ${report.item_type ?? "submission"} has been reopened for review.`;
-  } else if (action === "mark_reviewed") {
-    patch = {
-      ...patch,
-      admin_status: "Resolved",
-      status: "Reviewed",
-      reviewed_by: actor,
-      reviewed_at: now,
-      audit_history: appendAudit(report, "mark_reviewed", report.admin_status ?? null, "Resolved", actor)
-    };
-    notifyTitle = "Support item reviewed";
-    notifyBody = `Your ${report.item_type ?? "submission"} has been marked reviewed.`;
-  } else {
-    throw new Error("Unsupported action.");
+  const plan = planSupportAction(report, action, input, actor);
+  let updated = report;
+  if (!plan.unchanged && Object.keys(plan.patch).length) {
+    updated = await updateManagementReport(supabase, id, plan.patch);
   }
-
-  const updated = await updateManagementReport(supabase, id, patch);
-  if (notifyTitle && notifyBody) {
-    await notifySubmitter(supabase, updated, notifyTitle, notifyBody, actor);
+  if (plan.notify) {
+    try {
+      await sendSupportNotice(supabase, updated, plan.notify, actor);
+    } catch (error) {
+      if (error instanceof SupportNotificationError) {
+        throw new SupportNotificationError(error.message, updated);
+      }
+      throw error;
+    }
+    const refreshed = await getManagementReportById(supabase, id);
+    if (refreshed) updated = refreshed;
   }
   return updated;
 }

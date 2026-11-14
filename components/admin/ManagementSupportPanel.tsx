@@ -9,6 +9,7 @@ import { EMPTY_WARNING_NOTICE_FORM, WarningNoticeForm } from "@/components/admin
 import type { WarningNoticeFormData } from "@/lib/staff/warning-notice-constants";
 import type { ManagementReport } from "@/lib/staff/management-reports";
 import { caseDisplayTitle, SUPPORT_COMPLAINT_CATEGORIES, SUPPORT_REQUEST_CATEGORIES } from "@/lib/staff/support-case-display";
+import { canonicalSupportStatus, formatSupportWhen } from "@/lib/staff/support-workflow";
 import { useManagementSupportFetch } from "@/hooks/useManagementSupportFetch";
 
 type ManagementSupportSubTab = "submit" | "review" | "filed";
@@ -51,14 +52,42 @@ function statusClass(status: ManagementReport["status"]) {
   return "crossover-badge";
 }
 
-function SubmissionReviewCard({ report }: { report: ManagementReport }) {
+function SubmissionReviewCard({ report, onUpdated }: { report: ManagementReport; onUpdated?: () => void }) {
+  const { showToast } = useToast();
+  const [reply, setReply] = useState("");
+  const [busy, setBusy] = useState(false);
   const details = report.write_up_details;
   const groomerDetails = report.groomer_submission_details;
+  const workflow = canonicalSupportStatus(report.admin_status ?? report.status);
+  const canReply = report.item_type === "complaint" || report.item_type === "request" || report.report_type.endsWith("_complaint") || report.report_type.endsWith("_request");
+  const visibleThread = (report.comments ?? []).filter((comment) => comment.visibility === "visible_to_submitter");
+
+  async function sendReply() {
+    const body = reply.trim();
+    if (!body) return;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/admin/management-support", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "reply_to_submission", id: report.id, body })
+      });
+      const payload = await readResponseJson(response);
+      if (!response.ok) throw new Error(payload.error ?? "Unable to send your reply.");
+      setReply("");
+      showToast(payload.warning || "Reply sent to management.", payload.warning ? "error" : "success");
+      onUpdated?.();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to send your reply.", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <article className="push-notice-management-report">
       <div className="flex flex-wrap items-center gap-2">
-        <span className={statusClass(report.status)}>{report.status.toUpperCase()}</span>
+        <span className={statusClass(report.status)}>{workflow.toUpperCase()}</span>
         <span className="text-xs text-admin-muted">{formatDateTime(report.created_at)}</span>
       </div>
       <h4 className="mt-2 font-black text-white">{caseDisplayTitle(report)}</h4>
@@ -85,13 +114,24 @@ function SubmissionReviewCard({ report }: { report: ManagementReport }) {
               <span className="font-bold text-white">Management response:</span> {report.management_response}
             </p>
           ) : null}
-          {(report.comments ?? [])
-            .filter((comment) => comment.visibility === "visible_to_submitter")
-            .map((comment) => (
-              <p key={comment.id} className="rounded-lg border border-admin-border p-3">
-                <span className="font-bold text-white">{comment.user_name}:</span> {comment.body}
-              </p>
-            ))}
+          {visibleThread.map((comment) => (
+            <p key={comment.id} className="rounded-lg border border-admin-border p-3">
+              <span className="font-bold text-white">{comment.user_name}:</span> {comment.body}
+              <span className="mt-1 block text-xs">{formatSupportWhen(comment.created_at)}</span>
+            </p>
+          ))}
+          {report.acknowledged_by ? <p>Acknowledged by {report.acknowledged_by}{report.acknowledged_at ? ` · ${formatSupportWhen(report.acknowledged_at)}` : ""}</p> : null}
+          {report.in_progress_by ? <p>In progress with {report.in_progress_by}{report.in_progress_at ? ` · ${formatSupportWhen(report.in_progress_at)}` : ""}</p> : null}
+          {report.resolved_by ? <p>Resolved by {report.resolved_by}{report.resolved_at ? ` · ${formatSupportWhen(report.resolved_at)}` : ""}</p> : null}
+          {canReply && workflow !== "Closed" ? (
+            <div className="grid gap-2 pt-2">
+              <label className="admin-label" htmlFor={`reply-${report.id}`}>Reply to management</label>
+              <textarea id={`reply-${report.id}`} className="crossover-input min-h-24" value={reply} disabled={busy} onChange={(event) => setReply(event.target.value)} />
+              <button type="button" className="crossover-btn crossover-btn--primary w-fit" disabled={busy || !reply.trim()} onClick={() => void sendReply()}>
+                {busy ? "Sending…" : "Send reply"}
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : (
         <p className="mt-2 text-sm text-admin-muted">{report.summary}</p>
@@ -225,10 +265,11 @@ function GroomerManagementSupportPanel({ showRequests = true }: { showRequests?:
       const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to submit form.");
       showToast(
-        action === "create_groomer_complaint"
-          ? "Complaint submitted to admin and management for review."
-          : "Request submitted to admin and management for review.",
-        "success"
+        body.warning ||
+          (action === "create_groomer_complaint"
+            ? "Complaint submitted. Management has been alerted."
+            : "Request submitted. Management has been alerted."),
+        body.warning ? "error" : "success"
       );
       setSubTab("filed");
       await load();
@@ -331,7 +372,7 @@ function GroomerManagementSupportPanel({ showRequests = true }: { showRequests?:
             <span className="crossover-link-btn">{filedItems.length} total</span>
           </div>
           <div className="grid gap-3">
-            {filedItems.length ? filedItems.map((report) => <SubmissionReviewCard key={report.id} report={report} />) : (
+            {filedItems.length ? filedItems.map((report) => <SubmissionReviewCard key={report.id} report={report} onUpdated={() => void load()} />) : (
               <p className="text-sm text-admin-muted">
                 {section === "complaint"
                   ? "No complaints filed yet. Use File Complaint to send one to admin and management."
@@ -381,10 +422,11 @@ function TrainerManagementSupportPanel() {
       const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to submit form.");
       showToast(
-        action === "create_trainer_complaint"
-          ? "Complaint submitted to admin and management for review."
-          : "Request submitted to admin and management for review.",
-        "success"
+        body.warning ||
+          (action === "create_trainer_complaint"
+            ? "Complaint submitted. Management has been alerted."
+            : "Request submitted. Management has been alerted."),
+        body.warning ? "error" : "success"
       );
       setSubTab("filed");
       await load();
@@ -457,7 +499,7 @@ function TrainerManagementSupportPanel() {
             <span className="crossover-link-btn">{filedItems.length} total</span>
           </div>
           <div className="grid gap-3">
-            {filedItems.length ? filedItems.map((report) => <SubmissionReviewCard key={report.id} report={report} />) : (
+            {filedItems.length ? filedItems.map((report) => <SubmissionReviewCard key={report.id} report={report} onUpdated={() => void load()} />) : (
               <p className="text-sm text-admin-muted">
                 {section === "complaint"
                   ? "No complaints filed yet. Use File Complaint to send one to admin and management."
@@ -725,7 +767,7 @@ function TeamLeadManagementSupportPanel({
             <section className="crossover-card p-5">
               <div className="grid gap-3">
                 {complaints.length ? (
-                  complaints.map((report) => <SubmissionReviewCard key={report.id} report={report} />)
+                  complaints.map((report) => <SubmissionReviewCard key={report.id} report={report} onUpdated={() => void loadComplaints()} />)
                 ) : (
                   <p className="text-sm text-admin-muted">No complaints filed yet.</p>
                 )}
@@ -775,7 +817,7 @@ function TeamLeadManagementSupportPanel({
               </div>
               <div className="grid gap-3">
                 {requests.length ? (
-                  requests.map((report) => <SubmissionReviewCard key={report.id} report={report} />)
+                  requests.map((report) => <SubmissionReviewCard key={report.id} report={report} onUpdated={() => void loadRequests()} />)
                 ) : (
                   <p className="text-sm text-admin-muted">
                     No requests filed yet. Use File Request to send one to admin and management.

@@ -117,8 +117,11 @@ export function inferDisplayType(notification: StaffNotification): NotificationD
 
 export function mapSupportStatusToDisplay(status?: SupportAdminStatus | null): NotificationDisplayStatus {
   switch (status) {
+    case "New":
     case "Submitted":
       return "Open";
+    case "Acknowledged":
+    case "In Progress":
     case "In Review":
       return "In Review";
     case "Needs More Info":
@@ -205,8 +208,8 @@ function reportNeedsReply(report: ManagementReport, session: NotificationSession
   const visibleComments = (report.comments ?? []).filter((c) => c.visibility === "visible_to_submitter");
   const lastVisible = visibleComments.at(-1);
   if (canReview) {
-    if (status === "Submitted") return true;
-    if (lastVisible && lastVisible.user_role !== "admin" && lastVisible.user_role !== "management") return true;
+    if (status === "Submitted" || status === "New" || status === "Acknowledged") return true;
+    if (lastVisible && lastVisible.user_role !== "admin" && lastVisible.user_role !== "management" && lastVisible.user_role !== "owner_admin" && lastVisible.user_role !== "manager_admin") return true;
     return status === "Needs More Info";
   }
   if (isSubmitter) {

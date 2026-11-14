@@ -45,6 +45,7 @@ function isOpenStatus(status: string | undefined) {
 function severityFromReport(report: ManagementReport): AlertSeverity {
   if (report.priority === "Urgent") return report.escalated_at ? "Critical" : "Urgent";
   if (report.priority === "High") return "High";
+  if (report.priority === "Low") return "Low";
   return "Medium";
 }
 
