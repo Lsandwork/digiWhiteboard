@@ -29,6 +29,8 @@ type MappedRow = {
   phone: string | null;
   notes: string | null;
   comments: string | null;
+  pickupInstructions: string | null;
+  dropoffInstructions: string | null;
   date: string | null;
 };
 
@@ -73,7 +75,9 @@ function mapCsvRows(text: string): MappedRow[] {
   const zipH = pickHeader(headers, [/^zip$/, /postal/]);
   const phoneH = pickHeader(headers, [/phone/, /mobile/, /cell/]);
   const notesH = pickHeader(headers, [/^notes$/, /reservation note/, /client note/]);
-  const commentsH = pickHeader(headers, [/comment/, /instruction/, /pickup instruction/]);
+  const dropoffH = pickHeader(headers, [/drop off instruction/, /dropoff instruction/]);
+  const pickupH = pickHeader(headers, [/pick up instruction/, /pickup instruction/]);
+  const commentsH = pickHeader(headers, [/comment/, /special instruction/]);
   const dateH = pickHeader(headers, [/^date$/, /start date/, /reservation date/]);
 
   if (!dogH) return [];
@@ -105,6 +109,8 @@ function mapCsvRows(text: string): MappedRow[] {
         phone: phoneH ? String(row[phoneH] ?? "").trim() || null : null,
         notes: notesH ? String(row[notesH] ?? "").trim() || null : null,
         comments: commentsH ? String(row[commentsH] ?? "").trim() || null : null,
+        pickupInstructions: pickupH ? String(row[pickupH] ?? "").trim() || null : null,
+        dropoffInstructions: dropoffH ? String(row[dropoffH] ?? "").trim() || null : null,
         date: dateH ? String(row[dateH] ?? "").trim() || null : null
       };
     })
@@ -128,6 +134,24 @@ function mapPdfTable(text: string): MappedRow[] {
   return mapCsvRows(csvish);
 }
 
+/** "12 Oak St, Los Angeles, CA 90001" when City and ZIP were not separate columns. */
+function splitCombinedAddress(address: string | null): {
+  street: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+} | null {
+  if (!address) return null;
+  const match = address.trim().match(/^(.*?),\s*([^,]+),\s*([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+  if (!match) return null;
+  return {
+    street: match[1]!.trim() || null,
+    city: match[2]!.trim() || null,
+    state: match[3]!.trim().toUpperCase(),
+    zip: match[4]!.trim()
+  };
+}
+
 function splitOwner(name: string): { first: string | null; last: string | null } {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return { first: null, last: null };
@@ -139,11 +163,16 @@ function toReservation(row: MappedRow, date: string, index: number): GingrReserv
   const owner = splitOwner(row.ownerName);
   const first = row.ownerFirst || owner.first;
   const last = row.ownerLast || owner.last;
-  const street = row.street || row.address;
+  const combined = !row.city && !row.zip ? splitCombinedAddress(row.address || row.street) : null;
+  const street = combined?.street || row.street || row.address;
+  const city = row.city || combined?.city || null;
+  const state = row.state || combined?.state || null;
+  const zip = row.zip || combined?.zip || null;
   const serviceNames = Array.from(
     new Set([row.reservationType, ...row.services, ...row.addons].filter((value): value is string => Boolean(value)))
   );
   if (!serviceNames.length) serviceNames.push("Daycare Full Day");
+  const scheduledAt = row.date && /T\d{2}:/.test(row.date) ? row.date : `${date}T09:00:00`;
 
   return {
     id: row.reservationId || `upload-${date}-${index + 1}`,
@@ -153,21 +182,25 @@ function toReservation(row: MappedRow, date: string, index: number): GingrReserv
     a_o_last_name: last || undefined,
     owner_name: row.ownerName || [first, last].filter(Boolean).join(" ") || undefined,
     type: row.reservationType || serviceNames[0],
-    start_date: row.date || `${date}T09:00:00`,
+    start_date: scheduledAt,
     end_date: `${date}T18:00:00`,
-    services: serviceNames.map((name) => ({ name, scheduled_at: `${date}T09:00:00` })),
+    check_in_date: scheduledAt,
+    check_out_date: `${date}T18:00:00`,
+    services: serviceNames.map((name) => ({ name, scheduled_at: scheduledAt })),
     addons: row.addons.map((name) => ({ name })),
     notes: row.notes ? { reservation_notes: row.notes } : undefined,
     r_comments: row.comments || undefined,
+    pickup_instructions: row.pickupInstructions || undefined,
+    drop_off_instructions: row.dropoffInstructions || undefined,
     phone: row.phone || undefined,
     owner: {
       first_name: first || undefined,
       last_name: last || undefined,
       phone: row.phone || undefined,
       address_1: street || undefined,
-      city: row.city || undefined,
-      state: row.state || undefined,
-      postal: row.zip || undefined
+      city: city || undefined,
+      state: state || undefined,
+      postal: zip || undefined
     }
   };
 }

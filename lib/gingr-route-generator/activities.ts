@@ -21,6 +21,7 @@ export type GingrRouteActivityId =
   | "trainer_led_hike"
   | "urban_recall"
   | "sport_sign_ups"
+  | "evaluation"
   | "trainer_activity"
   | "club"
   | "taxi";
@@ -81,7 +82,7 @@ export const GINGR_ROUTE_ACTIVITIES: GingrRouteActivityMeta[] = [
     accent: "#DB2777",
     accentSoft: "#FCE7F3",
     accentText: "#9D174D",
-    aliases: ["cool tricks"]
+    aliases: ["cool tricks", "cool tricks | group training - business only"]
   },
   {
     id: "fun_and_fit_agility",
@@ -90,16 +91,27 @@ export const GINGR_ROUTE_ACTIVITIES: GingrRouteActivityMeta[] = [
     accent: "#EA580C",
     accentSoft: "#FFF1E7",
     accentText: "#C2410C",
-    aliases: ["fun & fit agility", "fun and fit agility", "fun & fit"]
+    aliases: [
+      "fun & fit agility",
+      "fun and fit agility",
+      "fun & fit",
+      "fun & fit agility | group training - business only"
+    ]
   },
   {
     id: "scent_works",
-    label: "Scent Works",
+    label: "Scent Work",
     category: "class",
     accent: "#E11D48",
     accentSoft: "#FFE4E9",
     accentText: "#9F1239",
-    aliases: ["scent works", "scent work", "nose work"]
+    aliases: [
+      "scent works",
+      "scent work",
+      "nose work",
+      "scent work | group training - business only",
+      "scent works | group training - business only"
+    ]
   },
   {
     id: "leash_manners",
@@ -108,7 +120,7 @@ export const GINGR_ROUTE_ACTIVITIES: GingrRouteActivityMeta[] = [
     accent: "#0D9488",
     accentSoft: "#E6FAF7",
     accentText: "#0F766E",
-    aliases: ["leash manners", "leash manner"]
+    aliases: ["leash manners", "leash manner", "leash manners | group training - business only"]
   },
   {
     id: "foundations_and_focus",
@@ -126,7 +138,10 @@ export const GINGR_ROUTE_ACTIVITIES: GingrRouteActivityMeta[] = [
     accent: "#B45309",
     accentSoft: "#FEF3C7",
     accentText: "#92400E",
-    aliases: ["foundational obedience"]
+    aliases: [
+      "foundational obedience",
+      "foundational obedience | group training - business only"
+    ]
   },
   {
     id: "reliable_recall",
@@ -135,7 +150,7 @@ export const GINGR_ROUTE_ACTIVITIES: GingrRouteActivityMeta[] = [
     accent: "#8B5CF6",
     accentSoft: "#F3E8FF",
     accentText: "#6D28D9",
-    aliases: ["reliable recall"]
+    aliases: ["reliable recall", "reliable recall | group training - business only"]
   },
   {
     id: "trail_foundations",
@@ -144,7 +159,7 @@ export const GINGR_ROUTE_ACTIVITIES: GingrRouteActivityMeta[] = [
     accent: "#65A30D",
     accentSoft: "#ECFCCB",
     accentText: "#3F6212",
-    aliases: ["trail foundations"]
+    aliases: ["trail foundations", "trail foundations | group training - business only"]
   },
   {
     id: "trainer_led_hike",
@@ -153,7 +168,7 @@ export const GINGR_ROUTE_ACTIVITIES: GingrRouteActivityMeta[] = [
     accent: "#0F766E",
     accentSoft: "#CCFBF1",
     accentText: "#115E59",
-    aliases: ["trainer led hike", "trainer-led hike"]
+    aliases: ["trainer led hike", "trainer-led hike", "trainer led hike | group training - business only"]
   },
   {
     id: "urban_recall",
@@ -162,11 +177,11 @@ export const GINGR_ROUTE_ACTIVITIES: GingrRouteActivityMeta[] = [
     accent: "#0369A1",
     accentSoft: "#E0F2FE",
     accentText: "#075985",
-    aliases: ["urban recall"]
+    aliases: ["urban recall", "urban recall | group training - business only"]
   },
   {
     id: "sport_sign_ups",
-    label: "Sport Sign Ups",
+    label: "Sports Sign Ups",
     category: "class",
     accent: "#BE185D",
     accentSoft: "#FCE7F3",
@@ -174,13 +189,22 @@ export const GINGR_ROUTE_ACTIVITIES: GingrRouteActivityMeta[] = [
     aliases: ["sport sign ups", "sports sign ups", "sport sign up", "sports sign up"]
   },
   {
-    id: "trainer_activity",
-    label: "Trainer Activity",
+    id: "evaluation",
+    label: "Evaluation",
     category: "class",
     accent: "#475569",
     accentSoft: "#F1F5F9",
     accentText: "#334155",
-    aliases: ["activity with trainer", "trainer activity"]
+    aliases: ["evaluation", "evaluations"]
+  },
+  {
+    id: "trainer_activity",
+    label: "Group Class",
+    category: "class",
+    accent: "#475569",
+    accentSoft: "#F1F5F9",
+    accentText: "#334155",
+    aliases: ["activity with trainer", "trainer activity", "group classes", "group class"]
   },
   {
     id: "club",
@@ -215,6 +239,26 @@ export type GingrSubjectGroupId = "class" | GingrRouteActivityId;
 export function isGingrClassActivity(id: GingrRouteActivityId | null | undefined): boolean {
   if (!id) return false;
   return GINGR_ROUTE_ACTIVITY_BY_ID[id]?.category === "class";
+}
+
+/**
+ * Sports Sign Ups covers the Gingr booking of that name plus the off-site
+ * sports booked through it: Adventure Hikes and Recall at the Beach.
+ * Beach Excursion is the third off-site sport and uses the same appointment options.
+ */
+const SPORT_SIGNUP_ACTIVITY_IDS = new Set<GingrRouteActivityId>([
+  "sport_sign_ups",
+  "adventure_hike",
+  "recall_at_the_beach",
+  "beach_excursion"
+]);
+
+export function isSportSignUpActivity(id: GingrRouteActivityId | null | undefined): boolean {
+  return Boolean(id && SPORT_SIGNUP_ACTIVITY_IDS.has(id));
+}
+
+export function dogHasSportSignUp(activities: GingrRouteActivityId[]): boolean {
+  return activities.some((activityId) => isSportSignUpActivity(activityId));
 }
 
 export function dogHasClassActivity(activities: GingrRouteActivityId[]): boolean {

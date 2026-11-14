@@ -485,6 +485,76 @@ function pacificHour(value: unknown): number | null {
   return Number.isFinite(hour) ? hour : null;
 }
 
+export type GingrVisitKind = "stay_and_play" | "half_day" | "full_day" | "overnight";
+
+/** Stay and Play, half-day, full-day, and overnight are the visits a taxi can attach to. */
+export function classifyGingrVisit(raw: unknown): GingrVisitKind | null {
+  const token = normalizeToken(raw);
+  if (!token) return null;
+  if (/\bstay (and|n) play\b/.test(token) || /\bstay play\b/.test(token)) return "stay_and_play";
+  if (/\bhalf day\b/.test(token)) return "half_day";
+  if (/\bfull day\b/.test(token)) return "full_day";
+  if (isBoardingTypeName(raw)) return "overnight";
+  return null;
+}
+
+export function classifyHalfDayPeriod(
+  raw: unknown,
+  scheduledAt?: unknown
+): "morning" | "afternoon" | null {
+  const token = normalizeToken(raw);
+  if (/\bmorning\b/.test(token) || /\bam\b/.test(token)) return "morning";
+  if (/\bafternoon\b/.test(token) || /\bevening\b/.test(token) || /\bpm\b/.test(token)) return "afternoon";
+  const hour = pacificHour(scheduledAt);
+  if (hour == null) return null;
+  return hour < 12 ? "morning" : "afternoon";
+}
+
+export function formatGingrVisitLabel(input: {
+  visit: GingrVisitKind | null;
+  halfPeriod: "morning" | "afternoon" | null;
+  routeDate: string;
+  checkInDate: string | null;
+  checkOutDate: string | null;
+}): string | null {
+  if (input.visit === "stay_and_play") return "Stay and Play";
+  if (input.visit === "full_day") return "Full-day daycare";
+  if (input.visit === "half_day") {
+    if (input.halfPeriod === "afternoon") return "Half-day daycare · afternoon";
+    if (input.halfPeriod === "morning") return "Half-day daycare · morning";
+    return "Half-day daycare";
+  }
+  if (input.visit === "overnight") {
+    if (input.checkInDate === input.routeDate) return "Overnight boarding · check-in";
+    if (input.checkOutDate === input.routeDate) return "Overnight boarding · checkout";
+    return "Overnight boarding · mid-stay";
+  }
+  return null;
+}
+
+/**
+ * A taxi attached to Stay and Play, half-day, or full-day covers both ends of
+ * that visit. Overnight taxi is a check-in pickup or a checkout drop-off.
+ * A taxi with no visit keeps the AM / PM / door-to-door reading.
+ */
+export function visitTaxiLegs(input: {
+  visit: GingrVisitKind | null;
+  routeDate: string;
+  occupancy: BoardingOccupancy;
+  taxiText: string;
+  scheduledAt?: unknown;
+}): { pickup: boolean; dropoff: boolean } {
+  if (input.visit === "full_day" || input.visit === "stay_and_play" || input.visit === "half_day") {
+    return { pickup: true, dropoff: true };
+  }
+  if (input.visit === "overnight" || input.occupancy.isOvernight) {
+    if (input.occupancy.checkInDate === input.routeDate) return { pickup: true, dropoff: false };
+    if (input.occupancy.checkOutDate === input.routeDate) return { pickup: false, dropoff: true };
+    return { pickup: false, dropoff: false };
+  }
+  return taxiVanLegs(normalizeToken(input.taxiText), input.scheduledAt);
+}
+
 /** AM taxi = home pickup and stay at club. PM taxi = home drop-off. Both = door-to-door. */
 export function taxiVanLegs(
   token: string,
@@ -529,9 +599,6 @@ export function mergeTransportationFlags(
   }
   if (type === "TAXI") {
     next.isTaxi = true;
-    const legs = taxiVanLegs(normalizeToken(sourceText));
-    if (legs.pickup) next.fitdogHomePickup = true;
-    if (legs.dropoff) next.fitdogHomeDropoff = true;
   }
   return next;
 }
@@ -733,6 +800,7 @@ function applyTypeTravelDefaults(
 ): TransportationFlags {
   const next = { ...flags };
   const typeName = reservationTypeLabel(reservation);
+  const visit = classifyGingrVisit(typeName);
 
   if (isBoardingTypeName(typeName) || next.types.includes("BOARDING_CLUB")) {
     next.isBoardingStay = true;
@@ -765,12 +833,23 @@ function applyTypeTravelDefaults(
       for (const row of taxiRows) {
         const name = String(row.name ?? row.service ?? row.type ?? row.s_name ?? typeName);
         const scheduled = row.scheduled_at ?? row.scheduled_until;
-        const legs = taxiVanLegs(normalizeToken(name), scheduled);
+        const legs = visitTaxiLegs({
+          visit: visit || classifyGingrVisit(name),
+          routeDate,
+          occupancy,
+          taxiText: name,
+          scheduledAt: scheduled
+        });
         if (legs.pickup) next.fitdogHomePickup = true;
         if (legs.dropoff) next.fitdogHomeDropoff = true;
       }
     } else if (typeIsTaxi) {
-      const legs = taxiVanLegs(normalizeToken(typeName));
+      const legs = visitTaxiLegs({
+        visit,
+        routeDate,
+        occupancy,
+        taxiText: typeName
+      });
       if (legs.pickup) next.fitdogHomePickup = true;
       if (legs.dropoff) next.fitdogHomeDropoff = true;
     }

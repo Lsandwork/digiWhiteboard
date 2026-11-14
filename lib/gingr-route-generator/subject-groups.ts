@@ -2,12 +2,21 @@ import {
   GINGR_ROUTE_ACTIVITIES,
   GINGR_ROUTE_ACTIVITY_BY_ID,
   dogHasClassActivity,
+  dogHasSportSignUp,
   isGingrClassActivity,
   type GingrRouteActivityId
 } from "@/lib/gingr-route-generator/activities";
 import type { GingrRouteDog } from "@/lib/gingr-route-generator/normalize";
 
-export type GingrActivityFilter = GingrRouteActivityId | "all" | "class";
+export type GingrActivityFilter =
+  | GingrRouteActivityId
+  | "all"
+  | "class"
+  | "sport"
+  | "stay_and_play"
+  | "half_day"
+  | "full_day"
+  | "overnight";
 
 export type GingrSubjectSubgroup = {
   id: GingrRouteActivityId;
@@ -26,6 +35,11 @@ export type GingrSubjectGroup = {
 export function dogMatchesActivityFilter(dog: GingrRouteDog, filter: GingrActivityFilter): boolean {
   if (filter === "all") return true;
   if (filter === "class") return dogHasClassActivity(dog.activities);
+  if (filter === "sport" || filter === "sport_sign_ups") return dogHasSportSignUp(dog.activities);
+  if (filter === "stay_and_play") return dog.visitKind === "stay_and_play";
+  if (filter === "half_day") return dog.visitKind === "half_day";
+  if (filter === "full_day") return dog.visitKind === "full_day";
+  if (filter === "overnight") return dog.visitKind === "overnight";
   if (filter === "club") return dog.activities.includes("club") && !dogHasClassActivity(dog.activities);
   if (isGingrClassActivity(filter)) return dog.activities.includes(filter);
   return !dogHasClassActivity(dog.activities) && dog.activities.includes(filter);

@@ -9,6 +9,7 @@ import {
   GINGR_ROUTE_ACTIVITY_BY_ID,
   dogHasClassActivity,
   dogHasOffsiteActivity,
+  isSportSignUpActivity,
   isDropOffService,
   isOffsiteGingrActivity,
   isPickUpService,
@@ -82,7 +83,24 @@ assert.equal(matchGingrRouteActivity("Urban Recall | Group Training")?.id, "urba
 assert.equal(matchGingrRouteActivity("Trail Foundations | Group Training")?.id, "trail_foundations");
 assert.equal(matchGingrRouteActivity("Daycare Full Day")?.id, "club");
 
-assert.equal(GINGR_ROUTE_ACTIVITIES.length, 18);
+assert.equal(GINGR_ROUTE_ACTIVITIES.length, 19);
+assert.equal(matchGingrRouteActivity("Cool Tricks | Group Training - Business Only")?.id, "cool_tricks");
+assert.equal(matchGingrRouteActivity("Foundational Obedience | Group Training - Business Only")?.id, "foundational_obedience");
+assert.equal(matchGingrRouteActivity("Fun & Fit Agility | Group Training - Business Only")?.id, "fun_and_fit_agility");
+assert.equal(matchGingrRouteActivity("Leash Manners | Group Training - Business Only")?.id, "leash_manners");
+assert.equal(matchGingrRouteActivity("Reliable Recall | Group Training - Business Only")?.id, "reliable_recall");
+assert.equal(matchGingrRouteActivity("Scent Work | Group Training - Business Only")?.id, "scent_works");
+assert.equal(matchGingrRouteActivity("Trail Foundations | Group Training - Business Only")?.id, "trail_foundations");
+assert.equal(matchGingrRouteActivity("Trainer Led Hike | Group Training - Business Only")?.id, "trainer_led_hike");
+assert.equal(matchGingrRouteActivity("Urban Recall | Group Training - Business Only")?.id, "urban_recall");
+assert.equal(matchGingrRouteActivity("Sports Sign Ups")?.id, "sport_sign_ups");
+assert.equal(matchGingrRouteActivity("Group Classes")?.id, "trainer_activity");
+assert.equal(matchGingrRouteActivity("Evaluation")?.id, "evaluation");
+assert.equal(isSportSignUpActivity("adventure_hike"), true);
+assert.equal(isSportSignUpActivity("recall_at_the_beach"), true);
+assert.equal(isSportSignUpActivity("beach_excursion"), true);
+assert.equal(isSportSignUpActivity("sport_sign_ups"), true);
+assert.equal(isSportSignUpActivity("leash_manners"), false);
 assert.equal(matchGingrRouteActivity("Activity | Leash Manners")?.id, "leash_manners");
 assert.equal(matchGingrRouteActivity("Cool Tricks | Group Training")?.id, "cool_tricks");
 assert.equal(matchGingrRouteActivity("Scent Work | Group Training")?.id, "scent_works");
@@ -190,6 +208,7 @@ const pepper = notesMerged.dogs.find((d) => d.name === "Pepper");
 assert.ok(pepper, "Pepper should be present");
 assert.equal(pepper!.notes, "Client note: soft mouth");
 assert.equal(pepper!.pickupInstructions, "Gate code 9988 — leave in side yard");
+assert.equal(pepper!.dropoffInstructions, "Gate code 9988 — leave in side yard");
 assert.ok(pepper!.activityLabels.includes("Canine Fitness"));
 
 function ownerHome() {
@@ -1037,8 +1056,110 @@ void (async () => {
     ).dogs[0];
     assert.equal(taxi!.routeVanKey, "van_5");
     assert.equal(taxi!.pickupDestination, "home");
-    assert.equal(taxi!.dropoff, false);
-    assert.equal(taxi!.endLocation, "club");
+    assert.equal(taxi!.dropoff, true, "full-day daycare taxi includes the evening home drop-off");
+    assert.equal(taxi!.dropoffDestination, "home");
+    assert.equal(taxi!.endLocation, "home");
+    assert.equal(taxi!.visitKind, "full_day");
+    assert.equal(taxi!.visitLabel, "Full-day daycare");
+  }
+
+  {
+    const stay = normalizeGingrRouteReservations(
+      [
+        reservation({
+          id: "stay-taxi",
+          animal_id: 931,
+          a_name: "StayDog",
+          type: "Stay and Play",
+          services: [{ name: "Taxi Service", scheduled_at: `${date}T10:00:00-07:00` }],
+          owner: ownerHome(),
+          drop_off_instructions: "Ring door bell",
+          pickup_instructions: "Call when outside"
+        })
+      ],
+      date
+    ).dogs[0];
+    assert.equal(stay!.visitLabel, "Stay and Play");
+    assert.equal(stay!.pickup, true);
+    assert.equal(stay!.dropoff, true);
+    assert.equal(stay!.dropoffInstructions, "Ring door bell");
+    assert.equal(stay!.pickupInstructions, "Call when outside");
+
+    const half = normalizeGingrRouteReservations(
+      [
+        reservation({
+          id: "half-taxi",
+          animal_id: 932,
+          a_name: "HalfDog",
+          type: "Half Day Daycare",
+          start_date: `${date}T13:00:00-07:00`,
+          services: [{ name: "Taxi Service", scheduled_at: `${date}T13:00:00-07:00` }],
+          owner: ownerHome()
+        })
+      ],
+      date
+    ).dogs[0];
+    assert.equal(half!.visitLabel, "Half-day daycare · afternoon");
+    assert.equal(half!.pickup, true);
+    assert.equal(half!.dropoff, true);
+
+    const checkIn = normalizeGingrRouteReservations(
+      [
+        reservation({
+          id: "board-in",
+          animal_id: 933,
+          a_name: "CheckInDog",
+          reservation_type: { type: "Overnight: Petite Suite" },
+          check_in_date: `${date}T08:00:00-07:00`,
+          check_out_date: "2026-09-02T17:00:00-07:00",
+          services: [{ name: "Taxi Service", scheduled_at: `${date}T08:00:00-07:00` }],
+          owner: ownerHome()
+        })
+      ],
+      date
+    ).dogs[0];
+    assert.equal(checkIn!.visitLabel, "Overnight boarding · check-in");
+    assert.equal(checkIn!.pickup, true);
+    assert.equal(checkIn!.dropoff, false);
+
+    const checkOut = normalizeGingrRouteReservations(
+      [
+        reservation({
+          id: "board-out",
+          animal_id: 934,
+          a_name: "CheckOutDog",
+          reservation_type: { type: "Overnight Boarding" },
+          check_in_date: "2026-08-28T08:00:00-07:00",
+          check_out_date: `${date}T17:00:00-07:00`,
+          services: [{ name: "Taxi Service", scheduled_at: `${date}T17:00:00-07:00` }],
+          owner: ownerHome()
+        })
+      ],
+      date
+    ).dogs[0];
+    assert.equal(checkOut!.visitLabel, "Overnight boarding · checkout");
+    assert.equal(checkOut!.pickup, false);
+    assert.equal(checkOut!.dropoff, true);
+
+    assert.equal(
+      dogMatchesActivityFilter(
+        normalizeGingrRouteReservations(
+          [
+            reservation({
+              id: "hike-sport",
+              animal_id: 935,
+              a_name: "HikeDog",
+              type: "Adventure Hikes",
+              services: [{ name: "Adventure Hikes", scheduled_at: `${date}T08:00:00-07:00` }],
+              owner: ownerHome()
+            })
+          ],
+          date
+        ).dogs[0]!,
+        "sport"
+      ),
+      true
+    );
   }
 
   {

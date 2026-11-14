@@ -115,7 +115,10 @@ function makeStop(
     notes:
       [
         clubNotes,
-        dog.pickupInstructions ? `Pick Up Instructions: ${dog.pickupInstructions}` : null,
+        dog.dropoffInstructions ? `Drop-off Instructions: ${dog.dropoffInstructions}` : null,
+        dog.pickupInstructions && dog.pickupInstructions !== dog.dropoffInstructions
+          ? `Pick Up Instructions: ${dog.pickupInstructions}`
+          : null,
         locationType === "OWNER_HOME" ? dog.notes : null
       ]
         .filter(Boolean)

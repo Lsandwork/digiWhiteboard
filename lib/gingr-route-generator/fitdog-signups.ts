@@ -156,6 +156,9 @@ export function fitdogSignupsToRouteDogs(signups: FitdogClassSignup[], date: str
         scheduledTimeLabel: null,
         notes: pickup.reservationNotes,
         pickupInstructions: pickup.driverNotes,
+        dropoffInstructions: pickup.driverNotes,
+        visitKind: null,
+        visitLabel: null,
         reservationIds: [],
         homeAddress: null,
         homeStreet1: null,
@@ -280,6 +283,9 @@ export function mergeFitdogRouteDogs(gingrDogs: GingrRouteDog[], fitdogDogs: Gin
     }
     target.notes = target.notes || src.notes;
     target.pickupInstructions = target.pickupInstructions || src.pickupInstructions;
+    target.dropoffInstructions = target.dropoffInstructions || src.dropoffInstructions;
+    target.visitKind = target.visitKind || src.visitKind;
+    target.visitLabel = target.visitLabel || src.visitLabel;
     target.ownerPhone = target.ownerPhone || src.ownerPhone;
     target.routeVanKey = resolveRouteVanKey({
       assignedLabels: target.assignedTo ? [target.assignedTo] : [],
