@@ -821,7 +821,7 @@ export function buildRoleHubStaffNav(visibleTabs: AdminTab[], role: string): Nav
   const cap =
     role === "front_desk_coordinator"
       ? 20
-      : role === "assistant_manager"
+      : role === "assistant_manager" || role === "owner_admin" || role === "manager_admin"
         ? 11
         : 10;
   const leaves: NavEntry[] = [];

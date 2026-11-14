@@ -23,9 +23,9 @@ const visible = ADMIN_TABS.filter((tab) => canAccessAdminTab(access, tab, "owner
 const nav = buildStaffPanelNav(visible, "staff", "owner_admin");
 const iconCount = countNavIcons(nav);
 
-assert.equal(SUPER_ADMIN_PRIMARY_TABS.length, 10, "primary tab list is exactly 10");
-assert.ok(iconCount <= 10, `Super Admin sidebar icons must be <= 10, got ${iconCount}`);
-assert.equal(iconCount, 10, `expected exactly 10 Super Admin icons, got ${iconCount}`);
+assert.equal(SUPER_ADMIN_PRIMARY_TABS.length, 11, "primary tab list is exactly 11");
+assert.ok(iconCount <= 11, `Super Admin sidebar icons must be <= 11, got ${iconCount}`);
+assert.equal(iconCount, 11, `expected exactly 11 Super Admin icons, got ${iconCount}`);
 
 for (const tab of SUPER_ADMIN_PRIMARY_TABS) {
   assert.equal(canAccessAdminTab(access, tab, "owner_admin", "staff"), true, `can access primary ${tab}`);
@@ -49,8 +49,13 @@ const adminAccess = accessFromLegacyRole("admin-1", "admin@fitdog.com", "manager
 const adminVisible = ADMIN_TABS.filter((tab) => canAccessAdminTab(adminAccess, tab, "manager_admin", "staff"));
 const adminNav = buildStaffPanelNav(adminVisible, "staff", "manager_admin");
 assert.ok(
-  countNavIcons(adminNav) <= 10,
-  "manager_admin sidebar should use the cleaned hub layout (≤10)"
+  countNavIcons(adminNav) <= 11,
+  "manager_admin sidebar should use the cleaned hub layout (≤11)"
+);
+assert.ok(nav.some((e) => e.type === "item" && e.tab === "team_engagement"), "owner_admin sidebar includes Team Engagement");
+assert.ok(
+  adminNav.some((e) => e.type === "item" && e.tab === "team_engagement"),
+  "manager_admin sidebar includes Team Engagement"
 );
 
 console.log("super-admin-nav-cleanup: ok", { iconCount, hubLinkedTabs: linked.size });
