@@ -713,6 +713,20 @@ export function normalizeGingrRouteReservations(
   reservations: GingrReservation[],
   date: string
 ): Omit<GingrRouteSchedulePayload, "fetchedAt" | "cached"> {
+  const qualifiesByAnimal = new Map<string, boolean>();
+  for (const reservation of reservations) {
+    try {
+      if (asRecord(reservation).cancelled_date) continue;
+      const key = animalKey(reservation);
+      const dayActivities = collectRouteDayActivities(reservation, date);
+      if (dayActivities.some((activityId) => isRouteQualifyingActivity(activityId))) {
+        qualifiesByAnimal.set(key, true);
+      }
+    } catch {
+      // First pass is best-effort.
+    }
+  }
+
   const byAnimal = new Map<string, Acc>();
 
   for (const reservation of reservations) {
@@ -778,7 +792,9 @@ export function normalizeGingrRouteReservations(
         acc.activityLabels.add(activity.label);
       }
 
-      const qualifyingServiceOnDate = dayActivities.some((activityId) => isRouteQualifyingActivity(activityId));
+      const qualifyingServiceOnDate =
+        dayActivities.some((activityId) => isRouteQualifyingActivity(activityId)) ||
+        qualifiesByAnimal.get(key) === true;
       const route = collectReservationRouteOptions(reservation as Record<string, unknown>, date, {
         qualifyingServiceOnDate,
         qualifyingServiceDates: qualifyingServiceDates(reservation)

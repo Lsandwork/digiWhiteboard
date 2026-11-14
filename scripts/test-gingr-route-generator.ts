@@ -1771,6 +1771,50 @@ void (async () => {
     assert.equal(duplicated.dogs[0]!.dropoff, true);
     assert.equal(buildTransportationStops(duplicated.dogs, routeDate).stops.length, 2);
 
+    // 10b. Gingr books Service Addons on separate reservations — still attach to the outing dog.
+    const splitAddons = normalizeGingrRouteReservations(
+      [
+        reservation({
+          reservation_id: "9601",
+          animal_id: 9600,
+          a_name: "Penelope",
+          owner: ownerHome(),
+          type: "Sports Sign Ups",
+          services: [{ name: "Activity | Adventure Hike", scheduled_at: `${routeDate}T08:00:00-07:00` }]
+        }),
+        reservation({
+          reservation_id: "9602",
+          animal_id: 9600,
+          a_name: "Penelope",
+          owner: ownerHome(),
+          type: "Before Outing - Fitdog to Pick Up @ Home",
+          start_date: `${routeDate}T08:00:00-07:00`,
+          services: []
+        }),
+        reservation({
+          reservation_id: "9603",
+          animal_id: 9600,
+          a_name: "Penelope",
+          owner: ownerHome(),
+          type: "After Outing - Fitdog to Drop Off @ Home",
+          start_date: `${routeDate}T08:00:00-07:00`,
+          services: []
+        })
+      ],
+      routeDate
+    );
+    assert.equal(splitAddons.dogs.length, 1);
+    assert.ok(
+      splitAddons.dogs[0]!.appointmentOptions.some((label) => /before outing/i.test(label)),
+      "Before addon on a sibling reservation should classify"
+    );
+    assert.ok(
+      splitAddons.dogs[0]!.appointmentOptions.some((label) => /after outing/i.test(label)),
+      "After addon on a sibling reservation should classify"
+    );
+    assert.equal(splitAddons.dogs[0]!.startLocation, "home");
+    assert.equal(splitAddons.dogs[0]!.endLocation, "home");
+
     // 11. Sport Sign Ups is a qualifying class service.
     const sport = normalizeGingrRouteReservations(
       [

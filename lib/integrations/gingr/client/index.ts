@@ -144,6 +144,14 @@ export function createGingrClient(overrides?: GingrClientConfig) {
       });
       return normalizeGingrReservationList(payload);
     },
+    /** Checked-in reservations — often carry fuller nested service / addon rows. */
+    async listCheckedInReservations() {
+      const payload = await requestForm<unknown>(`/api/v1/reservations`, {
+        location_id: config.locationId,
+        checked_in: "true"
+      });
+      return normalizeGingrReservationList(payload);
+    },
     async listReservationsByOwner(ownerId: string) {
       const payload = await requestForm<unknown>(
         `/api/v1/reservations_by_owner`,

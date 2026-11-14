@@ -45,6 +45,8 @@ const NESTED_OPTION_KEYS = [
   "addon_data",
   "service_addons",
   "service_addon",
+  "r_addons",
+  "s_addons",
   "items",
   "services",
   "options",
@@ -540,6 +542,10 @@ function canonicalOptionLabel(name: string, reading: OptionReading): string {
  * Read one booked appointment option for its full meaning. Returns null when
  * the text is not a transportation or boarding option (an activity name, a note).
  */
+function stripServiceAddonPrefix(name: string): string {
+  return name.replace(/^(service\s+addons?\s*[-:|]\s*)/i, "").trim();
+}
+
 export function classifyAppointmentOption(
   raw: unknown,
   meta: {
@@ -549,7 +555,8 @@ export function classifyAppointmentOption(
     stayDay?: GingrStayDay | null;
   } = {}
 ): GingrAppointmentOption | null {
-  const name = typeof raw === "string" || typeof raw === "number" ? String(raw).trim() : "";
+  const rawName = typeof raw === "string" || typeof raw === "number" ? String(raw).trim() : "";
+  const name = stripServiceAddonPrefix(rawName);
   const token = normalizeToken(name);
   if (!token) return null;
   const reading = readOptionToken(name, token);
@@ -800,6 +807,43 @@ function reservationTypeLabel(reservation: Record<string, unknown>): string {
   return raw == null ? "" : String(raw);
 }
 
+function serviceRowTransportCandidates(reservation: Record<string, unknown>): TransportCandidate[] {
+  const out: TransportCandidate[] = [];
+  for (const row of listServiceLikeRows(reservation)) {
+    const scheduledDate =
+      gingrTimestampDateKey(row.scheduled_at) ||
+      gingrTimestampDateKey(row.scheduled_until) ||
+      gingrTimestampDateKey(row.date);
+    const optionId = idText(row.id) ?? idText(row.option_id) ?? idText(row.addon_id) ?? idText(row.service_id);
+    const addText = (text: string, source: TransportCandidate["source"]) => {
+      if (!text || !looksLikeTransportToken(normalizeToken(text))) return;
+      out.push({
+        text,
+        optionId,
+        scheduledDate,
+        source,
+        cost: row.cost,
+        assignedTo: row.assigned_to
+      });
+    };
+    addText(String(row.name ?? row.service ?? row.type ?? row.s_name ?? "").trim(), "service");
+    const description = pickServiceAddonDescription(row);
+    if (description) addText(description, "addon");
+    for (const text of collectGingrTextValues(row.addonData ?? row.addon_data)) {
+      addText(text, "addon");
+    }
+  }
+  return out;
+}
+
+function pickServiceAddonDescription(row: Record<string, unknown>): string | null {
+  const description = String(row.description ?? row.notes ?? row.comment ?? "").trim();
+  if (!description) return null;
+  const token = normalizeToken(description);
+  if (!looksLikeTransportToken(token)) return null;
+  return stripServiceAddonPrefix(description);
+}
+
 function listServiceLikeRows(reservation: Record<string, unknown>): Array<Record<string, unknown>> {
   const rows: Array<Record<string, unknown>> = [];
   for (const key of [
@@ -853,7 +897,8 @@ export function collectReservationTransportCandidates(
           ]
         : [];
 
-    return [
+    const fromRows = serviceRowTransportCandidates(reservation);
+    const fromValues = [
       ...typeCandidates,
       ...collectCandidatesFromValue(reservation.addons, "addon", emptyInherited),
       ...collectCandidatesFromValue(reservation.addon, "addon", emptyInherited),
@@ -866,6 +911,13 @@ export function collectReservationTransportCandidates(
       ...collectCandidatesFromValue(reservation.reservation_options, "addon", emptyInherited),
       ...collectCandidatesFromValue(reservation.services, "service", emptyInherited)
     ].filter((candidate) => !isInternalBoardingTaxiMarker(candidate));
+    const seen = new Set<string>();
+    return [...fromRows, ...fromValues].filter((candidate) => {
+      const key = `${candidate.text}|${candidate.scheduledDate ?? ""}|${candidate.optionId ?? ""}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   } catch {
     return [];
   }
