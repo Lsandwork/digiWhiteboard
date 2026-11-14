@@ -8,6 +8,7 @@ export type SessionPayload = {
   mustChangePassword?: boolean;
   isDemo?: boolean;
   demoRole?: string;
+  impEmail?: string;
   exp: number;
 };
 
@@ -18,6 +19,7 @@ export type AdminSession = {
   mustChangePassword?: boolean;
   isDemo?: boolean;
   demoRole?: string;
+  impersonatorEmail?: string;
 };
 
 function base64UrlToBytes(value: string) {
@@ -84,7 +86,8 @@ export async function verifyAdminSessionTokenEdge(token: string | undefined | nu
       role: payload.role,
       mustChangePassword: payload.mustChangePassword ?? false,
       isDemo: payload.isDemo ?? false,
-      demoRole: payload.demoRole
+      demoRole: payload.demoRole,
+      impersonatorEmail: payload.impEmail
     };
   } catch {
     // Any malformed cookie/signature is treated as "not logged in" — never throw.

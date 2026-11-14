@@ -36,6 +36,9 @@ jobs:
       - name: Route Generator and SMS guard tests
         run: npm run test:route-generator-all
 
+      - name: Team Engagement authorization tests
+        run: npm run test:team-engagement
+
       # The check that actually matters for deploys — this is what failed on Vercel.
       - name: Production build
         run: npm run build

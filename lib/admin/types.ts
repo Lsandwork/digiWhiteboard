@@ -119,7 +119,8 @@ export type AdminTab =
   | "sa_whiteboard_hub"
   | "sa_people_hub"
   | "sa_apps_hub"
-  | "sa_admin_hub";
+  | "sa_admin_hub"
+  | "team_engagement";
 
 export const ADMIN_TABS: AdminTab[] = [
   "checklist",
@@ -197,7 +198,8 @@ export const ADMIN_TABS: AdminTab[] = [
   "sa_whiteboard_hub",
   "sa_people_hub",
   "sa_apps_hub",
-  "sa_admin_hub"
+  "sa_admin_hub",
+  "team_engagement"
 ];
 
 export const ADMIN_HR_TABS = ["write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult"] as const;

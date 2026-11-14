@@ -3,9 +3,15 @@ import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth"
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { canManageAdminUsers } from "@/lib/admin/permissions";
-import { legacyRoleToRoleKey, type DepartmentKey, type RoleKey } from "@/lib/admin/permissions";
+import {
+  isSuperAdminAccess,
+  isSuperAdminLegacyRole,
+  legacyRoleToRoleKey,
+  type DepartmentKey,
+  type RoleKey
+} from "@/lib/admin/permissions";
 import { assertUserMutationAllowed } from "@/lib/admin/super-admin-guards";
-import { roleAssignmentError } from "@/lib/admin/user-creation-access";
+import { roleAssignmentError, selfAccessChangeError } from "@/lib/admin/user-creation-access";
 import { getUserAccess, roleKeyToLegacyRole, setUserAccess } from "@/lib/admin/user-access";
 import {
   AdminUserRole,
@@ -79,6 +85,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Not allowed." }, { status: 403 });
   }
+
+  const selfError = selfAccessChangeError({
+    isSelf: session?.adminUserId === id,
+    actorIsSuperAdmin: isSuperAdminLegacyRole(session?.role) || isSuperAdminAccess(actorAccess),
+    current: existingAccess,
+    nextPrimaryRole: roleChangeRequested ? primaryRoleKey : null,
+    nextAdditionalRoles: Array.isArray(body.additional_roles) ? parseRoleKeys(body.additional_roles) : null,
+    nextDepartments: Array.isArray(body.departments) ? parseDepartments(body.departments) : null
+  });
+  if (selfError) return NextResponse.json({ error: selfError }, { status: 403 });
 
   const requestedRoles: unknown[] = [
     ...(roleChangeRequested ? [primaryRoleKey] : []),

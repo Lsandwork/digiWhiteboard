@@ -326,17 +326,29 @@ export async function POST(request: Request) {
       auditAction = "staff.issue.update";
     } else if (action === "create_staff_member") {
       if (!canManageStaffDirectory(role)) return staffOpsForbiddenResponse();
-      result = await createStaffDirectoryMember(supabase, body, actorDisplayName, actorAdminId, writeOpts);
+      result = await createStaffDirectoryMember(supabase, body, actorDisplayName, actorAdminId, writeOpts, {
+        adminUserId: actorAdminId,
+        legacyRole: role,
+        email: session?.email ?? null
+      });
       auditAction = "staff.directory.create";
     } else if (action === "update_staff_member") {
       if (!canManageStaffDirectory(role)) return staffOpsForbiddenResponse();
       const id = String(body.id ?? "");
-      result = await updateStaffDirectoryMember(supabase, id, body, actorDisplayName, actorAdminId, writeOpts);
+      result = await updateStaffDirectoryMember(supabase, id, body, actorDisplayName, actorAdminId, writeOpts, {
+        adminUserId: actorAdminId,
+        legacyRole: role,
+        email: session?.email ?? null
+      });
       auditAction = "staff.directory.update";
     } else if (action === "delete_staff_member") {
       if (!canManageStaffDirectory(role)) return staffOpsForbiddenResponse();
       const id = String(body.id ?? "");
-      await deleteStaffDirectoryMember(supabase, id, actorDisplayName, writeOpts);
+      await deleteStaffDirectoryMember(supabase, id, actorDisplayName, writeOpts, {
+        adminUserId: actorAdminId,
+        legacyRole: role,
+        email: session?.email ?? null
+      });
       result = { id };
       auditAction = "staff.directory.delete";
     } else if (action === "preview_staff_directory_reconciliation") {
@@ -439,6 +451,9 @@ export async function POST(request: Request) {
     }
     if (error instanceof StaffDirectoryValidationError) {
       return NextResponse.json({ error: error.message, code: "staff_directory_validation" }, { status: 400 });
+    }
+    if (error instanceof StaffOpsAuthorizationError) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
     }
     const message = error instanceof Error ? error.message : "Unable to save Staff Admin record.";
     if (message.includes("only delete Team Log entries")) {

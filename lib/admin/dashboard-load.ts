@@ -71,6 +71,7 @@ export function skipDashboardBackgroundHydrate(board: AdminBoardType, tab: strin
     tab === "active_issues" ||
     tab === "notifications" ||
     tab === "management_support" ||
+    tab === "team_engagement" ||
     tab === "ms_hub" ||
     tab === "staff_directory" ||
     tab === "users" ||

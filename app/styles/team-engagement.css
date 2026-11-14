@@ -1,0 +1,55 @@
+/* RuffOps Manage Team Engagement — hand-authored design primitives */
+:root {
+  --ro-blue: #0492C2; --ro-blue-dark: #08749A; --ro-navy: #173247;
+  --ro-orange: #E97832; --ro-orange-soft: #FFF3E9; --ro-blue-soft: #F2F8FB;
+  --ro-blue-border: #C9E4EF; --ro-text: #243746; --ro-muted: #6C7F8C;
+  --ro-surface: #FFFFFF; --ro-surface-subtle: #F7FAFC;
+  --ro-success: #23845D; --ro-warning: #B87518; --ro-danger: #B54747;
+  --ro-radius-sm: 6px; --ro-radius-md: 10px; --ro-radius-lg: 16px;
+}
+.ro-te-icon { width: 24px; height: 24px; display: inline-block; flex: 0 0 auto; }
+.ro-te-icon svg { width: 100%; height: 100%; }
+.ro-te-role { display:inline-flex; align-items:center; border-radius:999px; padding:4px 9px; font-size:12px; font-weight:650; }
+.ro-te-role--management { color:#08749A; background:#EAF6FA; }
+.ro-te-role--admin { color:#A9571F; background:#FFF3E9; }
+.ro-te-role--super-admin { color:#5A4A9A; background:#F1EEFA; }
+.ro-te-card { background:var(--ro-surface); border:1px solid var(--ro-blue-border); border-radius:var(--ro-radius-lg); padding:16px; }
+.ro-te-muted { color:var(--ro-muted); }
+.ro-te-shell { color:var(--ro-text); padding:8px 4px 24px; }
+.ro-te-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:16px; }
+.ro-te-header__title { margin:0; font-size:1.35rem; color:var(--ro-navy); }
+.ro-te-layout { display:grid; grid-template-columns:minmax(220px, 260px) 1fr; gap:16px; align-items:start; }
+@media (max-width: 960px) { .ro-te-layout { grid-template-columns:1fr; } }
+.ro-te-sidebar { background:var(--ro-blue-soft); border:1px solid var(--ro-blue-border); border-radius:var(--ro-radius-lg); padding:12px; }
+.ro-te-sidebar__group + .ro-te-sidebar__group { margin-top:12px; padding-top:12px; border-top:1px solid var(--ro-blue-border); }
+.ro-te-sidebar__label { font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--ro-muted); margin-bottom:6px; }
+.ro-te-sidebar ul { list-style:none; margin:0; padding:0; }
+.ro-te-sidebar__link { width:100%; display:flex; align-items:center; gap:10px; border:0; background:transparent; color:var(--ro-text); padding:8px 10px; border-radius:var(--ro-radius-sm); text-align:left; cursor:pointer; font-size:14px; }
+.ro-te-sidebar__link:hover { background:rgba(4,146,194,.08); }
+.ro-te-sidebar__link--active { background:#fff; border:1px solid var(--ro-blue-border); color:var(--ro-blue-dark); font-weight:600; }
+.ro-te-main { min-width:0; }
+.ro-te-main__title { margin:0 0 12px; font-size:1.1rem; color:var(--ro-navy); }
+.ro-te-stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:12px; }
+.ro-te-stat__label { font-size:12px; }
+.ro-te-stat__value { font-size:1.6rem; font-weight:700; color:var(--ro-navy); }
+.ro-te-stack { display:flex; flex-direction:column; gap:12px; }
+.ro-te-section__title { margin:0 0 10px; font-size:1rem; }
+.ro-te-list { list-style:none; margin:0; padding:0; }
+.ro-te-list__item { padding:12px 0; border-bottom:1px solid var(--ro-blue-border); }
+.ro-te-list__item:last-child { border-bottom:0; }
+.ro-te-list__meta { font-size:12px; margin:4px 0 0; }
+.ro-te-table-wrap { overflow:auto; }
+.ro-te-table { width:100%; border-collapse:collapse; font-size:14px; }
+.ro-te-table th, .ro-te-table td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--ro-blue-border); }
+.ro-te-empty { text-align:center; padding:24px 12px; }
+.ro-te-empty__art { max-width:220px; margin:0 auto 12px; display:block; }
+.ro-te-btn { border-radius:var(--ro-radius-sm); padding:8px 14px; font-size:14px; cursor:pointer; border:1px solid transparent; }
+.ro-te-btn--primary { background:var(--ro-blue); color:#fff; }
+.ro-te-btn--ghost { background:#fff; border-color:var(--ro-blue-border); color:var(--ro-blue-dark); }
+.ro-te-actions { display:flex; gap:8px; margin-top:8px; }
+.ro-te-error { color:var(--ro-danger); margin:8px 0; }
+.ro-te-debug { font-size:11px; max-height:320px; overflow:auto; background:var(--ro-surface-subtle); padding:12px; border-radius:var(--ro-radius-sm); }
+.ro-te-form { display:flex; flex-direction:column; gap:10px; margin-bottom:12px; }
+.ro-te-field { display:flex; flex-direction:column; gap:4px; font-size:14px; }
+.ro-te-field input, .ro-te-field select, .ro-te-field textarea { border:1px solid var(--ro-blue-border); border-radius:var(--ro-radius-sm); padding:8px 10px; font: inherit; }
+.ro-te-participation__tabs { display:flex; gap:8px; margin-bottom:12px; }

@@ -319,6 +319,28 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       p("card_studio.manage_settings", "Card Studio Settings", "Change Card Studio system and security settings."),
       p("card_studio.revoke", "Revoke Cards", "Revoke or replace issued ID cards.")
     ]
+  },
+  {
+    key: "team_engagement",
+    label: "Team Engagement",
+    permissions: [
+      p("engagement.participate", "Join Bark Outs & Suggestions", "Read the Bark Out feed, react, report concerns, and send suggestions."),
+      p("engagement.create_bark_out", "Post Bark Outs", "Recognize a coworker with a moderated Bark Out."),
+      p("engagement.view", "Open Manage Team Engagement", "Management, Admin, and Super Admin workspace for team engagement."),
+      p("engagement.view_all_departments", "See Every Department", "View engagement data for all departments instead of assigned teams only."),
+      p("engagement.manage_team", "Manage Team Engagement", "Development records, follow-ups, feedback responses, announcements, and nominations in scope."),
+      p("engagement.manage_departments", "Manage Departments", "Edit department engagement settings and assign department managers."),
+      p("engagement.moderate", "Moderate Bark Outs", "Approve, reject, remove, and escalate Bark Outs in scope."),
+      p("engagement.manage_programs", "Manage Recognition Programs", "Configure programs and record nomination decisions."),
+      p("engagement.manage_settings", "Engagement Settings", "Bark Out categories and participation limits."),
+      p("engagement.view_analytics", "Engagement Analytics", "Engagement, workload, and team reports in scope."),
+      p("engagement.export", "Export Engagement Data", "Download engagement CSV exports in scope."),
+      p("engagement.view_audit_logs", "Engagement Audit History", "Read the Team Engagement audit history."),
+      p("engagement.manage_permissions", "Engagement Access Control", "Assign leadership roles, manager departments, and engagement permissions (Super Admin)."),
+      p("engagement.configure_ai", "AI Moderation Policy", "Configure Bark Out AI moderation (Super Admin)."),
+      p("engagement.manage_security", "Engagement Security & Retention", "Security review, feature controls, and data retention (Super Admin)."),
+      p("engagement.manage_integrations", "Engagement Integrations & Health", "Integration status and system health for Team Engagement (Super Admin).")
+    ]
   }
 ];
 

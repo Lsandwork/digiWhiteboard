@@ -174,7 +174,23 @@ export type PermissionKey =
   | "card_studio.delete_templates"
   | "card_studio.manage_printers"
   | "card_studio.manage_settings"
-  | "card_studio.revoke";
+  | "card_studio.revoke"
+  | "engagement.view"
+  | "engagement.view_all_departments"
+  | "engagement.participate"
+  | "engagement.create_bark_out"
+  | "engagement.manage_team"
+  | "engagement.manage_departments"
+  | "engagement.moderate"
+  | "engagement.manage_programs"
+  | "engagement.manage_settings"
+  | "engagement.view_analytics"
+  | "engagement.export"
+  | "engagement.view_audit_logs"
+  | "engagement.manage_permissions"
+  | "engagement.configure_ai"
+  | "engagement.manage_security"
+  | "engagement.manage_integrations";
 
 export type RoleKey =
   | "super_admin"
@@ -415,11 +431,42 @@ const ALL_PERMISSIONS = Object.freeze([
   "card_studio.delete_templates",
   "card_studio.manage_printers",
   "card_studio.manage_settings",
-  "card_studio.revoke"
+  "card_studio.revoke",
+  "engagement.view",
+  "engagement.view_all_departments",
+  "engagement.participate",
+  "engagement.create_bark_out",
+  "engagement.manage_team",
+  "engagement.manage_departments",
+  "engagement.moderate",
+  "engagement.manage_programs",
+  "engagement.manage_settings",
+  "engagement.view_analytics",
+  "engagement.export",
+  "engagement.view_audit_logs",
+  "engagement.manage_permissions",
+  "engagement.configure_ai",
+  "engagement.manage_security",
+  "engagement.manage_integrations"
 ] as const satisfies readonly PermissionKey[]);
+
+/** Manage Team Engagement controls that only Super Admin may hold, regardless of matrix edits. */
+export const ENGAGEMENT_SUPER_ADMIN_ONLY_PERMISSIONS = new Set<PermissionKey>([
+  "engagement.manage_permissions",
+  "engagement.configure_ai",
+  "engagement.manage_security",
+  "engagement.manage_integrations"
+]);
+
+/** Every staff role may read the Bark Out feed, post Bark Outs, and send suggestions. */
+const ENGAGEMENT_PARTICIPANT_PERMISSIONS: PermissionKey[] = [
+  "engagement.participate",
+  "engagement.create_bark_out"
+];
 
 /** Permissions reserved for Super Admin — Admin cannot receive these by default. */
 export const SUPER_ADMIN_ONLY_PERMISSIONS = new Set<PermissionKey>([
+  ...ENGAGEMENT_SUPER_ADMIN_ONLY_PERMISSIONS,
   "view_user_groups_permissions",
   "manage_user_groups_permissions",
   "view_integrations",
@@ -518,6 +565,7 @@ const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "view_ops_dog_profile",
   "manage_ops_tasks",
   "receive_walks_board_reminders",
+  ...ENGAGEMENT_PARTICIPANT_PERMISSIONS,
 ];
 
 const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
@@ -602,6 +650,11 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "view_ops_command_center",
   "view_ops_dog_profile",
   "manage_ops_tasks",
+  ...ENGAGEMENT_PARTICIPANT_PERMISSIONS,
+  "engagement.view",
+  "engagement.manage_team",
+  "engagement.moderate",
+  "engagement.view_analytics",
 ];
 
 /** Trainer DigiBoard panel — trainer push, shift log entry, video links, notifications, complaints/requests/commissions, profile. */
@@ -630,6 +683,7 @@ const TRAINER_PERMISSIONS: PermissionKey[] = [
   "view_my_shift",
   "view_ops_command_center",
   "view_ops_dog_profile",
+  ...ENGAGEMENT_PARTICIPANT_PERMISSIONS,
 ];
 
 /** Groomer DigiBoard panel — grooming push, team log, video links, notifications, complaints/requests, profile. */
@@ -654,6 +708,7 @@ const GROOMER_PERMISSIONS: PermissionKey[] = [
   "view_my_shift",
   "view_ops_command_center",
   "view_ops_dog_profile",
+  ...ENGAGEMENT_PARTICIPANT_PERMISSIONS,
 ];
 
 /** Read-only staff roles (viewer / maintenance / generic staff). Overnight has its own panel. */
@@ -742,6 +797,7 @@ const DOG_HANDLER_PERMISSIONS: PermissionKey[] = [
   "view_ops_command_center",
   "view_ops_dog_profile",
   "receive_walks_board_reminders",
+  ...ENGAGEMENT_PARTICIPANT_PERMISSIONS,
 ];
 
 /** Team Lead DigiBoard panel — push, grooming, team log, video links, notifications, write-ups, profile. */
@@ -787,6 +843,7 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
   "view_ops_dog_profile",
   "manage_ops_tasks",
   "view_ops_command_center",
+  ...ENGAGEMENT_PARTICIPANT_PERMISSIONS,
 ];
 
 export const FRONT_DESK_COORDINATOR_TABS = [
@@ -930,10 +987,11 @@ export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
     "submit_groomer_complaint",
     "submit_groomer_request",
     "view_own_groomer_submissions",
-    ...STAFF_NOTIFICATION_PERMISSIONS
+    ...STAFF_NOTIFICATION_PERMISSIONS,
+    ...ENGAGEMENT_PARTICIPANT_PERMISSIONS
   ],
-  maintenance: STAFF_VIEWER_PERMISSIONS,
-  staff: STAFF_VIEWER_PERMISSIONS,
+  maintenance: [...STAFF_VIEWER_PERMISSIONS, ...ENGAGEMENT_PARTICIPANT_PERMISSIONS],
+  staff: [...STAFF_VIEWER_PERMISSIONS, ...ENGAGEMENT_PARTICIPANT_PERMISSIONS],
   marketing: MARKETING_PERMISSIONS,
   viewer: STAFF_VIEWER_PERMISSIONS
 };
@@ -1158,7 +1216,8 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   settings: "view_admin_panel",
   help: "view_admin_panel",
   lobby_slideshow: "manage_lobby_board",
-  cast_tv: "manage_cast_tv"
+  cast_tv: "manage_cast_tv",
+  team_engagement: "engagement.view"
 };
 
 export function canAccessTab(access: UserAccess | null | undefined, tab: string, legacyRole?: string | null): boolean {
@@ -1370,6 +1429,33 @@ export function canReviewManagementSupportForUser(access: UserAccess | null | un
 
 export function canManageSuperAdminUsers(actorAccess: UserAccess | null, actorLegacyRole?: string | null) {
   return isSuperAdminAccess(actorAccess) || isSuperAdminLegacyRole(actorLegacyRole);
+}
+
+export type TeamEngagementTier = "management" | "admin" | "super_admin";
+
+/** Leadership tier for Manage Team Engagement. Staff roles have no tier, even when a matrix grants engagement keys. */
+export function teamEngagementTier(
+  access: UserAccess | null | undefined,
+  legacyRole?: string | null
+): TeamEngagementTier | null {
+  const roles = new Set<RoleKey>(access?.roles ?? []);
+  if (legacyRole) {
+    const key = legacyRoleToRoleKey(legacyRole);
+    if (key === "super_admin" || key === "admin" || key === "management") roles.add(key);
+  }
+  if (roles.has("super_admin")) return "super_admin";
+  if (roles.has("admin")) return "admin";
+  if (roles.has("management")) return "management";
+  return null;
+}
+
+/** Management, Admin, and Super Admin with `engagement.view`; every other role is denied. */
+export function canUseTeamEngagement(access: UserAccess | null | undefined, legacyRole?: string | null) {
+  const tier = teamEngagementTier(access, legacyRole);
+  if (!tier) return false;
+  if (tier === "super_admin") return true;
+  const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+  return hasPermission(effective, "engagement.view");
 }
 
 export function isFrontDeskCoordinatorLegacyRole(legacyRole?: string | null) {
@@ -1619,6 +1705,12 @@ export function canAccessAdminTab(
   options?: { isDemo?: boolean }
 ): boolean {
   if (tab === "demo_push") return options?.isDemo === true && board === "staff";
+
+  // Checked before the full-admin early return so the tab never opens for staff roles or demo sessions.
+  if (tab === "team_engagement") {
+    if (board !== "staff" || options?.isDemo) return false;
+    return canUseTeamEngagement(access, legacyRole);
+  }
 
   // Retired entry tools — deny before the full-admin early return so they leave admin/management nav.
   if (tab === "trainer_entry" || tab === "handler_shift_entry") {

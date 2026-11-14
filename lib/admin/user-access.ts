@@ -265,15 +265,19 @@ const STAFF_DIRECTORY_DEPARTMENT_TO_RBAC: Record<string, DepartmentKey> = {
   admin: "admin"
 };
 
+export function rbacDepartmentForStaffLabel(staffDepartmentLabel?: string | null): DepartmentKey | null {
+  const normalized = String(staffDepartmentLabel ?? "")
+    .trim()
+    .toLowerCase();
+  return (normalized && STAFF_DIRECTORY_DEPARTMENT_TO_RBAC[normalized]) || null;
+}
+
 export function departmentsForLegacyRole(
   legacyRole?: AdminUserRole | null,
   staffDepartmentLabel?: string | null
 ): DepartmentKey[] {
   const primaryRole = legacyRoleToRoleKey(legacyRole);
-  const normalized = String(staffDepartmentLabel ?? "")
-    .trim()
-    .toLowerCase();
-  const mapped = normalized ? STAFF_DIRECTORY_DEPARTMENT_TO_RBAC[normalized] : undefined;
+  const mapped = rbacDepartmentForStaffLabel(staffDepartmentLabel);
   if (mapped) return [mapped];
   return defaultDepartmentsForRole(primaryRole);
 }
