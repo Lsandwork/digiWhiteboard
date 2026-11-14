@@ -78,6 +78,7 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
       { tab: "sa_floor_hub" },
       { tab: "sa_whiteboard_hub" },
       { tab: "ms_hub", label: "Support" },
+      { tab: "team_engagement", label: "Team Engagement" },
       { tab: "sa_people_hub" },
       { tab: "package_commissions", label: "Commissions" },
       { tab: "sa_apps_hub" },
