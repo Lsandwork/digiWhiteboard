@@ -352,8 +352,15 @@ export function GingrRouteGeneratorWorkspace({
         {exportMessage ? <p className="grg-export-status">{exportMessage}</p> : null}
         {exportWarning ? <p className="grg-export-warning">{exportWarning}</p> : null}
         {payload?.source === "upload" && payload.uploadFileName ? (
-          <p className="grg-export-status">
-            Using uploaded file {payload.uploadFileName}. Export writes a shortest-distance Samsara route (no traffic). Refresh pulls live Gingr again.
+          <p className="grg-export-warning" role="status">
+            Showing data from uploaded file {payload.uploadFileName}. Starts/Ends use that file, not live Gingr —
+            click <strong>Refresh</strong> to load Service Addons from Gingr for this date.
+          </p>
+        ) : payload?.source === "gingr_api" ? (
+          <p className="grg-export-status" role="status">
+            Live Gingr data for {payload.date}
+            {payload.cached ? " (cached — Refresh for a new pull)" : ""}.
+            {payload.warnings?.length ? ` ${payload.warnings.join(" ")}` : ""}
           </p>
         ) : null}
       </div>

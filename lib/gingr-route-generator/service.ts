@@ -6,6 +6,7 @@ import {
   type GingrRouteDog,
   type GingrRouteSchedulePayload
 } from "@/lib/gingr-route-generator/normalize";
+import { isRouteQualifyingActivity } from "@/lib/gingr-route-generator/activities";
 import {
   fitdogSignupsToRouteDogs,
   mergeFitdogRouteDogs
@@ -85,12 +86,24 @@ export async function loadGingrRouteSchedule(options: {
       fetchedAt: new Date().toISOString()
     });
     const dogs = mergeFitdogRouteDogs(gingr.dogs, fitdog.dogs);
+    const missingAddonDogs = dogs.filter(
+      (dog) =>
+        dog.activities.some((id) => isRouteQualifyingActivity(id)) &&
+        !dog.isTaxi &&
+        dog.appointmentOptions.length === 0
+    ).length;
+    const warnings = [...fitdog.warnings];
+    if (missingAddonDogs > 0) {
+      warnings.push(
+        `${missingAddonDogs} outing/class dog${missingAddonDogs === 1 ? "" : "s"} came back from Gingr with no Service Addon rows — Starts/Ends may show Needs review until Gingr exposes those addons on the reservation pull.`
+      );
+    }
     const next = {
       ...gingr,
       dogs,
       stats: summarizeRouteDogs(dogs),
       source: "gingr_api" as const,
-      ...(fitdog.warnings.length ? { warnings: fitdog.warnings } : {})
+      ...(warnings.length ? { warnings } : {})
     };
     writeGingrRouteCache(date, next);
     return next;
