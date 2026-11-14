@@ -6214,7 +6214,9 @@ html[data-theme="light"] .admin-toast--error {
 /*
  * Notification detail modal — dark overlay for every staff theme and role.
  * Portal wrapper resets Clear/Light navy tokens so body copy stays high-contrast.
+ * Same-element `.admin-theme.admin-on-dark` beats `html[data-theme=clear] .admin-theme`.
  */
+.admin-theme.notif-response-portal.admin-on-dark,
 .notif-response-portal.admin-on-dark {
   --fitdog-text: #f2f5f9;
   --fitdog-text-secondary: #c5d0dc;
@@ -6224,12 +6226,78 @@ html[data-theme="light"] .admin-toast--error {
   --text-primary: #f2f5f9;
   --text-secondary: #c5d0dc;
   --text-muted: #b8c5d6;
-  color: #f2f5f9;
+  --notif-modal-text: #f2f5f9;
+  --notif-modal-muted: #c5d0dc;
+  color: #f2f5f9 !important;
   background: transparent !important;
 }
 
-.notif-response-modal.admin-on-dark :is(.rich-text, .notif-response-rich-text) :is(p, li, span, div, em, strong, b, i, blockquote, ul, ol, h1, h2, h3, h4) {
+.notif-response-modal.admin-on-dark,
+.admin-theme .notif-response-modal.admin-on-dark {
+  --notif-modal-text: #f2f5f9;
+  --notif-modal-muted: #c5d0dc;
+  --fitdog-text: #f2f5f9;
+  --crossover-text: #f2f5f9;
+  --admin-muted: #c5d0dc;
+  color: #f2f5f9 !important;
+  background: #1a120c !important;
+}
+
+.notif-response-modal.admin-on-dark :is(
+    .rich-text,
+    .notif-response-rich-text,
+    .notif-response-details,
+    .notif-response-details__full,
+    .notif-response-details__grid,
+    .notif-hub-thread,
+    .notif-hub-thread__body,
+    .notif-hub-composer__label,
+    .notif-hub-composer__textarea,
+    .notif-hub-composer__check,
+    .notif-response-table td,
+    .notif-response-table__mono
+  ),
+.notif-response-modal.admin-on-dark :is(.rich-text, .notif-response-rich-text, .notif-response-details, .notif-hub-thread) :is(
+    p,
+    li,
+    span,
+    div,
+    em,
+    strong,
+    b,
+    i,
+    blockquote,
+    ul,
+    ol,
+    h1,
+    h2,
+    h3,
+    h4,
+    td,
+    th,
+    label
+  ) {
   color: var(--notif-modal-text, #f2f5f9) !important;
+}
+
+.notif-response-modal.admin-on-dark :is(
+    .notif-response-modal__section-title,
+    .notif-response-modal__meta,
+    .notif-response-table th,
+    .notif-hub-thread__role,
+    .notif-hub-thread__time,
+    .notif-hub-composer__quick-btn,
+    .notif-response-modal__loading,
+    .notif-response-modal__empty-thread,
+    .notif-response-modal__no-reply
+  ) {
+  color: var(--notif-modal-muted, #c5d0dc) !important;
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .notif-response-modal.admin-on-dark,
+:is(html[data-theme="light"], html[data-theme="clear"]) .admin-theme .notif-response-modal.admin-on-dark {
+  background: #1a120c !important;
+  color: #f2f5f9 !important;
 }
 
 /* Theme-aware admin surfaces (commissions, cast, drawers) */

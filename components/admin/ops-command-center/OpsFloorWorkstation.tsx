@@ -293,7 +293,7 @@ export function OpsFloorWorkstation({
   const showRail = view === "floor" || view === "issues";
 
   return (
-    <section className="ops-floor" aria-label="Ops floor workstation">
+    <section className="ops-floor admin-on-dark" aria-label="Ops floor workstation">
       <header className="ops-floor__chrome">
         <div className="ops-floor__brand">
           <Image src={RUFFOPS_MARK} alt="" width={28} height={28} className="ops-floor__brand-mark" />
@@ -618,12 +618,12 @@ export function OpsFloorWorkstation({
             ) : null}
             {view === "driver" ? (
               <div className="ops-floor__embedded">
-                <DriverModePanel />
+                <DriverModePanel theme="floor" />
               </div>
             ) : null}
             {view === "overnight" ? (
               <div className="ops-floor__embedded">
-                <OvernightCommandPanel />
+                <OvernightCommandPanel theme="floor" />
               </div>
             ) : null}
           </main>
@@ -738,6 +738,7 @@ export function OpsFloorWorkstation({
         open={Boolean(selectedRow)}
         title={selectedRow?.dogName ?? "Dog"}
         onClose={() => setSelectedRowId(null)}
+        theme="floor"
         footer={
           selectedRow ? (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>

@@ -54,7 +54,7 @@ export function OpsDogCard({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className={floor ? "ops-floor__dog truncate" : "truncate text-sm font-semibold text-white"}>{dog.name}</p>
-          {dog.status ? <OpsStatusBadge status={dog.status} /> : null}
+          {dog.status ? <OpsStatusBadge status={dog.status} theme={theme} /> : null}
         </div>
         <p className={floor ? "ops-floor__sub truncate" : "truncate text-xs text-admin-muted"}>
           {dog.ownerName || "Owner unknown"}

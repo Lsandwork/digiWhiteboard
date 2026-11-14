@@ -768,6 +768,143 @@
   border-color: rgba(255, 154, 143, 0.55);
 }
 
+.ops-floor__status {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--ops-line);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: capitalize;
+  color: var(--ops-muted);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ops-floor__status--ok {
+  color: var(--ops-green);
+  border-color: rgba(95, 212, 164, 0.4);
+  background: rgba(95, 212, 164, 0.1);
+}
+
+.ops-floor__status--info {
+  color: var(--ops-blue);
+  border-color: rgba(126, 192, 255, 0.4);
+  background: rgba(126, 192, 255, 0.1);
+}
+
+.ops-floor__status--warn {
+  color: var(--ops-amber);
+  border-color: rgba(240, 197, 106, 0.45);
+  background: rgba(240, 197, 106, 0.1);
+}
+
+.ops-floor__status--late {
+  color: var(--ops-red);
+  border-color: rgba(255, 154, 143, 0.45);
+  background: rgba(255, 154, 143, 0.1);
+}
+
+.ops-floor__status--muted {
+  color: var(--ops-muted);
+}
+
+.ops-floor__input {
+  min-height: 96px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--ops-line);
+  background: var(--ops-panel);
+  color: var(--ops-text);
+  font-size: 14px;
+  resize: vertical;
+}
+
+.ops-floor__input::placeholder {
+  color: var(--ops-faint);
+}
+
+.ops-floor__drawer-backdrop {
+  /* Keep Clear/Light from forcing a white sheet over the dark floor drawer */
+  background: rgba(0, 0, 0, 0.72) !important;
+}
+
+.ops-floor__drawer {
+  margin-left: auto;
+  height: 100%;
+  max-height: 100vh;
+  border-left: 1px solid var(--ops-line);
+  background: #121a22 !important;
+  color: var(--ops-text) !important;
+  box-shadow: -18px 0 48px rgba(0, 0, 0, 0.45);
+}
+
+.ops-floor__drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--ops-line);
+}
+
+.ops-floor__drawer-body {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+  color: var(--ops-text);
+}
+
+.ops-floor__drawer-body dd {
+  margin: 0;
+  color: var(--ops-text);
+}
+
+.ops-floor__drawer-foot {
+  border-top: 1px solid var(--ops-line);
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Beat Clear/Light canvas remaps inside the floor shell */
+.ops-floor.admin-on-dark,
+.ops-floor.admin-on-dark :is(h1, h2, h3, h4, p, span, label, td, th, li, strong, button, a) {
+  color: inherit;
+}
+
+.ops-floor.admin-on-dark {
+  color: var(--ops-text) !important;
+  --fitdog-text: var(--ops-text);
+  --fitdog-text-secondary: var(--ops-muted);
+  --admin-muted: var(--ops-muted);
+  --crossover-text: var(--ops-text);
+  --crossover-muted: var(--ops-muted);
+  --text-primary: var(--ops-text);
+  --text-secondary: var(--ops-muted);
+  --text-muted: var(--ops-faint);
+}
+
+.ops-floor .ops-floor__dog,
+.ops-floor .ops-floor__head h2,
+.ops-floor .ops-floor__station-head h2,
+.ops-floor .ops-floor__table td,
+.ops-floor .ops-floor__drawer,
+.ops-floor .ops-floor__drawer-body {
+  color: var(--ops-text) !important;
+}
+
+.ops-floor .ops-floor__sub,
+.ops-floor .ops-floor__muted,
+.ops-floor .ops-floor__head p,
+.ops-floor .ops-floor__station-head p,
+.ops-floor .text-admin-muted,
+.ops-floor .admin-muted {
+  color: var(--ops-muted) !important;
+}
+
 @media (max-width: 1100px) {
   .ops-floor__body {
     grid-template-columns: 1fr;

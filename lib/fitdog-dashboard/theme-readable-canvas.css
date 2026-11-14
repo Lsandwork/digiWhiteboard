@@ -767,12 +767,20 @@ html[data-theme="light"] .admin-toast {
 }
 
 /*
- * Intentional dark islands (Live Fleet, branded dark headers, map chrome).
+ * Intentional dark islands (Live Fleet, Floor workstation, notification modal,
+ * branded dark headers, map chrome).
  * Must come AFTER the light-canvas remaps so white / muted text stays readable
  * on dark backgrounds in Light and Clear themes.
+ *
+ * Include SAME-ELEMENT matches (`.admin-theme.admin-on-dark`) — the notification
+ * portal is itself `.admin-theme`, so descendant-only selectors miss the shell.
  */
-html[data-theme="light"] .admin-theme :is(.admin-on-dark, .notif-response-modal, .notif-response-portal),
-html[data-theme="clear"] .admin-theme :is(.admin-on-dark, .notif-response-modal, .notif-response-portal) {
+html[data-theme="light"] .admin-theme:is(.admin-on-dark, .notif-response-modal, .notif-response-portal),
+html[data-theme="clear"] .admin-theme:is(.admin-on-dark, .notif-response-modal, .notif-response-portal),
+html[data-theme="light"] .admin-theme :is(.admin-on-dark, .notif-response-modal, .notif-response-portal, .ops-floor),
+html[data-theme="clear"] .admin-theme :is(.admin-on-dark, .notif-response-modal, .notif-response-portal, .ops-floor),
+html[data-theme="light"] .ops-floor,
+html[data-theme="clear"] .ops-floor {
   --admin-muted: #cbd5e1;
   --fitdog-text: #f8fafc;
   --fitdog-text-secondary: #cbd5e1;
@@ -781,10 +789,12 @@ html[data-theme="clear"] .admin-theme :is(.admin-on-dark, .notif-response-modal,
   --text-primary: #f8fafc;
   --text-secondary: #cbd5e1;
   --text-muted: #94a3b8;
+  --notif-modal-text: #f2f5f9;
+  --notif-modal-muted: #c5d0dc;
   color: #f8fafc !important;
 }
 
-html[data-theme="light"] .admin-theme :is(.admin-on-dark, .notif-response-modal) :is(
+html[data-theme="light"] .admin-theme:is(.admin-on-dark, .notif-response-modal) :is(
     .text-white,
     [class*="text-white/"],
     .admin-text-emphasis,
@@ -793,7 +803,25 @@ html[data-theme="light"] .admin-theme :is(.admin-on-dark, .notif-response-modal)
     h3,
     h4
   ),
-html[data-theme="clear"] .admin-theme :is(.admin-on-dark, .notif-response-modal) :is(
+html[data-theme="clear"] .admin-theme:is(.admin-on-dark, .notif-response-modal) :is(
+    .text-white,
+    [class*="text-white/"],
+    .admin-text-emphasis,
+    h1,
+    h2,
+    h3,
+    h4
+  ),
+html[data-theme="light"] .admin-theme :is(.admin-on-dark, .notif-response-modal, .ops-floor) :is(
+    .text-white,
+    [class*="text-white/"],
+    .admin-text-emphasis,
+    h1,
+    h2,
+    h3,
+    h4
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-on-dark, .notif-response-modal, .ops-floor) :is(
     .text-white,
     [class*="text-white/"],
     .admin-text-emphasis,
@@ -805,12 +833,14 @@ html[data-theme="clear"] .admin-theme :is(.admin-on-dark, .notif-response-modal)
   color: #ffffff !important;
 }
 
-html[data-theme="light"] .admin-theme :is(.admin-on-dark, .notif-response-modal) :is(.text-admin-muted, .admin-muted, .admin-page-subtitle),
-html[data-theme="clear"] .admin-theme :is(.admin-on-dark, .notif-response-modal) :is(.text-admin-muted, .admin-muted, .admin-page-subtitle) {
+html[data-theme="light"] .admin-theme:is(.admin-on-dark, .notif-response-modal) :is(.text-admin-muted, .admin-muted, .admin-page-subtitle),
+html[data-theme="clear"] .admin-theme:is(.admin-on-dark, .notif-response-modal) :is(.text-admin-muted, .admin-muted, .admin-page-subtitle),
+html[data-theme="light"] .admin-theme :is(.admin-on-dark, .notif-response-modal, .ops-floor) :is(.text-admin-muted, .admin-muted, .admin-page-subtitle),
+html[data-theme="clear"] .admin-theme :is(.admin-on-dark, .notif-response-modal, .ops-floor) :is(.text-admin-muted, .admin-muted, .admin-page-subtitle) {
   color: #cbd5e1 !important;
 }
 
-html[data-theme="light"] .admin-theme :is(.admin-on-dark, .notif-response-modal) :is(
+html[data-theme="light"] .admin-theme:is(.admin-on-dark, .notif-response-modal) :is(
     [class*="text-slate-100"],
     [class*="text-slate-200"],
     [class*="text-slate-300"],
@@ -821,7 +851,29 @@ html[data-theme="light"] .admin-theme :is(.admin-on-dark, .notif-response-modal)
     [class*="text-zinc-200"],
     [class*="text-zinc-300"]
   ),
-html[data-theme="clear"] .admin-theme :is(.admin-on-dark, .notif-response-modal) :is(
+html[data-theme="clear"] .admin-theme:is(.admin-on-dark, .notif-response-modal) :is(
+    [class*="text-slate-100"],
+    [class*="text-slate-200"],
+    [class*="text-slate-300"],
+    [class*="text-gray-100"],
+    [class*="text-gray-200"],
+    [class*="text-gray-300"],
+    [class*="text-zinc-100"],
+    [class*="text-zinc-200"],
+    [class*="text-zinc-300"]
+  ),
+html[data-theme="light"] .admin-theme :is(.admin-on-dark, .notif-response-modal, .ops-floor) :is(
+    [class*="text-slate-100"],
+    [class*="text-slate-200"],
+    [class*="text-slate-300"],
+    [class*="text-gray-100"],
+    [class*="text-gray-200"],
+    [class*="text-gray-300"],
+    [class*="text-zinc-100"],
+    [class*="text-zinc-200"],
+    [class*="text-zinc-300"]
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-on-dark, .notif-response-modal, .ops-floor) :is(
     [class*="text-slate-100"],
     [class*="text-slate-200"],
     [class*="text-slate-300"],
@@ -835,16 +887,33 @@ html[data-theme="clear"] .admin-theme :is(.admin-on-dark, .notif-response-modal)
   color: #e2e8f0 !important;
 }
 
-html[data-theme="light"] .admin-theme .notif-response-modal :is(.rich-text, .notif-response-rich-text) :is(p, li, span, div, em, strong, b, i, blockquote, ul, ol),
-html[data-theme="clear"] .admin-theme .notif-response-modal :is(.rich-text, .notif-response-rich-text) :is(p, li, span, div, em, strong, b, i, blockquote, ul, ol) {
+html[data-theme="light"] .admin-theme .notif-response-modal :is(.rich-text, .notif-response-rich-text, .notif-response-details, .notif-hub-thread) :is(p, li, span, div, em, strong, b, i, blockquote, ul, ol, td, th, label),
+html[data-theme="clear"] .admin-theme .notif-response-modal :is(.rich-text, .notif-response-rich-text, .notif-response-details, .notif-hub-thread) :is(p, li, span, div, em, strong, b, i, blockquote, ul, ol, td, th, label),
+html[data-theme="light"] .notif-response-modal.admin-on-dark :is(.rich-text, .notif-response-rich-text, .notif-response-details, .notif-hub-thread) :is(p, li, span, div, em, strong, b, i, blockquote, ul, ol, td, th, label),
+html[data-theme="clear"] .notif-response-modal.admin-on-dark :is(.rich-text, .notif-response-rich-text, .notif-response-details, .notif-hub-thread) :is(p, li, span, div, em, strong, b, i, blockquote, ul, ol, td, th, label) {
   color: #f2f5f9 !important;
 }
 
 html[data-theme="light"] .admin-theme .notif-response-modal .notif-response-table td,
 html[data-theme="clear"] .admin-theme .notif-response-modal .notif-response-table td,
 html[data-theme="light"] .admin-theme .notif-response-modal .notif-response-table__mono,
-html[data-theme="clear"] .admin-theme .notif-response-modal .notif-response-table__mono {
+html[data-theme="clear"] .admin-theme .notif-response-modal .notif-response-table__mono,
+html[data-theme="light"] .notif-response-modal.admin-on-dark .notif-response-table td,
+html[data-theme="clear"] .notif-response-modal.admin-on-dark .notif-response-table td,
+html[data-theme="light"] .notif-response-modal.admin-on-dark .notif-response-table__mono,
+html[data-theme="clear"] .notif-response-modal.admin-on-dark .notif-response-table__mono {
   color: #f2f5f9 !important;
+}
+
+html[data-theme="light"] .admin-theme .notif-response-modal .notif-response-table th,
+html[data-theme="clear"] .admin-theme .notif-response-modal .notif-response-table th,
+html[data-theme="light"] .notif-response-modal.admin-on-dark .notif-response-table th,
+html[data-theme="clear"] .notif-response-modal.admin-on-dark .notif-response-table th,
+html[data-theme="light"] .admin-theme .notif-response-modal .notif-response-modal__section-title,
+html[data-theme="clear"] .admin-theme .notif-response-modal .notif-response-modal__section-title,
+html[data-theme="light"] .notif-response-modal.admin-on-dark .notif-response-modal__section-title,
+html[data-theme="clear"] .notif-response-modal.admin-on-dark .notif-response-modal__section-title {
+  color: #c5d0dc !important;
 }
 
 /* Hard-coded dark map / fleet chrome stays light-on-dark even without the class. */

@@ -253,11 +253,25 @@ html[data-theme="clear"] .crossover-table td {
   color: var(--fitdog-text);
 }
 
-html[data-theme="clear"] .admin-drawer-panel,
-html[data-theme="clear"] .admin-modal,
-html[data-theme="clear"] [class*="Modal"] {
+html[data-theme="clear"] .admin-drawer-panel:not(.ops-floor__drawer):not(.admin-on-dark),
+html[data-theme="clear"] .admin-modal:not(.admin-on-dark):not(.notif-response-modal),
+html[data-theme="clear"] [class*="Modal"]:not(.notif-response-modal):not(.admin-on-dark):not(.ops-floor__drawer) {
   background: #ffffff;
   color: var(--fitdog-text);
+}
+
+/* Never bleach intentional dark overlays (notification detail, floor drawers). */
+html[data-theme="clear"] .notif-response-modal,
+html[data-theme="clear"] .notif-response-modal.admin-on-dark,
+html[data-theme="clear"] .ops-floor__drawer,
+html[data-theme="clear"] .ops-floor__drawer.admin-on-dark {
+  background: #1a120c;
+  color: #f2f5f9;
+}
+
+html[data-theme="clear"] .ops-floor__drawer,
+html[data-theme="clear"] .ops-floor__drawer.admin-on-dark {
+  background: #121a22;
 }
 
 /*

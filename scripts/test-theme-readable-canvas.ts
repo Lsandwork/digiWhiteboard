@@ -43,6 +43,12 @@ assert.match(
   /:is\(\.admin-on-dark, \.notif-response-modal/,
   "clear/light must keep notification modal body text readable"
 );
+assert.match(
+  readable,
+  /\.admin-theme:is\(\.admin-on-dark, \.notif-response-modal/,
+  "clear/light must match admin-on-dark portals on the same element"
+);
+assert.match(readable, /\.ops-floor/, "clear/light must keep Floor workstation text light-on-dark");
 
 const clearTheme = readFileSync(resolve(root, "lib/fitdog-dashboard/theme-clear.css"), "utf8");
 assert.match(clearTheme, /html\[data-theme="clear"\] \.crossover-dashboard/, "clear theme must remap crossover-dashboard tokens");

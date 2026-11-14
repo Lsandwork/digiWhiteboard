@@ -137,13 +137,18 @@ export function FrontDeskCommandPanel({
           Open Gingr
         </a>
       </div>
-      <OpsSidePanel open={Boolean(selected)} title={selected?.name || "Dog"} onClose={() => setSelected(null)}>
+      <OpsSidePanel open={Boolean(selected)} title={selected?.name || "Dog"} onClose={() => setSelected(null)} theme={theme}>
         {selected ? (
           <div className="space-y-3">
-            <OpsDogCard dog={selected} />
-            <p className="text-sm text-admin-muted">1–2 action Front Desk flow: confirm board state, then open Gingr if billing/reservation changes are required.</p>
+            <OpsDogCard dog={selected} theme={theme} />
+            <p className={floor ? "ops-floor__sub" : "text-sm text-admin-muted"}>
+              1–2 action Front Desk flow: confirm board state, then open Gingr if billing/reservation changes are required.
+            </p>
             {selected.gingrAnimalId ? (
-              <a className="admin-btn-primary inline-flex" href={`/gingr?animalId=${encodeURIComponent(selected.gingrAnimalId)}`}>
+              <a
+                className={floor ? "ops-floor__act inline-flex" : "admin-btn-primary inline-flex"}
+                href={`/gingr?animalId=${encodeURIComponent(selected.gingrAnimalId)}`}
+              >
                 Open Gingr profile
               </a>
             ) : null}
@@ -257,7 +262,8 @@ export function YardCommandPanel({
   );
 }
 
-export function DriverModePanel() {
+export function DriverModePanel({ theme = "admin" }: { theme?: "admin" | "floor" }) {
+  const floor = theme === "floor";
   const [queue, setQueue] = useState(listOfflineQueue());
   const [note, setNote] = useState("");
 
@@ -304,18 +310,24 @@ export function DriverModePanel() {
   }
 
   return (
-    <section className="mx-auto max-w-xl space-y-4">
-      <header className="rounded-2xl border border-admin-border bg-admin-card p-4">
-        <h2 className="admin-text-emphasis text-2xl font-semibold">Driver / Hiker Mode</h2>
-        <p className="mt-1 text-sm text-admin-muted">Large touch targets. Complements Samsara — does not replace fleet management.</p>
+    <section className={floor ? "ops-floor__station mx-auto max-w-xl" : "mx-auto max-w-xl space-y-4"}>
+      <header className={floor ? "ops-floor__station-head" : "rounded-2xl border border-admin-border bg-admin-card p-4"}>
+        <h2 className={floor ? undefined : "admin-text-emphasis text-2xl font-semibold"}>Driver / Hiker Mode</h2>
+        <p className={floor ? undefined : "mt-1 text-sm text-admin-muted"}>
+          Large touch targets. Complements Samsara — does not replace fleet management.
+        </p>
       </header>
-      <div className="rounded-2xl border border-sky-400/20 bg-sky-500/10 p-4">
-        <p className="text-xs uppercase tracking-wide text-sky-100">Next stop</p>
-        <p className="admin-text-emphasis mt-2 text-2xl font-semibold">Use Route Generator + Samsara for live stop order</p>
-        <p className="mt-1 text-sm text-admin-muted">Confirm arrival / load / complete here so RuffOps keeps the operational timeline.</p>
+      <div className={floor ? "ops-floor__lane" : "rounded-2xl border border-sky-400/20 bg-sky-500/10 p-4"}>
+        <p className={floor ? "ops-floor__nav-label" : "text-xs uppercase tracking-wide text-sky-100"}>Next stop</p>
+        <p className={floor ? "ops-floor__dog" : "admin-text-emphasis mt-2 text-2xl font-semibold"} style={floor ? { fontSize: 22, marginTop: 8 } : undefined}>
+          Use Route Generator + Samsara for live stop order
+        </p>
+        <p className={floor ? "ops-floor__sub" : "mt-1 text-sm text-admin-muted"} style={floor ? { marginTop: 6 } : undefined}>
+          Confirm arrival / load / complete here so RuffOps keeps the operational timeline.
+        </p>
       </div>
       <textarea
-        className="admin-input min-h-24 w-full"
+        className={floor ? "ops-floor__input min-h-24 w-full" : "admin-input min-h-24 w-full"}
         placeholder="Driver notes (autosaved locally)"
         value={note}
         onChange={(event) => {
@@ -328,14 +340,14 @@ export function DriverModePanel() {
           <button
             key={label}
             type="button"
-            className="admin-btn-primary min-h-14 text-base font-semibold"
+            className={floor ? "ops-floor__act min-h-14 text-base" : "admin-btn-primary min-h-14 text-base font-semibold"}
             onClick={() => queueStop(label.toLowerCase().replace(/\s+/g, "_"))}
           >
             {label}
           </button>
         ))}
       </div>
-      <div className="rounded-xl border border-white/10 p-3 text-sm text-admin-muted">
+      <div className={floor ? "ops-floor__lane ops-floor__sub" : "rounded-xl border border-white/10 p-3 text-sm text-admin-muted"}>
         Sync queue: {queue.filter((q) => q.status !== "synced").length} waiting ·{" "}
         {navigator.onLine ? "Online" : "Offline — actions queued"}
       </div>
@@ -343,7 +355,8 @@ export function DriverModePanel() {
   );
 }
 
-export function OvernightCommandPanel() {
+export function OvernightCommandPanel({ theme = "admin" }: { theme?: "admin" | "floor" }) {
+  const floor = theme === "floor";
   const [rounds, setRounds] = useState<Array<Record<string, unknown>>>([]);
   const [loading, setLoading] = useState(true);
   const [busyRoundId, setBusyRoundId] = useState<string | null>(null);
@@ -376,30 +389,30 @@ export function OvernightCommandPanel() {
   }
 
   return (
-    <section className="space-y-4">
-      <header className="rounded-2xl border border-admin-border bg-admin-card p-4">
-        <h2 className="admin-text-emphasis text-xl font-semibold">Overnight Command Center</h2>
-        <p className="mt-1 text-sm text-admin-muted">Required timestamped rounds with escalation when missed.</p>
+    <section className={floor ? "ops-floor__station" : "space-y-4"}>
+      <header className={floor ? "ops-floor__station-head" : "rounded-2xl border border-admin-border bg-admin-card p-4"}>
+        <h2 className={floor ? undefined : "admin-text-emphasis text-xl font-semibold"}>Overnight Command Center</h2>
+        <p className={floor ? undefined : "mt-1 text-sm text-admin-muted"}>Required timestamped rounds with escalation when missed.</p>
       </header>
-      {loading ? <div className="h-24 animate-pulse rounded-2xl bg-white/5" /> : null}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      {loading ? <div className={floor ? "ops-floor__lane h-24 animate-pulse" : "h-24 animate-pulse rounded-2xl bg-white/5"} /> : null}
+      <div className={floor ? "ops-floor__yard-grid" : "grid gap-3 sm:grid-cols-2 lg:grid-cols-5"}>
         {rounds.map((round) => (
-          <div key={String(round.id)} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-            <p className="admin-text-emphasis text-lg font-semibold">{String(round.round_slot)}</p>
+          <div key={String(round.id)} className={floor ? "ops-floor__yard-tile" : "rounded-2xl border border-white/10 bg-white/[0.03] p-3"}>
+            <p className={floor ? "ops-floor__dog" : "admin-text-emphasis text-lg font-semibold"}>{String(round.round_slot)}</p>
             <div className="mt-2">
-              <OpsStatusBadge status={String(round.status)} />
+              <OpsStatusBadge status={String(round.status)} theme={theme} />
             </div>
             {String(round.status) !== "completed" ? (
               <button
                 type="button"
-                className="admin-btn-primary mt-3 w-full min-h-11"
+                className={floor ? "ops-floor__act mt-3 w-full min-h-11" : "admin-btn-primary mt-3 w-full min-h-11"}
                 disabled={busyRoundId === String(round.id)}
                 onClick={() => void complete(String(round.id))}
               >
                 {busyRoundId === String(round.id) ? "Saving…" : "Complete round"}
               </button>
             ) : (
-              <p className="mt-3 text-xs text-emerald-300">Completed</p>
+              <p className={floor ? "ops-floor__sub mt-3" : "mt-3 text-xs text-emerald-300"}>Completed</p>
             )}
           </div>
         ))}
