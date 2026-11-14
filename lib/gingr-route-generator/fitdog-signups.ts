@@ -3,10 +3,9 @@
  *
  * Outings, group classes, and taxi are booked on the Fitdog platform (class
  * occurrences), and many of those dogs never appear as Gingr reservations. Each
- * sign-up carries its own pickup and drop-off location: the owner's home (or a
- * custom address) is a Fitdog van leg; Fitdog Club makes the Club the dog's
- * transportation location, which the stop builder turns into a Club stop for
- * outings only.
+ * sign-up carries its own pickup and drop-off location, read as the matching
+ * appointment option: the owner's home (or a custom address) is a Fitdog home
+ * pick-up / drop-off; Fitdog Club is the owner handing the dog off at the Club.
  */
 
 import {
@@ -17,13 +16,16 @@ import {
   type GingrRouteActivityId
 } from "@/lib/gingr-route-generator/activities";
 import {
+  routeDogTransportFields,
   sortRouteDogs,
   type GingrRouteAddressStatus,
   type GingrRouteDog
 } from "@/lib/gingr-route-generator/normalize";
-import type { GingrTransportationType } from "@/lib/gingr-route-generator/transportation";
+import {
+  classifyAppointmentOption,
+  type GingrAppointmentOption
+} from "@/lib/gingr-route-generator/transportation";
 import { resolveRouteVanKey } from "@/lib/gingr-route-generator/van-assignment";
-import { appointmentOptionLabel } from "@/lib/gingr-route-generator/transportation";
 import type { FitdogClassSignup } from "@/lib/route-generator/fitdog-api";
 import type { NormalizedReportItem } from "@/lib/route-generator/parser";
 
@@ -114,9 +116,37 @@ function withAddress(dog: GingrRouteDog, item: NormalizedReportItem): void {
   dog.addressStatus = addressStatusOf(item);
 }
 
+const SIGNUP_OPTION_NAME = {
+  homePickup: "Before Outing - Fitdog to Pick Up @ Home",
+  clubDropoff: "Before Outing - Owner To Drop Off @ Fitdog Club",
+  homeDropoff: "After Outing - Fitdog to Drop Off @ Home",
+  clubPickup: "After Outing - Owner Pick Up @ Fitdog Club"
+} as const;
+
+function signupOption(name: string, signup: FitdogClassSignup): GingrAppointmentOption | null {
+  return classifyAppointmentOption(name, {
+    source: "fitdog_signup",
+    reservationId: signup.pickup.reservationId
+  });
+}
+
+function applyTransportFields(dog: GingrRouteDog, options: GingrAppointmentOption[]): void {
+  Object.assign(
+    dog,
+    routeDogTransportFields({
+      activities: dog.activities,
+      options,
+      homeAddress: dog.homeAddress,
+      addressStatus: dog.addressStatus,
+      alreadyOnProperty: dog.alreadyOnProperty
+    })
+  );
+}
+
 export function fitdogSignupsToRouteDogs(signups: FitdogClassSignup[], date: string): GingrRouteDog[] {
   const byDog = new Map<string, GingrRouteDog>();
   const activitySets = new Map<string, Set<GingrRouteActivityId>>();
+  const optionSets = new Map<string, GingrAppointmentOption[]>();
 
   for (const signup of signups) {
     const activity = activityForClass(signup);
@@ -136,22 +166,11 @@ export function fitdogSignupsToRouteDogs(signups: FitdogClassSignup[], date: str
         imageUrl: null,
         activities: [],
         activityLabels: [],
-        pickup: false,
-        dropoff: false,
-        pickupDestination: null,
-        dropoffDestination: null,
-        startLocation: "club",
-        endLocation: "club",
-        clubTransportLocation: false,
-        ownerClubDropoff: false,
-        ownerClubPickup: false,
-        returnToClub: false,
+        ...routeDogTransportFields({ activities: [], options: [], homeAddress: null, addressStatus: "ok" }),
         isTaxi: false,
         assignedTo: null,
         routeVanKey: "van_5",
         ownerLastName: pickup.ownerLastName,
-        alreadyOnProperty: false,
-        transportationTypes: [],
         scheduledTime: null,
         scheduledTimeLabel: null,
         notes: pickup.reservationNotes,
@@ -168,49 +187,31 @@ export function fitdogSignupsToRouteDogs(signups: FitdogClassSignup[], date: str
         homePostalCode: null,
         ownerPhone: pickup.raw?.phone || null,
         ownerFullName: pickup.ownerFullName,
-        addressStatus: "ok",
-        appointmentOptions: []
+        addressStatus: "ok"
       };
       byDog.set(key, dog);
       activitySets.set(key, new Set());
+      optionSets.set(key, []);
     }
     activitySets.get(key)!.add(activity);
 
-    const types = new Set<GingrTransportationType>(dog.transportationTypes);
+    const options = optionSets.get(key)!;
     const pickupKind = legKind(pickup);
     const dropoffKind = legKind(dropoff);
+    const hadHomeAddress = options.some((option) => option.location === "HOME");
     if (pickupKind === "home") {
-      dog.pickup = true;
-      dog.pickupDestination = "home";
-      dog.startLocation = "home";
-      types.add(activity === "taxi" ? "TAXI" : "FITDOG_HOME_PICKUP");
       withAddress(dog, pickup);
+    } else if (dropoffKind === "home" && (!hadHomeAddress || dog.addressStatus !== "ok")) {
+      withAddress(dog, dropoff);
     }
-    if (dropoffKind === "home") {
-      dog.dropoff = true;
-      dog.dropoffDestination = "home";
-      dog.endLocation = "home";
-      types.add(activity === "taxi" ? "TAXI" : "FITDOG_HOME_DROPOFF");
-      if (!dog.pickup || dog.addressStatus !== "ok") withAddress(dog, dropoff);
-    }
-    if (pickupKind === "club") {
-      dog.ownerClubDropoff = true;
-      dog.clubTransportLocation = true;
-    }
-    if (dropoffKind === "club") {
-      dog.ownerClubPickup = true;
-      dog.returnToClub = true;
-      dog.clubTransportLocation = true;
+    for (const name of [
+      pickupKind === "home" ? SIGNUP_OPTION_NAME.homePickup : pickupKind === "club" ? SIGNUP_OPTION_NAME.clubDropoff : null,
+      dropoffKind === "home" ? SIGNUP_OPTION_NAME.homeDropoff : dropoffKind === "club" ? SIGNUP_OPTION_NAME.clubPickup : null
+    ]) {
+      const option = name ? signupOption(name, signup) : null;
+      if (option) options.push(option);
     }
     if (activity === "taxi") dog.isTaxi = true;
-    dog.transportationTypes = Array.from(types);
-    for (const raw of [
-      pickupKind === "home" ? "Fitdog to Pick Up @ Home" : pickupKind === "club" ? "Owner Drop Off | Fitdog Club" : null,
-      dropoffKind === "home" ? "Fitdog to Drop Off @ Home" : dropoffKind === "club" ? "Owner Pick Up | Fitdog Club" : null
-    ]) {
-      const label = raw ? appointmentOptionLabel(raw) : null;
-      if (label && !dog.appointmentOptions.includes(label)) dog.appointmentOptions.push(label);
-    }
 
     const time = scheduledIso(date, pickup.timeWindowStart);
     if (time && (!dog.scheduledTime || time < dog.scheduledTime)) {
@@ -224,6 +225,7 @@ export function fitdogSignupsToRouteDogs(signups: FitdogClassSignup[], date: str
     dog.activities = sortGingrRouteActivities(activitySets.get(dog.id)!);
     dog.activityLabels = dog.activities.map((id) => GINGR_ROUTE_ACTIVITY_BY_ID[id].label);
     dog.routeVanKey = resolveRouteVanKey({ assignedLabels: [], isTaxi: dog.isTaxi, activities: dog.activities });
+    applyTransportFields(dog, optionSets.get(dog.id)!);
     if (!dog.pickup && !dog.dropoff) dog.addressStatus = "ok";
   }
   return dogs;
@@ -254,7 +256,7 @@ export function mergeFitdogRouteDogs(gingrDogs: GingrRouteDog[], fitdogDogs: Gin
     target.activities = sortGingrRouteActivities([...target.activities, ...src.activities]);
     target.activityLabels = target.activities.map((id) => GINGR_ROUTE_ACTIVITY_BY_ID[id].label);
     const needsAddress = (src.pickup && !target.pickup) || (src.dropoff && !target.dropoff);
-    if (needsAddress && target.addressStatus !== "ok") {
+    if (needsAddress && (target.addressStatus !== "ok" || !target.homeAddress)) {
       target.homeAddress = src.homeAddress;
       target.homeStreet1 = src.homeStreet1;
       target.homeStreet2 = src.homeStreet2;
@@ -263,20 +265,8 @@ export function mergeFitdogRouteDogs(gingrDogs: GingrRouteDog[], fitdogDogs: Gin
       target.homePostalCode = src.homePostalCode;
       target.addressStatus = src.addressStatus;
     }
-    if (src.pickup && !target.pickup) {
-      target.pickup = true;
-      target.pickupDestination = "home";
-      target.startLocation = "home";
-    }
-    if (src.dropoff && !target.dropoff) {
-      target.dropoff = true;
-      target.dropoffDestination = "home";
-      target.endLocation = "home";
-    }
-    target.clubTransportLocation = target.clubTransportLocation || src.clubTransportLocation;
     target.isTaxi = target.isTaxi || src.isTaxi;
-    target.transportationTypes = Array.from(new Set([...target.transportationTypes, ...src.transportationTypes]));
-    target.appointmentOptions = Array.from(new Set([...(target.appointmentOptions || []), ...(src.appointmentOptions || [])]));
+    applyTransportFields(target, [...target.appointmentOptionDetails, ...src.appointmentOptionDetails]);
     if (src.scheduledTime && (!target.scheduledTime || src.scheduledTime < target.scheduledTime)) {
       target.scheduledTime = src.scheduledTime;
       target.scheduledTimeLabel = src.scheduledTimeLabel;

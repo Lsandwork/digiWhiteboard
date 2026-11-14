@@ -266,20 +266,6 @@ export function dogHasClassActivity(activities: GingrRouteActivityId[]): boolean
 }
 
 /**
- * Only the outing category leaves Fitdog Club in a van (Adventure Hike, Beach
- * Excursion, Recall At The Beach). Every Group Training is a class and stays on
- * site, including Trainer Led Hike. This drives outing/van behavior only — a
- * dog's pickup and drop-off come from its transportation add-ons regardless.
- */
-export function isOffsiteGingrActivity(id: GingrRouteActivityId | null | undefined): boolean {
-  return Boolean(id && GINGR_ROUTE_ACTIVITY_BY_ID[id]?.category === "outing");
-}
-
-export function dogHasOffsiteActivity(activities: GingrRouteActivityId[]): boolean {
-  return activities.some((id) => isOffsiteGingrActivity(id));
-}
-
-/**
  * Only outings, taxi service, and classes are route services.
  *
  * The "club" category (daycare, boarding, overnight, dog hotel, general club

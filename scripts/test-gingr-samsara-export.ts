@@ -49,9 +49,31 @@ function makeStop(
   const address = partial.homeAddress ?? "123 Main St, Santa Monica, CA 90401, USA";
   const locationType =
     partial.locationType ?? (partial.destination === "club" ? "FITDOG_CLUB" : "OWNER_HOME");
+  const atClub = locationType === "FITDOG_CLUB";
   return {
     key: `${partial.date || date}|${partial.dogId}|${partial.kind}|${address}`,
     date: partial.date || date,
+    stopType:
+      partial.stopType ??
+      (partial.kind === "PICK_UP" ? (atClub ? "CLUB_PICKUP" : "HOME_PICKUP") : atClub ? "CLUB_DROPOFF" : "HOME_DROPOFF"),
+    dogs: partial.dogs ?? [
+      {
+        dogId: partial.dogId,
+        animalId: partial.animalId ?? 1,
+        dogName: partial.dogName,
+        ownerName: partial.ownerName ?? "Owner",
+        ownerLastName: null,
+        ownerFullName: partial.ownerFullName ?? "Owner Name",
+        ownerPhone: partial.ownerPhone ?? null,
+        reservationIds: [],
+        activityLabels: partial.activityLabels ?? ["Adventure Hike"],
+        reason: atClub ? "Boarding @ Fitdog Club" : "Fitdog to Pick Up @ Home",
+        handoffParty: "FITDOG",
+        transportOption: partial.transportOption ?? null,
+        scheduledTime: partial.scheduledTime ?? null,
+        instructions: partial.notes ?? null
+      }
+    ],
     dogId: partial.dogId,
     animalId: partial.animalId ?? 1,
     dogName: partial.dogName,
@@ -531,9 +553,19 @@ assert.deepEqual(gingrDepotPlan("van_6", "dropoff"), { start: "club", end: "club
     date
   ).dogs;
   const builtStops = buildTransportationStops(dogs, date);
-  assert.equal(builtStops.stops.length, 0, "owner pick-up at club is not a Samsara van stop");
+  assert.ok(
+    !builtStops.stops.some((s) => s.locationType === "OWNER_HOME"),
+    "owner pick-up at the Club never becomes a home drop-off"
+  );
+  assert.deepEqual(
+    builtStops.stops.map((s) => s.stopType),
+    ["CLUB_DROPOFF"],
+    "the van returns the dog to the Club, where the owner collects it"
+  );
   assert.equal(dogs[0]!.ownerClubPickup, true);
   assert.equal(dogs[0]!.dropoff, false);
+  assert.equal(dogs[0]!.transportPlan.startingLocation.locationType, "UNKNOWN", "no Before option, no guessed start");
+  assert.deepEqual(builtStops.reviewDogs.map((d) => d.dogName), ["Cove"]);
 }
 
 // Boarding @ Fitdog Club exports as a real Fitdog Club stop without needing a geocode.
@@ -587,6 +619,86 @@ assert.deepEqual(gingrDepotPlan("van_6", "dropoff"), { start: "club", end: "club
     "Club drop-off notes name the location"
   );
   assert.equal(built.pickupTrackingStops.length, 0, "no owner tracking SMS for a Club pickup");
+}
+
+// Van 5/6 routes already start and end at the Club: Club dogs ride on those rows, never a second Club row.
+{
+  const boarder = (id: string, name: string, last: string) =>
+    reservation({
+      reservation_id: id,
+      animal_id: Number(id.replace(/\D/g, "")),
+      a_name: name,
+      a_o_first_name: "Pat",
+      a_o_last_name: last,
+      reservation_type: { type: "Overnight: Petite Suite" },
+      start_date: "2026-08-28T07:00:00-07:00",
+      end_date: "2026-09-04T18:00:00-07:00",
+      check_in_date: "2026-08-28T09:00:00-07:00",
+      services: [{ name: "Leash Manners | Group Training - Business Only", scheduled_at: `${date}T10:00:00-07:00` }],
+      owner: ownerWithAddress({ last_name: last })
+    });
+  const dogs = normalizeGingrRouteReservations(
+    [boarder("9101", "Juniper", "Ames"), boarder("9102", "Kiwi", "Banks")],
+    date
+  ).dogs;
+  assert.ok(dogs.every((d) => d.routeVanKey === "van_5"));
+  const builtStops = buildTransportationStops(dogs, date);
+  assert.deepEqual(
+    builtStops.stops.map((s) => `${s.stopType}:${s.dogs.length}`),
+    ["CLUB_PICKUP:2", "CLUB_DROPOFF:2"],
+    "two boarding dogs share one Club pickup and one Club return"
+  );
+  const built = buildGingrSamsaraCsvFromStops({ date, stops: builtStops.stops, geocoded: new Map() });
+  assert.equal(built.validation.ok, true, JSON.stringify(built.validation.report.errors));
+  assert.equal(built.routedStopCount, 2);
+  const clubRows = built.rows.filter((r) => /Fitdog Club/i.test(r.stopName));
+  assert.ok(clubRows.every((r) => isFacilityBookendRow(r)), "no extra Club row beside the start / end rows");
+  const pickRoute = built.rows.filter((r) => /Pickup|Pick-Up|Pick Up/i.test(r.routeName));
+  const dropRoute = built.rows.filter((r) => /Drop/i.test(r.routeName));
+  assert.equal(pickRoute.length, 2);
+  assert.match(pickRoute[0]!.stopNotes, /^START: .*PICK UP AT FITDOG CLUB \(2\): Juniper Ames; Kiwi Banks/);
+  assert.match(dropRoute[dropRoute.length - 1]!.stopNotes, /^END: .*DROP OFF AT FITDOG CLUB \(2\): Juniper Ames; Kiwi Banks/);
+}
+
+// Dogs from one household share one home stop; each dog stays listed.
+{
+  const address = "123 Main St, Santa Monica, CA 90401, USA";
+  const sibling = (id: string, name: string) =>
+    reservation({
+      id,
+      animal_id: Number(id.replace(/\D/g, "")),
+      a_name: name,
+      a_o_first_name: "Sarah",
+      a_o_last_name: "Miller",
+      type: "Adventure Hike",
+      services: [{ name: "Adventure Hike", scheduled_at: `${date}T09:00:00-07:00` }],
+      addons: [
+        { name: "Before Outing - Fitdog to Pick Up @ Home" },
+        { name: "After Outing - Fitdog to Drop Off @ Home" }
+      ],
+      pickup_instructions: `${name} waits by the gate`,
+      owner: ownerWithAddress()
+    });
+  const dogs = normalizeGingrRouteReservations([sibling("9201", "Pip"), sibling("9202", "Rue")], date).dogs;
+  const builtStops = buildTransportationStops(dogs, date);
+  assert.equal(builtStops.stops.length, 2, "one pickup and one drop-off for the household");
+  const pick = builtStops.stops.find((s) => s.kind === "PICK_UP")!;
+  assert.deepEqual(pick.dogs.map((d) => d.dogName), ["Pip", "Rue"]);
+  assert.equal(pick.dogName, "Pip & Rue");
+  const built = buildGingrSamsaraCsvFromStops({
+    date,
+    stops: builtStops.stops,
+    geocoded: new Map([[address, geoFor(address)]])
+  });
+  assert.equal(built.validation.ok, true);
+  const homeRows = customerRows(built.rows);
+  assert.equal(homeRows.length, 2);
+  assert.match(homeRows[0]!.stopName, /^Pip & Rue \(Sarah M\.\) - PICK UP FROM HOME$/);
+  assert.match(homeRows[0]!.stopNotes, /Dogs: Pip & Rue/);
+  assert.match(homeRows[0]!.stopNotes, /Pip: Pick Up Instructions: Pip waits by the gate/);
+  assert.match(homeRows[0]!.stopNotes, /Rue: Pick Up Instructions: Rue waits by the gate/);
+  assert.equal(built.pickupTrackingStops.length, 1);
+  assert.deepEqual(built.pickupTrackingStops[0]!.dogIds.sort(), ["animal:9201", "animal:9202"]);
 }
 
 console.log("test-gingr-samsara-export: all assertions passed");

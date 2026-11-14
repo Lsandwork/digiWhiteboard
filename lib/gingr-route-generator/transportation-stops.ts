@@ -1,27 +1,59 @@
 /**
- * Build van stops for every scheduled Gingr Route dog.
+ * Build Fitdog driver stops from each dog's transport plan.
  *
- * Fitdog to Pick Up / Drop Off @ Home use the owner address.
- * Boarding @ Fitdog Club makes Fitdog Club the stop location — the day's
- * activities decide whether the Club is the pickup or the drop-off.
+ * A Fitdog home pick-up / drop-off is a stop at the owner's address. A dog that
+ * starts or ends an activity day at Fitdog Club (boarding, or handed off there
+ * by the owner) is picked up from / returned to the Club. Dogs that share a
+ * van, a run, and a physical place share one stop, and each dog stays listed
+ * on it with the option that put it there.
  */
 
 import { DEFAULT_FITDOG_LOCATIONS } from "@/lib/route-generator/locations";
-import { dogHasOffsiteActivity } from "@/lib/gingr-route-generator/activities";
 import type { GingrRouteDog } from "@/lib/gingr-route-generator/normalize";
-import type { GingrTransportationType } from "@/lib/gingr-route-generator/transportation";
+import type {
+  GingrResponsibleParty,
+  GingrTransportationType,
+  GingrTransportEnd
+} from "@/lib/gingr-route-generator/transportation";
 import { clubPassengerNote, type GingrRouteVanKey } from "@/lib/gingr-route-generator/van-assignment";
 
 export type TransportationKind = "PICK_UP" | "DROP_OFF";
 
 export type TransportationLocationType = "OWNER_HOME" | "FITDOG_CLUB";
 
-export type TransportationStop = {
-  /** Stable dedupe key: date|dogId|kind|addressFingerprint */
-  key: string;
-  date: string;
+export type TransportationStopType = "HOME_PICKUP" | "HOME_DROPOFF" | "CLUB_PICKUP" | "CLUB_DROPOFF";
+
+export type TransportationStopDog = {
   dogId: string;
   animalId: number | null;
+  dogName: string;
+  ownerName: string;
+  ownerLastName: string | null;
+  ownerFullName: string | null;
+  ownerPhone: string | null;
+  reservationIds: number[];
+  activityLabels: string[];
+  /** Appointment option (or rule) that puts the dog at this stop. */
+  reason: string;
+  /** Who hands the dog to the driver (pick-up) or receives it (drop-off), besides Fitdog staff. */
+  handoffParty: GingrResponsibleParty;
+  transportOption: GingrTransportationType | null;
+  scheduledTime: string | null;
+  /** Drop-off / pick-up instructions and client notes for this dog. */
+  instructions: string | null;
+};
+
+export type TransportationStop = {
+  /** Stable key for one physical stop: date|van|kind|place */
+  key: string;
+  date: string;
+  stopType: TransportationStopType;
+  /** Every dog served at this stop. */
+  dogs: TransportationStopDog[];
+  /** First dog's id; `dogs` lists everyone at the stop. */
+  dogId: string;
+  animalId: number | null;
+  /** Every dog at the stop, e.g. "Scout & Maple". */
   dogName: string;
   ownerName: string;
   ownerFullName: string | null;
@@ -31,7 +63,7 @@ export type TransportationStop = {
   destination: "home" | "club";
   locationType: TransportationLocationType;
   locationLabel: string;
-  /** Gingr transportation option that created this stop. */
+  /** Gingr transportation option that created this stop (first dog). */
   transportOption: GingrTransportationType | null;
   routeVanKey?: GingrRouteVanKey;
   activityLabels: string[];
@@ -46,12 +78,21 @@ export type TransportationStop = {
   addressStatus: "ok" | "missing" | "incomplete";
 };
 
+export type TransportationReviewDog = {
+  dogId: string;
+  dogName: string;
+  ownerName: string;
+  issues: string[];
+};
+
 export type TransportationStopBuildResult = {
   stops: TransportationStop[];
   exportable: TransportationStop[];
   missingAddress: TransportationStop[];
   pickupCount: number;
   dropoffCount: number;
+  /** Dogs whose options are missing or conflicting; their unknown ends get no stop. */
+  reviewDogs: TransportationReviewDog[];
 };
 
 function addressFingerprint(dog: GingrRouteDog): string {
@@ -83,21 +124,113 @@ function clubAddressParts() {
   };
 }
 
+/** "Scout", "Scout & Maple", "Scout, Maple & Pepper". */
+export function joinDogNames(names: string[]): string {
+  const unique = Array.from(new Set(names.filter(Boolean)));
+  if (unique.length <= 1) return unique[0] ?? "";
+  return `${unique.slice(0, -1).join(", ")} & ${unique[unique.length - 1]}`;
+}
+
+function dogInstructions(dog: GingrRouteDog, locationType: TransportationLocationType): string | null {
+  if (locationType === "FITDOG_CLUB") return null;
+  return (
+    [
+      dog.dropoffInstructions ? `Drop-off Instructions: ${dog.dropoffInstructions}` : null,
+      dog.pickupInstructions && dog.pickupInstructions !== dog.dropoffInstructions
+        ? `Pick Up Instructions: ${dog.pickupInstructions}`
+        : null,
+      dog.notes
+    ]
+      .filter(Boolean)
+      .join(" | ") || null
+  );
+}
+
+function stopDog(
+  dog: GingrRouteDog,
+  end: GingrTransportEnd,
+  locationType: TransportationLocationType
+): TransportationStopDog {
+  return {
+    dogId: dog.id,
+    animalId: dog.animalId,
+    dogName: dog.name,
+    ownerName: dog.owner,
+    ownerLastName: dog.ownerLastName,
+    ownerFullName: dog.ownerFullName,
+    ownerPhone: dog.ownerPhone,
+    reservationIds: [...dog.reservationIds],
+    activityLabels: [...dog.activityLabels],
+    reason: end.basis || (locationType === "FITDOG_CLUB" ? "Fitdog Club" : "Owner home"),
+    handoffParty: end.responsibleParty,
+    transportOption:
+      dog.isTaxi && locationType === "OWNER_HOME"
+        ? "TAXI"
+        : end.transportationType === "UNKNOWN"
+          ? null
+          : end.transportationType,
+    scheduledTime: dog.scheduledTime,
+    instructions: dogInstructions(dog, locationType)
+  };
+}
+
+/** Short reason for Club driver notes. */
+function noteReason(entry: TransportationStopDog): string {
+  const reason = entry.reason.toLowerCase();
+  if (/boarding/.test(reason)) return "boarding";
+  if (/owner/.test(reason) && /drop off/.test(reason)) return "owner drop-off at Club";
+  if (/owner/.test(reason) && /pick up/.test(reason)) return "owner pick-up at Club";
+  return entry.reason;
+}
+
+function composeStopNotes(stop: TransportationStop): string | null {
+  if (stop.locationType === "FITDOG_CLUB") {
+    return (
+      stop.dogs
+        .map((entry) => `${clubPassengerNote(entry.dogName, entry.ownerLastName)} (${noteReason(entry)})`)
+        .join("; ") || null
+    );
+  }
+  if (stop.dogs.length === 1) return stop.dogs[0]!.instructions;
+  return (
+    stop.dogs
+      .filter((entry) => entry.instructions)
+      .map((entry) => `${entry.dogName}: ${entry.instructions}`)
+      .join(" | ") || null
+  );
+}
+
+function refreshStopSummary(stop: TransportationStop): void {
+  stop.dogs.sort((a, b) => a.dogName.localeCompare(b.dogName));
+  const first = stop.dogs[0]!;
+  stop.dogId = first.dogId;
+  stop.animalId = first.animalId;
+  stop.dogName = joinDogNames(stop.dogs.map((entry) => entry.dogName));
+  stop.ownerName = Array.from(new Set(stop.dogs.map((entry) => entry.ownerName).filter(Boolean))).join(" / ");
+  stop.ownerFullName = stop.dogs.find((entry) => entry.ownerFullName)?.ownerFullName ?? null;
+  stop.ownerPhone = stop.dogs.find((entry) => entry.ownerPhone)?.ownerPhone ?? null;
+  stop.transportOption = first.transportOption;
+  stop.activityLabels = Array.from(new Set(stop.dogs.flatMap((entry) => entry.activityLabels)));
+  const times = stop.dogs.map((entry) => entry.scheduledTime).filter((t): t is string => Boolean(t)).sort();
+  stop.scheduledTime = times[0] ?? null;
+  stop.notes = composeStopNotes(stop);
+}
+
 function makeStop(
+  key: string,
   date: string,
   dog: GingrRouteDog,
   kind: TransportationKind,
-  locationType: TransportationLocationType,
-  transportOption: GingrTransportationType | null
+  stopType: TransportationStopType
 ): TransportationStop {
-  const destination = locationType === "FITDOG_CLUB" ? "club" : "home";
+  const locationType: TransportationLocationType =
+    stopType === "CLUB_PICKUP" || stopType === "CLUB_DROPOFF" ? "FITDOG_CLUB" : "OWNER_HOME";
   const club = locationType === "FITDOG_CLUB" ? clubAddressParts() : null;
-  const fingerprint = locationType === "FITDOG_CLUB" ? "fitdog-club" : addressFingerprint(dog);
-  const passenger = clubPassengerNote(dog.name, dog.ownerLastName);
-  const clubNotes = locationType === "FITDOG_CLUB" ? passenger : null;
   return {
-    key: `${date}|${dog.id}|${kind}|${fingerprint}`,
+    key,
     date,
+    stopType,
+    dogs: [],
     dogId: dog.id,
     animalId: dog.animalId,
     dogName: dog.name,
@@ -105,24 +238,14 @@ function makeStop(
     ownerFullName: dog.ownerFullName,
     ownerPhone: dog.ownerPhone,
     kind,
-    destination,
+    destination: locationType === "FITDOG_CLUB" ? "club" : "home",
     locationType,
     locationLabel: locationType === "FITDOG_CLUB" ? DEFAULT_FITDOG_LOCATIONS.club.name : "Owner Home",
-    transportOption,
+    transportOption: null,
     routeVanKey: dog.routeVanKey,
-    activityLabels: [...dog.activityLabels],
-    scheduledTime: dog.scheduledTime,
-    notes:
-      [
-        clubNotes,
-        dog.dropoffInstructions ? `Drop-off Instructions: ${dog.dropoffInstructions}` : null,
-        dog.pickupInstructions && dog.pickupInstructions !== dog.dropoffInstructions
-          ? `Pick Up Instructions: ${dog.pickupInstructions}`
-          : null,
-        locationType === "OWNER_HOME" ? dog.notes : null
-      ]
-        .filter(Boolean)
-        .join(" | ") || null,
+    activityLabels: [],
+    scheduledTime: null,
+    notes: null,
     homeAddress: club?.homeAddress ?? dog.homeAddress,
     homeStreet1: club?.homeStreet1 ?? dog.homeStreet1,
     homeStreet2: club?.homeStreet2 ?? dog.homeStreet2,
@@ -131,21 +254,6 @@ function makeStop(
     homePostalCode: club?.homePostalCode ?? dog.homePostalCode,
     addressStatus: locationType === "FITDOG_CLUB" ? "ok" : dog.addressStatus
   };
-}
-
-function mergeActivityLabels(target: TransportationStop, incoming: TransportationStop) {
-  const set = new Set([...target.activityLabels, ...incoming.activityLabels]);
-  target.activityLabels = Array.from(set);
-  if (incoming.notes) {
-    if (!target.notes) target.notes = incoming.notes;
-    else if (!target.notes.includes(incoming.notes)) {
-      target.notes = `${target.notes} | ${incoming.notes}`;
-    }
-  }
-  if (!target.scheduledTime && incoming.scheduledTime) {
-    target.scheduledTime = incoming.scheduledTime;
-  }
-  if (!target.ownerPhone && incoming.ownerPhone) target.ownerPhone = incoming.ownerPhone;
 }
 
 function compareStops(a: TransportationStop, b: TransportationStop): number {
@@ -160,65 +268,44 @@ function compareStops(a: TransportationStop, b: TransportationStop): number {
   return a.dogName.localeCompare(b.dogName);
 }
 
-/**
- * Where the dog joins and leaves the Fitdog van for this route date.
- *
- * Home legs come only from the Fitdog @ Home options (or a dated taxi).
- *
- * Fitdog Club is the stop location for the outbound leg of an offsite activity
- * whenever the dog is already at the Club — boarding or dropped off by the owner
- * (Club → Hike / Beach). The return leg belongs to the Club only when the dog
- * is boarding there (Hike / Beach → Club); Owner Pick Up | Fitdog Club stays
- * owner-operated and never becomes a van stop.
- */
-export function resolveStopPlan(dog: GingrRouteDog): {
-  pickup: { locationType: TransportationLocationType; option: GingrTransportationType | null } | null;
-  dropoff: { locationType: TransportationLocationType; option: GingrTransportationType | null } | null;
-} {
-  const homePickup = dog.pickup && dog.pickupDestination === "home";
-  const homeDropoff = dog.dropoff && dog.dropoffDestination === "home";
-  const offsite = dogHasOffsiteActivity(dog.activities);
-  const clubPickup = offsite && (dog.clubTransportLocation || dog.ownerClubDropoff);
-  const clubDropoff = offsite && dog.clubTransportLocation;
-
-  return {
-    pickup: homePickup
-      ? { locationType: "OWNER_HOME", option: dog.isTaxi ? "TAXI" : "FITDOG_HOME_PICKUP" }
-      : clubPickup
-        ? {
-            locationType: "FITDOG_CLUB",
-            option: dog.clubTransportLocation ? "BOARDING_CLUB" : "OWNER_CLUB_DROPOFF"
-          }
-        : null,
-    dropoff: homeDropoff
-      ? { locationType: "OWNER_HOME", option: dog.isTaxi ? "TAXI" : "FITDOG_HOME_DROPOFF" }
-      : clubDropoff
-        ? { locationType: "FITDOG_CLUB", option: "BOARDING_CLUB" }
-        : null
-  };
-}
-
 export function buildTransportationStops(
   dogs: GingrRouteDog[],
   date: string
 ): TransportationStopBuildResult {
   const byKey = new Map<string, TransportationStop>();
+  const reviewDogs: TransportationReviewDog[] = [];
 
   for (const dog of dogs) {
-    const plan = resolveStopPlan(dog);
-    for (const [kind, leg] of [
-      ["PICK_UP", plan.pickup],
-      ["DROP_OFF", plan.dropoff]
-    ] as const) {
-      if (!leg) continue;
-      const stop = makeStop(date, dog, kind, leg.locationType, leg.option);
-      const existing = byKey.get(stop.key);
-      if (!existing) byKey.set(stop.key, stop);
-      else mergeActivityLabels(existing, stop);
+    const plan = dog.transportPlan;
+    if (plan.status === "NEEDS_REVIEW") {
+      reviewDogs.push({ dogId: dog.id, dogName: dog.name, ownerName: dog.owner, issues: [...plan.issues] });
+    }
+    const legs = [
+      ["PICK_UP", plan.pickupStopType, plan.startingLocation],
+      ["DROP_OFF", plan.dropoffStopType, plan.finalDestination]
+    ] as const;
+    for (const [kind, stopType, end] of legs) {
+      if (!stopType) continue;
+      const atClub = stopType === "CLUB_PICKUP" || stopType === "CLUB_DROPOFF";
+      const place = atClub
+        ? "fitdog-club"
+        : dog.addressStatus === "ok" && dog.homeAddress
+          ? `home:${addressFingerprint(dog)}`
+          : `home-unrouted:${dog.id}`;
+      const key = `${date}|${dog.routeVanKey}|${kind}|${place}`;
+      let stop = byKey.get(key);
+      if (!stop) {
+        stop = makeStop(key, date, dog, kind, stopType);
+        byKey.set(key, stop);
+      }
+      if (stop.dogs.some((entry) => entry.dogId === dog.id)) continue;
+      stop.dogs.push(stopDog(dog, end, stop.locationType));
     }
   }
 
-  const stops = Array.from(byKey.values()).sort(compareStops);
+  const stops = Array.from(byKey.values());
+  for (const stop of stops) refreshStopSummary(stop);
+  stops.sort(compareStops);
   const exportable = stops.filter((s) => s.addressStatus === "ok" && Boolean(s.homeAddress));
   const missingAddress = stops.filter((s) => s.addressStatus !== "ok" || !s.homeAddress);
 
@@ -227,7 +314,8 @@ export function buildTransportationStops(
     exportable,
     missingAddress,
     pickupCount: stops.filter((s) => s.kind === "PICK_UP").length,
-    dropoffCount: stops.filter((s) => s.kind === "DROP_OFF").length
+    dropoffCount: stops.filter((s) => s.kind === "DROP_OFF").length,
+    reviewDogs
   };
 }
 
