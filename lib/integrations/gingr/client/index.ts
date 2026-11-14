@@ -168,12 +168,14 @@ export function createGingrClient(overrides?: GingrClientConfig) {
       return rows;
     },
     async listReservationsByOwner(ownerId: string) {
-      const payload = await requestForm<unknown>(
-        `/api/v1/reservations_by_owner`,
-        { owner_id: ownerId },
-        "GET"
-      );
-      return normalizeGingrReservationList(payload);
+      const fields = { owner_id: ownerId, location_id: config.locationId };
+      try {
+        const payload = await requestForm<unknown>(`/api/v1/reservations_by_owner`, fields, "POST");
+        return normalizeGingrReservationList(payload);
+      } catch {
+        const payload = await requestForm<unknown>(`/api/v1/reservations_by_owner`, fields, "GET");
+        return normalizeGingrReservationList(payload);
+      }
     }
   };
 }

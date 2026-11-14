@@ -912,6 +912,21 @@ export function collectReservationTransportCandidates(
       ...collectCandidatesFromValue(reservation.additional_services, "addon", emptyInherited),
       ...collectCandidatesFromValue(reservation.reservation_services, "addon", emptyInherited),
       ...collectCandidatesFromValue(reservation.appointment_options, "addon", emptyInherited),
+      ...collectCandidatesFromValue(
+        (reservation as Record<string, unknown>).appointment_option,
+        "addon",
+        emptyInherited
+      ),
+      ...collectCandidatesFromValue(
+        (reservation as Record<string, unknown>).appt_options,
+        "addon",
+        emptyInherited
+      ),
+      ...collectCandidatesFromValue(
+        (reservation as Record<string, unknown>).booking_options,
+        "addon",
+        emptyInherited
+      ),
       ...collectCandidatesFromValue(reservation.options, "addon", emptyInherited),
       ...collectCandidatesFromValue(reservation.reservation_options, "addon", emptyInherited),
       ...collectCandidatesFromValue(reservation.service_items, "addon", emptyInherited),
