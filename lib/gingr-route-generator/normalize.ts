@@ -31,6 +31,7 @@ import {
   resolveRouteVanKey,
   type GingrRouteVanKey
 } from "@/lib/gingr-route-generator/van-assignment";
+import { listReservationServiceArrays } from "@/lib/gingr-route-generator/reservation-service-rows";
 
 export type GingrRouteAddressStatus = "ok" | "missing" | "incomplete";
 
@@ -157,27 +158,11 @@ function reservationTypeName(reservation: GingrReservation): string {
 }
 
 function reservationServiceRows(reservation: GingrReservation): Array<Record<string, unknown>> {
-  const record = reservation as Record<string, unknown>;
-  const candidates = [
-    record.services,
-    record.additional_services,
-    record.reservation_services,
-    record.addons,
-    record.service_addons
-  ];
-  const rows: Array<Record<string, unknown>> = [];
-  for (const candidate of candidates) {
-    if (!Array.isArray(candidate)) continue;
-    for (const item of candidate) {
-      const row = asRecord(item);
-      if (Object.keys(row).length) rows.push(row);
-    }
-  }
-  return rows;
+  return listReservationServiceArrays(reservation as Record<string, unknown>);
 }
 
 function serviceName(service: Record<string, unknown>): string {
-  return pickString(service.name, service.service, service.type, service.s_name) || "";
+  return pickString(service.name, service.service, service.type, service.s_name, service.s_type) || "";
 }
 
 function ownerDisplayName(reservation: GingrReservation): string {

@@ -6,16 +6,9 @@
 import type { GingrReservation } from "@/lib/integrations/gingr/types";
 import { mergeGingrServiceRows, serviceRowKey } from "@/lib/tl-digi-board/gingr-service-completion";
 
-const SERVICE_ARRAY_KEYS = [
-  "services",
-  "additional_services",
-  "reservation_services",
-  "addons",
-  "service_addons",
-  "appointment_options",
-  "options",
-  "reservation_options"
-] as const;
+import { RESERVATION_SERVICE_ARRAY_KEYS } from "@/lib/gingr-route-generator/reservation-service-rows";
+
+const SERVICE_ARRAY_KEYS = RESERVATION_SERVICE_ARRAY_KEYS;
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;

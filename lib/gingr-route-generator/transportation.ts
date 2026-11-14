@@ -9,6 +9,7 @@
  */
 
 import { DEFAULT_FITDOG_LOCATIONS } from "@/lib/route-generator/locations";
+import { listReservationServiceArrays } from "@/lib/gingr-route-generator/reservation-service-rows";
 
 export type GingrTransportationType =
   | "FITDOG_HOME_PICKUP"
@@ -28,6 +29,7 @@ const NAME_KEYS = [
   "addon",
   "addon_name",
   "s_name",
+  "s_type",
   "title",
   "label",
   "service_name",
@@ -105,6 +107,12 @@ export function gingrTimestampDateKey(value: unknown): string | null {
   const raw = String(value).trim();
   const isoDay = raw.match(/^(\d{4}-\d{2}-\d{2})/);
   if (isoDay) return isoDay[1];
+  const slashDay = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (slashDay) {
+    const month = slashDay[1]!.padStart(2, "0");
+    const day = slashDay[2]!.padStart(2, "0");
+    return `${slashDay[3]}-${month}-${day}`;
+  }
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) return null;
   try {
@@ -826,7 +834,10 @@ function serviceRowTransportCandidates(reservation: Record<string, unknown>): Tr
         assignedTo: row.assigned_to
       });
     };
-    addText(String(row.name ?? row.service ?? row.type ?? row.s_name ?? "").trim(), "service");
+    addText(
+      String(row.name ?? row.service ?? row.type ?? row.s_name ?? row.s_type ?? row.addon_name ?? "").trim(),
+      "service"
+    );
     const description = pickServiceAddonDescription(row);
     if (description) addText(description, "addon");
     for (const text of collectGingrTextValues(row.addonData ?? row.addon_data)) {
@@ -845,27 +856,7 @@ function pickServiceAddonDescription(row: Record<string, unknown>): string | nul
 }
 
 function listServiceLikeRows(reservation: Record<string, unknown>): Array<Record<string, unknown>> {
-  const rows: Array<Record<string, unknown>> = [];
-  for (const key of [
-    "addons",
-    "addon",
-    "service_addons",
-    "service_addon",
-    "additional_services",
-    "reservation_services",
-    "services",
-    "options",
-    "appointment_options",
-    "reservation_options"
-  ]) {
-    const value = reservation[key];
-    if (!Array.isArray(value)) continue;
-    for (const item of value) {
-      const row = asRecord(item);
-      if (row) rows.push(row);
-    }
-  }
-  return rows;
+  return listReservationServiceArrays(reservation);
 }
 
 /** Every appointment-option-like text on the reservation (never the reservation type). */

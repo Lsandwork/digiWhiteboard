@@ -136,21 +136,36 @@ export function createGingrClient(overrides?: GingrClientConfig) {
       return normalizeGingrReservationList(payload);
     },
     async listReservationsByDate(date: string) {
-      const payload = await requestForm<unknown>(`/api/v1/reservations`, {
+      return this.listReservationsPaged({
         start_date: date,
         end_date: date,
-        location_id: config.locationId,
         checked_in: "false"
       });
-      return normalizeGingrReservationList(payload);
     },
     /** Checked-in reservations — often carry fuller nested service / addon rows. */
     async listCheckedInReservations() {
-      const payload = await requestForm<unknown>(`/api/v1/reservations`, {
-        location_id: config.locationId,
-        checked_in: "true"
-      });
-      return normalizeGingrReservationList(payload);
+      return this.listReservationsPaged({ checked_in: "true" });
+    },
+    /** Page through POST /api/v1/reservations until an empty or duplicate page. */
+    async listReservationsPaged(fields: Record<string, string>, maxPages = 8) {
+      const rows: GingrReservation[] = [];
+      let previousSignature = "";
+      for (let page = 1; page <= maxPages; page += 1) {
+        const payload = await requestForm<unknown>(`/api/v1/reservations`, {
+          ...fields,
+          location_id: config.locationId,
+          page: String(page)
+        });
+        const batch = normalizeGingrReservationList(payload);
+        if (!batch.length) break;
+        const signature = batch
+          .map((row) => String((row as GingrReservation).id ?? (row as GingrReservation).reservation_id))
+          .join("|");
+        if (page > 1 && signature === previousSignature) break;
+        previousSignature = signature;
+        rows.push(...batch);
+      }
+      return rows;
     },
     async listReservationsByOwner(ownerId: string) {
       const payload = await requestForm<unknown>(

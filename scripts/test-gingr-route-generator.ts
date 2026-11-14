@@ -1815,6 +1815,30 @@ void (async () => {
     assert.equal(splitAddons.dogs[0]!.startLocation, "home");
     assert.equal(splitAddons.dogs[0]!.endLocation, "home");
 
+    const [rdY, rdM, rdD] = routeDate.split("-");
+    const gingrSlashDate = `${Number(rdM)}/${Number(rdD)}/${rdY}`;
+    const serviceItems = normalizeGingrRouteReservations(
+      [
+        reservation({
+          reservation_id: "9701",
+          animal_id: 9700,
+          a_name: "Annie",
+          owner: ownerHome(),
+          type: "Sports Sign Ups",
+          services: [{ name: "Activity | Adventure Hike", scheduled_at: `${routeDate}T09:00:00-07:00` }],
+          service_items: [
+            { name: "Before Outing - Fitdog to Pick Up @ Home", scheduled_at: `${gingrSlashDate} 12:00 am` },
+            { name: "After Outing - Fitdog to Drop Off @ Home", scheduled_at: `${gingrSlashDate} 12:00 am` }
+          ]
+        })
+      ],
+      routeDate
+    ).dogs[0];
+    assert.ok(serviceItems, "Annie service_items fixture");
+    assert.ok(serviceItems!.appointmentOptions.length >= 2, "service_items carry Service Addons");
+    assert.equal(serviceItems!.startLocation, "home");
+    assert.equal(serviceItems!.endLocation, "home");
+
     // 11. Sport Sign Ups is a qualifying class service.
     const sport = normalizeGingrRouteReservations(
       [
