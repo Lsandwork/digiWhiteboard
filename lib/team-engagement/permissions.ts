@@ -56,13 +56,19 @@ export function effectiveEngagementPermissions(
 ): EngagementPermission[] {
   const tier = teamEngagementTier(access, legacyRole);
   const granted = new Set(access?.permissions ?? []);
-  return ENGAGEMENT_PERMISSION_KEYS.filter((permission) => {
+  const list = ENGAGEMENT_PERMISSION_KEYS.filter((permission) => {
     if (tier === "super_admin") return true;
     if (!granted.has(permission)) return false;
     if (PARTICIPANT_PERMISSIONS.has(permission)) return true;
     if (!tier) return false;
     return !ENGAGEMENT_SUPER_ADMIN_ONLY_PERMISSIONS.has(permission);
   });
+  if (list.includes("engagement.participate")) {
+    const set = new Set(list);
+    set.add("engagement.create_bark_out");
+    return [...set];
+  }
+  return list;
 }
 
 export type DepartmentScope = {
@@ -166,9 +172,9 @@ export type ActionRule = ViewRule & {
 
 /** POST actions of `/api/admin/team-engagement`. */
 export const LEADERSHIP_ACTION_RULES = {
-  create_bark_out: { permission: "engagement.create_bark_out", feature: "bark_outs" },
-  confirm_bark_out: { permission: "engagement.create_bark_out", feature: "bark_outs" },
-  withdraw_bark_out: { permission: "engagement.create_bark_out" },
+  create_bark_out: { permission: "engagement.participate", feature: "bark_outs" },
+  confirm_bark_out: { permission: "engagement.participate", feature: "bark_outs" },
+  withdraw_bark_out: { permission: "engagement.participate" },
   react_bark_out: { permission: "engagement.participate", feature: "reactions" },
   unreact_bark_out: { permission: "engagement.participate", feature: "reactions" },
   approve_bark_out: { permission: "engagement.moderate" },
@@ -220,9 +226,9 @@ export type LeadershipAction = keyof typeof LEADERSHIP_ACTION_RULES;
 
 /** Employee feed actions of `/api/admin/bark-outs`. These never need a leadership tier. */
 export const PARTICIPANT_ACTION_RULES = {
-  create_bark_out: { permission: "engagement.create_bark_out", feature: "bark_outs" },
-  confirm_bark_out: { permission: "engagement.create_bark_out", feature: "bark_outs" },
-  withdraw_bark_out: { permission: "engagement.create_bark_out" },
+  create_bark_out: { permission: "engagement.participate", feature: "bark_outs" },
+  confirm_bark_out: { permission: "engagement.participate", feature: "bark_outs" },
+  withdraw_bark_out: { permission: "engagement.participate" },
   react_bark_out: { permission: "engagement.participate", feature: "reactions" },
   unreact_bark_out: { permission: "engagement.participate", feature: "reactions" },
   report_bark_out: { permission: "engagement.participate", feature: "concern_reports" },

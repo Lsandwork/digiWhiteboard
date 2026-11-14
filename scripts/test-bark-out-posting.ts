@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { accessFromLegacyRole } from "@/lib/admin/permissions";
 import { buildEngagementActor } from "@/lib/team-engagement/authorize";
 import { barkOutPostingState } from "@/lib/team-engagement/bark-out-posting";
+import { effectiveEngagementPermissions } from "@/lib/team-engagement/permissions";
 
 function actorForLegacy(role: string, impersonated = false) {
   const access = accessFromLegacyRole(`id-${role}`, `${role}@fitdog.test`, role);
@@ -44,5 +45,16 @@ assert.ok(stripped.permissions.includes("engagement.create_bark_out"), "baseline
 const impersonating = actorForLegacy("dog_handler", true);
 assert.equal(barkOutPostingState(impersonating).canPost, false);
 assert.equal(barkOutPostingState(impersonating).blockedReason, "impersonated");
+
+const participateOnly = effectiveEngagementPermissions({
+  userId: "id-p",
+  email: "p@fitdog.test",
+  primaryRole: "groomer",
+  roles: ["groomer"],
+  departments: [],
+  permissions: ["engagement.participate"],
+  displayLabel: "Groomer"
+});
+assert.ok(participateOnly.includes("engagement.create_bark_out"), "participate implies create_bark_out for API checks");
 
 console.log("test-bark-out-posting: ok");

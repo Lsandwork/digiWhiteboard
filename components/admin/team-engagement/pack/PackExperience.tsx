@@ -528,6 +528,16 @@ export default function PackExperience() {
     );
   }
 
+  function openCreateBarkOut() {
+    if (!pack) return;
+    if (!pack.me.canPost) {
+      setError(pack.me.postingBlockedMessage ?? "You cannot create a Bark Out right now.");
+      return;
+    }
+    setError(null);
+    setModalOpen(true);
+  }
+
   if (!pack.storageReady) {
     return <p className="ro-te-muted">Team Engagement is being set up. Run migration 103 on Supabase, then refresh.</p>;
   }
@@ -581,11 +591,15 @@ export default function PackExperience() {
             <span className="pack-pill">{pack.stats.barkOutsThisWeek} new this week</span>
             {pack.stats.pendingMyPosts > 0 ? <span className="pack-pill">{pack.stats.pendingMyPosts} awaiting review</span> : null}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-              {pack.me.canPost ? (
-                <button type="button" className="pack-btn pack-btn--primary" onClick={() => setModalOpen(true)}>
-                  + Give a Bark Out
-                </button>
-              ) : null}
+              <button
+                type="button"
+                className="pack-btn pack-btn--primary"
+                aria-disabled={!pack.me.canPost}
+                style={!pack.me.canPost ? { opacity: 0.85 } : undefined}
+                onClick={openCreateBarkOut}
+              >
+                Create Bark Out
+              </button>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "flex-end" }}>
                 <button type="button" className="pack-btn pack-btn--ghost" onClick={() => setSection("milestones")}>
                   Milestones
@@ -644,6 +658,26 @@ export default function PackExperience() {
         ))}
       </nav>
 
+      <div
+        className="pack-card"
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          marginBottom: 16,
+          flexWrap: "wrap",
+          padding: "12px 16px"
+        }}
+      >
+        <p className="pack-muted" style={{ margin: 0, fontSize: 14 }}>
+          Recognize any teammate—create a Bark Out from here on any tab.
+        </p>
+        <button type="button" className="pack-btn pack-btn--primary" onClick={openCreateBarkOut}>
+          Create Bark Out
+        </button>
+      </div>
+
       {error ? <p className="ro-te-error">{error}</p> : null}
 
       {pendingSent.length > 0 ? (
@@ -685,11 +719,9 @@ export default function PackExperience() {
                   title="Every great team has moments worth celebrating"
                   body="Give someone their first Bark Out — recognition starts with you."
                 />
-                {pack.me.canPost ? (
-                  <button type="button" className="pack-btn pack-btn--primary" style={{ marginTop: 12 }} onClick={() => setModalOpen(true)}>
-                    Give a Bark Out
-                  </button>
-                ) : null}
+                <button type="button" className="pack-btn pack-btn--primary" style={{ marginTop: 12 }} onClick={openCreateBarkOut}>
+                  Create Bark Out
+                </button>
               </div>
             ) : (
               feedItems.map((item) => <BarkOutCard key={item.id} item={item} onReact={react} onReport={reportBarkOut} />)
@@ -830,11 +862,9 @@ export default function PackExperience() {
             <h2 className="pack-card__title" style={{ margin: 0 }}>
               Bark Outs
             </h2>
-            {pack.me.canPost ? (
-              <button type="button" className="pack-btn pack-btn--primary" onClick={() => setModalOpen(true)}>
-                Give a Bark Out
-              </button>
-            ) : null}
+            <button type="button" className="pack-btn pack-btn--primary" onClick={openCreateBarkOut}>
+              Create Bark Out
+            </button>
           </div>
           <div className="pack-nav" style={{ marginBottom: 16 }}>
             {(
@@ -1328,7 +1358,7 @@ export default function PackExperience() {
         <div className="pack-modal-backdrop" role="presentation" onClick={() => setModalOpen(false)}>
           <div className="pack-modal" role="dialog" aria-labelledby="pack-bark-out-title" onClick={(event) => event.stopPropagation()}>
             <h2 id="pack-bark-out-title" style={{ marginTop: 0 }}>
-              Give a Bark Out
+              Create Bark Out
             </h2>
             <p className="pack-muted" style={{ fontSize: 13, lineHeight: 1.45 }}>
               {COMMUNITY_GUIDELINE}
@@ -1376,7 +1406,7 @@ export default function PackExperience() {
                     Cancel
                   </button>
                   <button type="submit" className="pack-btn pack-btn--primary" disabled={busy}>
-                    Publish
+                    Create Bark Out
                   </button>
                 </div>
               </form>

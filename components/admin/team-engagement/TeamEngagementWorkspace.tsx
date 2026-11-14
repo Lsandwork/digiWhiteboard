@@ -8,7 +8,7 @@ import TeamEngagementParticipationPanel from "@/components/admin/team-engagement
  * Leadership opens Manage + The Pack (participate). Staff only see The Pack.
  */
 export default function TeamEngagementWorkspace({ leadership }: { leadership: boolean }) {
-  const [mode, setMode] = useState<"pack" | "manage">(leadership ? "manage" : "pack");
+  const [mode, setMode] = useState<"pack" | "manage">("pack");
   if (!leadership) {
     return <TeamEngagementParticipationPanel />;
   }

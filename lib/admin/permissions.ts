@@ -770,7 +770,8 @@ const MARKETING_PERMISSIONS: PermissionKey[] = [
   "card_studio.issue",
   "card_studio.print",
   "card_studio.manage_assets",
-  "card_studio.revoke"
+  "card_studio.revoke",
+  ...ENGAGEMENT_PARTICIPANT_PERMISSIONS
 ];
 
 /** Transportation / Driver-Hiker Route Generator operations (no settings). */
