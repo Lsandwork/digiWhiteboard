@@ -1,0 +1,145 @@
+.staff-training {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 1100px;
+}
+
+.staff-training-hero {
+  padding: 1.25rem 1.5rem;
+  border-radius: 12px;
+  background: var(--admin-surface-elevated, #f8fafc);
+  border: 1px solid var(--admin-border, #e2e8f0);
+}
+
+.staff-training-notice {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.staff-training-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .staff-training-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.staff-training-lesson-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.staff-training-lesson-btn {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--admin-border, #e2e8f0);
+  background: #fff;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+
+.staff-training-lesson-btn.is-active {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.staff-training-lesson-btn.is-done::after {
+  content: " ✓";
+  color: #15803d;
+}
+
+.staff-training-player {
+  border: 1px solid var(--admin-border, #e2e8f0);
+  border-radius: 12px;
+  padding: 1rem 1.25rem 1.25rem;
+  background: #fff;
+}
+
+.staff-training-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.staff-training-pill {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #f1f5f9;
+}
+
+.staff-training-pill--warn {
+  background: #fef3c7;
+}
+
+.staff-training-video-shell {
+  aspect-ratio: 16 / 9;
+  background: #0f172a;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #e2e8f0;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+
+.staff-training-video-shell video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.staff-training-script {
+  white-space: pre-wrap;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  max-height: 220px;
+  overflow: auto;
+  padding: 0.75rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.staff-training-steps {
+  margin: 1rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.staff-training-quiz label {
+  display: block;
+  margin: 0.35rem 0;
+  font-size: 0.9rem;
+}
+
+.staff-training-report table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.staff-training-report th,
+.staff-training-report td {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0.5rem 0.4rem;
+  text-align: left;
+}
