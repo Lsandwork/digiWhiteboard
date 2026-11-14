@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
-import type { UserAccess } from "@/lib/admin/permissions";
+import { legacyRoleToRoleKey, ROLE_PERMISSIONS, type UserAccess } from "@/lib/admin/permissions";
 import { getAdminSessionFromRequest, type AdminSession } from "@/lib/admin/session";
 import { getUserAccessMap } from "@/lib/admin/user-access";
 import { normalizeAdminUserId } from "@/lib/admin/users";
@@ -23,7 +23,32 @@ import {
   type ParticipantAction,
   type ViewRule
 } from "@/lib/team-engagement/permissions";
+import type { EngagementPermission } from "@/lib/team-engagement/permissions";
 import type { DepartmentManagerRow, EngagementActor, EngagementDb } from "@/lib/team-engagement/types";
+
+/** Role matrix edits must not strip Bark Out participation that the static role defaults include. */
+function withBaselineParticipantPermissions(
+  permissions: EngagementPermission[],
+  legacyRole: string
+): EngagementPermission[] {
+  const set = new Set(permissions);
+  const roleKey = legacyRoleToRoleKey(legacyRole);
+  for (const key of ROLE_PERMISSIONS[roleKey] ?? []) {
+    if (key === "engagement.participate" || key === "engagement.create_bark_out") {
+      set.add(key);
+    }
+  }
+  return [...set];
+}
+
+async function engagementStorageReady(db: EngagementDb): Promise<boolean> {
+  try {
+    const status = await db.tableStatus();
+    return Boolean(status.team_engagement_bark_outs && status.team_engagement_settings);
+  } catch {
+    return false;
+  }
+}
 
 export type EngagementIdentity = {
   userId: string;
@@ -62,7 +87,10 @@ export function buildEngagementActor(input: {
 }): EngagementActor {
   const { identity, access } = input;
   const tier = teamEngagementTier(access, identity.legacyRole);
-  const permissions = effectiveEngagementPermissions(access, identity.legacyRole);
+  const permissions = withBaselineParticipantPermissions(
+    effectiveEngagementPermissions(access, identity.legacyRole),
+    identity.legacyRole
+  );
   const scope = resolveDepartmentScope({
     tier,
     permissions,
@@ -224,11 +252,12 @@ export async function loadEngagementContext(
       return { ok: false, response: Response.json({ error: INACTIVE_MESSAGE, code: "forbidden" }, { status: 403 }) };
     }
     const db = createSupabaseEngagementDb(supabase);
-    const [accessMap, managed] = await Promise.all([
+    const [accessMap, managed, storageReady] = await Promise.all([
       getUserAccessMap(supabase, [
         { id: identity.userId, email: identity.email, full_name: identity.name, role: identity.legacyRole }
       ]),
-      loadManagedDepartments(db, identity.userId)
+      loadManagedDepartments(db, identity.userId),
+      engagementStorageReady(db)
     ]);
     const access = accessMap[identity.userId];
     const actor = buildEngagementActor({
@@ -237,7 +266,7 @@ export async function loadEngagementContext(
       managedDepartments: managed.departments,
       impersonated: Boolean(session.impersonatorEmail)
     });
-    return { ok: true, context: { session, supabase, db, actor, storageReady: managed.storageReady } };
+    return { ok: true, context: { session, supabase, db, actor, storageReady: storageReady || managed.storageReady } };
   } catch (error) {
     return { ok: false, response: engagementErrorResponse(error) };
   }

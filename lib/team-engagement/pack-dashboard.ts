@@ -5,6 +5,7 @@ import type { BarkOutView } from "@/lib/team-engagement/bark-outs";
 import type { ServiceContext } from "@/lib/team-engagement/context";
 import { commentCounts, milestonesView, packTablesReady, resolvePackSpotlight, funZoneView } from "@/lib/team-engagement/pack-features";
 import type { DbFilter } from "@/lib/team-engagement/types";
+import { barkOutPostingState } from "@/lib/team-engagement/bark-out-posting";
 import { PACK_PRIORITY2_MIGRATION, PACK_PRIORITY3_MIGRATION } from "@/lib/team-engagement/constants";
 import { packGoalsEmployeeView } from "@/lib/team-engagement/pack-goals";
 import { employeeVoiceCatalog } from "@/lib/team-engagement/employee-voice";
@@ -59,6 +60,7 @@ async function distinctAuthorsSince(ctx: ServiceContext, since: string): Promise
 /** Staff landing dashboard for The Pack — real counts only, no fabricated posts. */
 export async function packDashboard(ctx: ServiceContext) {
   const settings = await ctx.settings();
+  const posting = barkOutPostingState(ctx.actor, { barkOutsEnabled: settings.features.bark_outs });
   if (!ctx.storageReady) {
     return { storageReady: false as const, features: settings.features };
   }
@@ -118,7 +120,10 @@ export async function packDashboard(ctx: ServiceContext) {
     me: {
       userId: ctx.actor.userId,
       name: ctx.actor.name,
-      canPost: ctx.actor.permissions.includes("engagement.create_bark_out") && !ctx.actor.impersonated
+      canPost: posting.canPost,
+      postingBlockedReason: posting.blockedReason,
+      postingBlockedMessage: posting.blockedMessage,
+      impersonated: ctx.actor.impersonated
     },
     tagline: "Good things happen when we work together.",
     stats: {

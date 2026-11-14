@@ -39,7 +39,14 @@ type CommentItem = {
 type PackPayload = {
   storageReady: boolean;
   greeting: string;
-  me: { userId: string; name: string; canPost: boolean };
+  me: {
+    userId: string;
+    name: string;
+    canPost: boolean;
+    postingBlockedReason?: string;
+    postingBlockedMessage?: string;
+    impersonated?: boolean;
+  };
   tagline: string;
   stats: {
     barkOutsThisMonth: number;
@@ -437,6 +444,23 @@ export default function PackExperience() {
         </div>
       </header>
 
+      {pack.me.impersonated && pack.me.postingBlockedMessage ? (
+        <div className="pack-card" style={{ marginBottom: 16, borderColor: "#c77d2d" }}>
+          <strong>Viewing as {pack.me.name}</strong>
+          <p className="pack-muted" style={{ margin: "6px 0 0", fontSize: 13 }}>
+            {pack.me.postingBlockedMessage}
+          </p>
+        </div>
+      ) : null}
+      {!pack.me.canPost && !pack.me.impersonated && pack.me.postingBlockedMessage ? (
+        <div className="pack-card" style={{ marginBottom: 16, borderColor: "#c77d2d" }}>
+          <strong>Bark Outs unavailable</strong>
+          <p className="pack-muted" style={{ margin: "6px 0 0", fontSize: 13 }}>
+            {pack.me.postingBlockedMessage}
+          </p>
+        </div>
+      ) : null}
+
       {pack.packSetup && pack.packSetup.migrations.length > 0 ? (
         <div className="pack-card" style={{ marginBottom: 16, borderColor: "var(--pack-blue)" }}>
           <strong>Database setup still needed</strong>
@@ -466,10 +490,17 @@ export default function PackExperience() {
           <section className="pack-card">
             <h2 className="pack-card__title">Your Team Feed</h2>
             {feedItems.length === 0 ? (
-              <SectionEmpty
-                title="Every great team has moments worth celebrating"
-                body="Give someone their first Bark Out — recognition starts with you."
-              />
+              <div>
+                <SectionEmpty
+                  title="Every great team has moments worth celebrating"
+                  body="Give someone their first Bark Out — recognition starts with you."
+                />
+                {pack.me.canPost ? (
+                  <button type="button" className="pack-btn pack-btn--primary" style={{ marginTop: 12 }} onClick={() => setModalOpen(true)}>
+                    Give a Bark Out
+                  </button>
+                ) : null}
+              </div>
             ) : (
               feedItems.map((item) => <BarkOutCard key={item.id} item={item} onReact={react} />)
             )}

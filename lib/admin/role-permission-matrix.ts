@@ -43,6 +43,14 @@ function enforceEngagementLocks(matrix: RolePermissionMatrix) {
         matrix[role][key] = (ROLE_PERMISSIONS[role] ?? []).includes(key) && !ENGAGEMENT_SUPER_ADMIN_ONLY_PERMISSIONS.has(key);
       }
     }
+    if (!ENGAGEMENT_LEADERSHIP_ROLES.has(role)) {
+      for (const key of ENGAGEMENT_PARTICIPANT_KEYS) {
+        if ((ROLE_PERMISSIONS[role] ?? []).includes(key)) {
+          if (!matrix[role]) matrix[role] = {};
+          matrix[role][key] = true;
+        }
+      }
+    }
   }
   return matrix;
 }

@@ -10,6 +10,7 @@ import {
   TEAM_ENGAGEMENT_MIGRATION,
   departmentLabel
 } from "@/lib/team-engagement/constants";
+import { barkOutPostingState } from "@/lib/team-engagement/bark-out-posting";
 import {
   accessView,
   aiPolicyView,
@@ -418,9 +419,17 @@ async function participantHome(ctx: ServiceContext) {
     sharedDevelopmentForEmployee(ctx),
     settings.features.feedback ? myFeedback(ctx) : { items: [] }
   ]);
+  const posting = barkOutPostingState(ctx.actor, { barkOutsEnabled: settings.features.bark_outs });
   return {
     storageReady: true,
-    me: { userId: ctx.actor.userId, name: ctx.actor.name, canPost: ctx.actor.permissions.includes("engagement.create_bark_out") && !ctx.actor.impersonated },
+    me: {
+      userId: ctx.actor.userId,
+      name: ctx.actor.name,
+      canPost: posting.canPost,
+      postingBlockedReason: posting.blockedReason,
+      postingBlockedMessage: posting.blockedMessage,
+      impersonated: ctx.actor.impersonated
+    },
     features: settings.features,
     categories: settings.categories.filter((category) => category.active),
     participation: {

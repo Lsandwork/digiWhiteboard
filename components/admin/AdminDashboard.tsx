@@ -118,8 +118,7 @@ import { RuffopsChecklistPanel } from "@/components/admin/RuffopsChecklistPanel"
 import { BodyChecksPanel } from "@/components/admin/body-checks/BodyChecksPanel";
 import { ReportsPanel } from "@/components/admin/ReportsPanel";
 import { TlDigiBoardPanel } from "@/components/admin/TlDigiBoardPanel";
-import TeamEngagementPanel from "@/components/admin/team-engagement/TeamEngagementPanel";
-import TeamEngagementParticipationPanel from "@/components/admin/team-engagement/TeamEngagementParticipationPanel";
+import TeamEngagementWorkspace from "@/components/admin/team-engagement/TeamEngagementWorkspace";
 import { ManagementSupportEngagementShell } from "@/components/admin/team-engagement/ManagementSupportEngagementShell";
 import { LobbySlideshowUploadPanel } from "@/components/admin/LobbySlideshowUploadPanel";
 import { CastTvPanel } from "@/components/admin/CastTvPanel";
@@ -971,11 +970,7 @@ export function AdminDashboard() {
         ) : null}
 
         {tab === "team_engagement" ? (
-          canUseTeamEngagement(userAccess, currentRole) ? (
-            <TeamEngagementPanel />
-          ) : (
-            <TeamEngagementParticipationPanel />
-          )
+          <TeamEngagementWorkspace leadership={canUseTeamEngagement(userAccess, currentRole)} />
         ) : null}
 
         {tab === "ms_hub" ? <ManagementSupportHubPanel onNavigate={(nextTab) => setActiveTab(nextTab)} /> : null}
