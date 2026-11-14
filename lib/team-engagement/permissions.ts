@@ -149,7 +149,14 @@ export const LEADERSHIP_VIEW_RULES = {
   retention: { permission: "engagement.manage_security", superAdminOnly: true },
   features: { permission: "engagement.manage_security", superAdminOnly: true },
   integrations: { permission: "engagement.manage_integrations", superAdminOnly: true },
-  system_health: { permission: "engagement.manage_integrations", superAdminOnly: true }
+  system_health: { permission: "engagement.manage_integrations", superAdminOnly: true },
+  pack_overview: { permission: "engagement.manage_team" },
+  pack_goals_admin: { permission: "engagement.manage_team" },
+  employee_voice_admin: { permission: "engagement.manage_team" },
+  fun_zone_admin: { permission: "engagement.manage_team" },
+  pack_ideas_admin: { permission: "engagement.manage_team" },
+  pack_milestones_admin: { permission: "engagement.manage_team" },
+  voice_survey_results: { permission: "engagement.manage_team" }
 } as const satisfies Record<string, ViewRule>;
 export type LeadershipView = keyof typeof LEADERSHIP_VIEW_RULES;
 
@@ -198,7 +205,13 @@ export const LEADERSHIP_ACTION_RULES = {
   publish_fun_question: { permission: "engagement.manage_team" },
   save_fun_poll: { permission: "engagement.manage_team" },
   publish_fun_poll: { permission: "engagement.manage_team" },
-  sync_pack_milestones: { permission: "engagement.manage_team" }
+  sync_pack_milestones: { permission: "engagement.manage_team" },
+  save_pack_goal: { permission: "engagement.manage_team" },
+  publish_pack_goal: { permission: "engagement.manage_team" },
+  update_pack_goal_progress: { permission: "engagement.manage_team" },
+  archive_pack_goal: { permission: "engagement.manage_team" },
+  save_voice_survey: { permission: "engagement.manage_team" },
+  publish_voice_survey: { permission: "engagement.manage_team" }
 } as const satisfies Record<string, ActionRule>;
 export type LeadershipAction = keyof typeof LEADERSHIP_ACTION_RULES;
 
@@ -218,7 +231,8 @@ export const PARTICIPANT_ACTION_RULES = {
   congratulate_milestone: { permission: "engagement.participate" },
   answer_fun_question: { permission: "engagement.participate" },
   vote_fun_poll: { permission: "engagement.participate" },
-  answer_fun_trivia: { permission: "engagement.participate" }
+  answer_fun_trivia: { permission: "engagement.participate" },
+  submit_voice_survey: { permission: "engagement.participate" }
 } as const satisfies Record<string, ActionRule>;
 export type ParticipantAction = keyof typeof PARTICIPANT_ACTION_RULES;
 
@@ -276,7 +290,13 @@ export type EngagementSectionId =
   | "integrations"
   | "system_health"
   | "retention"
-  | "features";
+  | "features"
+  | "pack_overview"
+  | "pack_goals_admin"
+  | "employee_voice_admin"
+  | "fun_zone_admin"
+  | "pack_ideas_admin"
+  | "pack_milestones_admin";
 
 export type EngagementNavItem = {
   id: EngagementSectionId;
@@ -310,6 +330,18 @@ const MANAGEMENT_NAV: EngagementNavGroup[] = [
       item("announcements", "Announcements", "announcements"),
       item("programs", "Recognition Programs", "programs"),
       item("reports", "Team Reports", "analytics")
+    ]
+  },
+  {
+    id: "the_pack",
+    label: "The Pack",
+    items: [
+      item("pack_overview", "Engagement Overview", "team-overview", "pack_overview"),
+      item("pack_goals_admin", "Pack Goals", "analytics", "pack_goals_admin"),
+      item("employee_voice_admin", "Employee Voice", "feedback", "employee_voice_admin"),
+      item("fun_zone_admin", "Fun Zone", "check", "fun_zone_admin"),
+      item("pack_ideas_admin", "Ideas for the Pack", "feedback", "pack_ideas_admin"),
+      item("pack_milestones_admin", "Milestones", "calendar-shift", "pack_milestones_admin")
     ]
   }
 ];

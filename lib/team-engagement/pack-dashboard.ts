@@ -140,11 +140,11 @@ export async function packDashboard(ctx: ServiceContext) {
       milestones: milestones.ready
         ? { ready: true }
         : { ready: false, message: `Apply ${PACK_PRIORITY2_MIGRATION} and sync milestones from staff hire dates.` },
-      packGoals: { ready: false, message: "Pack Goals are coming soon. Leaders will post team challenges here." },
+      packGoals: { ready: true, message: "Published team goals appear in Pack Goals when migration 107 is applied." },
       funZone: funZone.ready
         ? { ready: true }
         : { ready: false, message: `Fun Zone opens after ${PACK_PRIORITY2_MIGRATION} is applied.` },
-      employeeVoice: { ready: settings.features.feedback, message: settings.features.feedback ? "Use Ideas for the Pack or leadership surveys when they are published." : "Surveys are not enabled yet." },
+      employeeVoice: { ready: true, message: "Employee Voice surveys appear here when leadership publishes them." },
       ideas: { ready: settings.features.feedback }
     }
   };

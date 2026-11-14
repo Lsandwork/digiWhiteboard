@@ -285,7 +285,13 @@ async function testTabVisibility() {
     "Team Feedback",
     "Announcements",
     "Recognition Programs",
-    "Team Reports"
+    "Team Reports",
+    "Engagement Overview",
+    "Pack Goals",
+    "Employee Voice",
+    "Fun Zone",
+    "Ideas for the Pack",
+    "Milestones"
   ]);
   assert.ok(sections(PEOPLE.admin).includes("Audit History") && sections(PEOPLE.admin).includes("Engagement Settings"));
   assert.ok(!sections(PEOPLE.admin).some((label) => ["Role & Permission Control", "AI Policy Configuration", "Security & Privacy"].includes(label)));

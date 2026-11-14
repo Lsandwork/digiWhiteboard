@@ -5,6 +5,14 @@ import "@/app/styles/team-engagement.css";
 import { useCallback, useEffect, useState } from "react";
 import { fetchAdminJson } from "@/lib/http/fetch-admin-json";
 import { humanizeUnknownError } from "@/lib/safe-url";
+import {
+  EmployeeVoiceAdminBody,
+  FunZoneAdminBody,
+  PackGoalsAdminBody,
+  PackIdeasAdminBody,
+  PackMilestonesAdminBody,
+  PackOverviewBody
+} from "@/components/admin/team-engagement/pack/PackLeadershipViews";
 
 type NavItem = { id: string; label: string; icon: string; view: string };
 type NavGroup = { id: string; label: string; items: NavItem[] };
@@ -203,8 +211,19 @@ function ModerationBody({
   );
 }
 
-function viewBody(view: string, data: unknown, onAction: (action: string, payload: Record<string, unknown>) => Promise<void>) {
+function viewBody(
+  view: string,
+  data: unknown,
+  onAction: (action: string, payload: Record<string, unknown>) => Promise<void>,
+  onRefresh: () => void
+) {
   const record = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
+  if (view === "pack_overview") return <PackOverviewBody data={record} onRefresh={onRefresh} />;
+  if (view === "pack_goals_admin") return <PackGoalsAdminBody data={record} onRefresh={onRefresh} />;
+  if (view === "employee_voice_admin") return <EmployeeVoiceAdminBody data={record} onRefresh={onRefresh} />;
+  if (view === "fun_zone_admin") return <FunZoneAdminBody data={record} onRefresh={onRefresh} />;
+  if (view === "pack_ideas_admin") return <PackIdeasAdminBody data={record} onRefresh={onRefresh} />;
+  if (view === "pack_milestones_admin") return <PackMilestonesAdminBody onSync={onRefresh} />;
   if (view === "overview") return <OverviewBody data={record} />;
   if (view === "staff") {
     const items = (record.items as Record<string, unknown>[]) ?? [];
@@ -402,7 +421,7 @@ export default function TeamEngagementPanel() {
           <h3 className="ro-te-main__title">{active?.label ?? "Overview"}</h3>
           {viewLoading ? <p className="ro-te-muted">Loading…</p> : null}
           {viewError ? <p className="ro-te-error">{viewError}</p> : null}
-          {!viewLoading && !viewError && active ? viewBody(active.view, viewData, postAction) : null}
+          {!viewLoading && !viewError && active ? viewBody(active.view, viewData, postAction, () => void loadView(active)) : null}
         </main>
       </div>
     </div>

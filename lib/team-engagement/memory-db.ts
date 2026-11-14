@@ -35,7 +35,9 @@ const UNIQUE_KEYS: Partial<Record<EngagementTable, { columns: string[]; where?: 
       where: (row) => row.status === "active" && row.employee_user_id != null
     }
   ],
-  team_engagement_spotlights: [{ columns: ["week_start"], where: (row) => row.active === true }]
+  team_engagement_spotlights: [{ columns: ["week_start"], where: (row) => row.active === true }],
+  team_engagement_voice_responses: [{ columns: ["survey_id", "question_id", "responder_user_id"] }],
+  team_engagement_voice_anonymous_completions: [{ columns: ["survey_id", "participant_hash"] }]
 };
 
 const CASCADES: { parent: EngagementTable; child: EngagementTable; column: string }[] = [
@@ -49,7 +51,14 @@ const CASCADES: { parent: EngagementTable; child: EngagementTable; column: strin
   { parent: "team_engagement_fun_questions", child: "team_engagement_fun_question_responses", column: "question_id" },
   { parent: "team_engagement_fun_polls", child: "team_engagement_fun_poll_options", column: "poll_id" },
   { parent: "team_engagement_fun_polls", child: "team_engagement_fun_poll_votes", column: "poll_id" },
-  { parent: "team_engagement_fun_trivia", child: "team_engagement_fun_trivia_answers", column: "trivia_id" }
+  { parent: "team_engagement_fun_trivia", child: "team_engagement_fun_trivia_answers", column: "trivia_id" },
+  { parent: "team_engagement_pack_goals", child: "team_engagement_pack_goal_events", column: "goal_id" },
+  { parent: "team_engagement_voice_surveys", child: "team_engagement_voice_questions", column: "survey_id" },
+  { parent: "team_engagement_voice_surveys", child: "team_engagement_voice_responses", column: "survey_id" },
+  { parent: "team_engagement_voice_surveys", child: "team_engagement_voice_anonymous_responses", column: "survey_id" },
+  { parent: "team_engagement_voice_surveys", child: "team_engagement_voice_anonymous_completions", column: "survey_id" },
+  { parent: "team_engagement_voice_questions", child: "team_engagement_voice_responses", column: "question_id" },
+  { parent: "team_engagement_voice_questions", child: "team_engagement_voice_anonymous_responses", column: "question_id" }
 ];
 
 function primaryKey(table: EngagementTable) {
