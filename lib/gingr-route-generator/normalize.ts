@@ -158,7 +158,13 @@ function reservationTypeName(reservation: GingrReservation): string {
 
 function reservationServiceRows(reservation: GingrReservation): Array<Record<string, unknown>> {
   const record = reservation as Record<string, unknown>;
-  const candidates = [record.services, record.additional_services, record.reservation_services, record.addons];
+  const candidates = [
+    record.services,
+    record.additional_services,
+    record.reservation_services,
+    record.addons,
+    record.service_addons
+  ];
   const rows: Array<Record<string, unknown>> = [];
   for (const candidate of candidates) {
     if (!Array.isArray(candidate)) continue;

@@ -43,6 +43,8 @@ const NESTED_OPTION_KEYS = [
   "addons",
   "addonData",
   "addon_data",
+  "service_addons",
+  "service_addon",
   "items",
   "services",
   "options",
@@ -803,6 +805,8 @@ function listServiceLikeRows(reservation: Record<string, unknown>): Array<Record
   for (const key of [
     "addons",
     "addon",
+    "service_addons",
+    "service_addon",
     "additional_services",
     "reservation_services",
     "services",
@@ -831,9 +835,30 @@ export function collectReservationTransportCandidates(
       cost: undefined,
       assignedTo: undefined
     };
+    const typeLabel = reservationTypeLabel(reservation);
+    const typeCandidates: TransportCandidate[] =
+      typeLabel && looksLikeTransportToken(normalizeToken(typeLabel))
+        ? [
+            {
+              text: typeLabel,
+              optionId: idText(reservation.id) ?? idText(reservation.reservation_id),
+              scheduledDate:
+                gingrTimestampDateKey(reservation.start_date) ||
+                gingrTimestampDateKey(reservation.scheduled_at) ||
+                null,
+              source: "addon",
+              cost: undefined,
+              assignedTo: undefined
+            }
+          ]
+        : [];
+
     return [
+      ...typeCandidates,
       ...collectCandidatesFromValue(reservation.addons, "addon", emptyInherited),
       ...collectCandidatesFromValue(reservation.addon, "addon", emptyInherited),
+      ...collectCandidatesFromValue(reservation.service_addons, "addon", emptyInherited),
+      ...collectCandidatesFromValue(reservation.service_addon, "addon", emptyInherited),
       ...collectCandidatesFromValue(reservation.additional_services, "addon", emptyInherited),
       ...collectCandidatesFromValue(reservation.reservation_services, "addon", emptyInherited),
       ...collectCandidatesFromValue(reservation.appointment_options, "addon", emptyInherited),

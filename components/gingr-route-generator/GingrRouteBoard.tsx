@@ -89,7 +89,9 @@ function bookedAs(dog: GingrRouteDog): string {
 }
 
 type EndCell = {
+  badge: string | null;
   title: string;
+  subtitle: string | null;
   van: string | null;
   basis: string | null;
   tone: "van" | "club" | "owner" | "review";
@@ -105,11 +107,18 @@ function endCell(dog: GingrRouteDog, which: "start" | "end"): EndCell {
   const time = showTime && dog.scheduledTimeLabel ? ` · ${dog.scheduledTimeLabel}` : "";
 
   if (end.locationType === "UNKNOWN") {
-    return { title: "Needs review", van: null, basis: "The booking does not decide this", tone: "review" };
+    const issue =
+      plan.issues.find((line) =>
+        which === "start" ? /starting|before outing|pick-up/i.test(line) : /final|after outing|drop-off|destination/i.test(line)
+      ) ?? "The booking does not decide this";
+    return { badge: "Needs review", title: "Unknown", subtitle: issue, van: null, basis: end.basis, tone: "review" };
   }
   if (end.locationType === "HOME") {
+    const badge = which === "start" ? "Home pickup" : "Home drop-off";
     return {
-      title: which === "start" ? "Fitdog picks up at home" : "Fitdog drops off at home",
+      badge,
+      title: "Home",
+      subtitle: which === "start" ? "Fitdog picks up at owner's home" : "Fitdog drops off at owner's home",
       van: stopType ? `${van}${time}` : null,
       basis: end.basis,
       tone: "van"
@@ -120,14 +129,28 @@ function endCell(dog: GingrRouteDog, which: "start" | "end"): EndCell {
     : null;
   if (end.responsibleParty === "OWNER") {
     return {
-      title: which === "start" ? "Owner drops off at Club" : "Owner collects at Club",
+      badge: which === "start" ? "Owner drop-off" : "Owner pickup",
+      title: "Fitdog Club",
+      subtitle: which === "start" ? "Owner brings the dog to Fitdog Club" : "Owner collects the dog at Fitdog Club",
       van: clubVan,
       basis: end.basis,
       tone: "owner"
     };
   }
+  if (plan.isBoarding && which === "start") {
+    return {
+      badge: "Boarding",
+      title: "Fitdog Club",
+      subtitle: "Boarding at Fitdog Club",
+      van: clubVan,
+      basis: end.basis,
+      tone: "club"
+    };
+  }
   return {
-    title: which === "start" ? "Boarding at Fitdog Club" : "Returns to boarding",
+    badge: "Return to Club",
+    title: "Fitdog Club",
+    subtitle: plan.isBoarding ? "Return to Fitdog Club" : "Ends at Fitdog Club",
     van: clubVan,
     basis: end.basis,
     tone: "club"
@@ -418,7 +441,9 @@ export function GingrRouteBoard({
 function EndCellView({ cell }: { cell: EndCell }) {
   return (
     <div className={`grg-end grg-end--${cell.tone}`}>
+      {cell.badge ? <span className="grg-end-badge">{cell.badge}</span> : null}
       <div className="grg-end-title">{cell.title}</div>
+      {cell.subtitle ? <div className="grg-end-subtitle">{cell.subtitle}</div> : null}
       {cell.van ? <div className="grg-end-van">{cell.van}</div> : null}
       {cell.basis ? <div className="grg-end-basis">{cell.basis}</div> : null}
     </div>
