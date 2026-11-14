@@ -22,11 +22,14 @@ export function barkOutPostingState(actor: EngagementActor, options?: { barkOuts
         "You are viewing RuffOps as another employee. Exit “Log In As Employee” so they can give a Bark Out from their own account—or sign in as them directly."
     };
   }
-  if (!actor.permissions.includes("engagement.create_bark_out")) {
+  const mayParticipate =
+    actor.permissions.includes("engagement.participate") || actor.permissions.includes("engagement.create_bark_out");
+  if (!mayParticipate) {
     return {
       canPost: false,
       blockedReason: "missing_permission",
-      blockedMessage: "Your role is not allowed to post Bark Outs. Ask an admin to confirm engagement permissions for your role."
+      blockedMessage:
+        "Team Engagement participation is off for your role. An admin can enable “participate” for your role in permissions."
     };
   }
   return { canPost: true };
