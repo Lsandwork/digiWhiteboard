@@ -142,6 +142,7 @@ export function GingrRouteGeneratorWorkspace({
           pickupCount: number;
           dropoffCount: number;
           excludedMissingAddress: number;
+          reviewDogs?: Array<{ dogName: string; issues: string[] }>;
         };
         missingAddressStops?: Array<{ dogName: string; ownerName: string; kind: string }>;
         ownerTracking?: {
@@ -156,13 +157,18 @@ export function GingrRouteGeneratorWorkspace({
         };
         ownerTrackingError?: string | null;
       };
+      const reviewNote = data.summary?.reviewDogs?.length
+        ? ` Needs review (not routed until the booking is fixed): ${data.summary.reviewDogs
+            .map((d) => d.dogName)
+            .join(", ")}.`
+        : "";
       if (!res.ok || !data.ok || !data.csv || !data.summary) {
         const missing = data.missingAddressStops?.length
           ? ` Missing addresses: ${data.missingAddressStops
               .map((s) => `${s.dogName} (${s.kind.replace("_", " ")})`)
               .join(", ")}.`
           : "";
-        setExportWarning((data.error || "Unable to export Samsara CSV.") + missing);
+        setExportWarning((data.error || "Unable to export Samsara CSV.") + missing + reviewNote);
         return;
       }
       const blob = new Blob([data.csv], { type: "text/csv;charset=utf-8" });
@@ -178,6 +184,7 @@ export function GingrRouteGeneratorWorkspace({
         `Samsara CSV ready — ${data.summary.stopCount} stops (${data.summary.pickupCount} pickups, ${data.summary.dropoffCount} drop-offs).`
       );
       const trackingWarnings: string[] = [];
+      if (reviewNote) trackingWarnings.push(reviewNote.trim());
       if (data.summary.excludedMissingAddress > 0) {
         trackingWarnings.push(
           `${data.summary.excludedMissingAddress} stop(s) excluded due to missing addresses.`
@@ -360,7 +367,11 @@ export function GingrRouteGeneratorWorkspace({
           </button>
         </div>
       ) : (
-        <GingrRouteBoard dogs={payload?.dogs ?? []} loading={loadState === "loading"} />
+        <GingrRouteBoard
+          dogs={payload?.dogs ?? []}
+          date={payload?.date ?? dateKey}
+          loading={loadState === "loading"}
+        />
       )}
     </div>
   );
