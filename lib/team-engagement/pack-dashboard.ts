@@ -3,7 +3,9 @@ import { employeeFeed, myBarkOuts } from "@/lib/team-engagement/bark-outs";
 import { announcementsForEmployee } from "@/lib/team-engagement/records";
 import type { BarkOutView } from "@/lib/team-engagement/bark-outs";
 import type { ServiceContext } from "@/lib/team-engagement/context";
+import { commentCounts, milestonesView, packTablesReady, resolvePackSpotlight, funZoneView } from "@/lib/team-engagement/pack-features";
 import type { DbFilter } from "@/lib/team-engagement/types";
+import { PACK_PRIORITY2_MIGRATION } from "@/lib/team-engagement/constants";
 
 function pacificGreeting(now: Date): string {
   const hour = Number(
@@ -80,11 +82,22 @@ export async function packDashboard(ctx: ServiceContext) {
   const participationPercent =
     activeEmployees > 0 ? Math.min(100, Math.round((authorsThisMonth / activeEmployees) * 100)) : 0;
 
-  let spotlight: BarkOutView | null = null;
+  let autoSpotlight: BarkOutView | null = null;
   const weekItems = feed.items.filter((item) => item.publishedAt && item.publishedAt >= weekStart);
   for (const item of weekItems.length ? weekItems : feed.items) {
-    if (!spotlight || reactionTotal(item) > reactionTotal(spotlight)) spotlight = item;
+    if (!autoSpotlight || reactionTotal(item) > reactionTotal(autoSpotlight)) autoSpotlight = item;
   }
+  const resolvedSpotlight = await resolvePackSpotlight(ctx, autoSpotlight);
+  const commentMap = await commentCounts(
+    ctx,
+    feed.items.map((item) => item.id)
+  );
+  const activityFeed = feed.items.slice(0, 12).map((item) => ({
+    ...item,
+    commentCount: commentMap.get(item.id) ?? 0
+  }));
+
+  const [milestones, funZone, packReady] = await Promise.all([milestonesView(ctx), funZoneView(ctx), packTablesReady(ctx)]);
 
   const awaiting = mine.sent.filter((row) => row.status === "awaiting_confirmation" || row.status === "pending_review");
 
@@ -106,8 +119,13 @@ export async function packDashboard(ctx: ServiceContext) {
       newForMeThisWeek: pendingForMe,
       pendingMyPosts: awaiting.length
     },
-    activityFeed: feed.items.slice(0, 12),
-    spotlight,
+    activityFeed,
+    spotlight: resolvedSpotlight.barkOut,
+    spotlightMeta: resolvedSpotlight.curated,
+    milestonesPreview: milestones,
+    funZonePreview: funZone,
+    packMigration: PACK_PRIORITY2_MIGRATION,
+    packStorageReady: Object.values(packReady).every(Boolean),
     personal: {
       receivedCount: mine.received.length,
       sentCount: mine.sent.length,
@@ -119,9 +137,13 @@ export async function packDashboard(ctx: ServiceContext) {
     },
     announcements: announcements.items.slice(0, 5),
     sectionStatus: {
-      milestones: { ready: false, message: "Celebrations will appear when HR milestone data is connected." },
+      milestones: milestones.ready
+        ? { ready: true }
+        : { ready: false, message: `Apply ${PACK_PRIORITY2_MIGRATION} and sync milestones from staff hire dates.` },
       packGoals: { ready: false, message: "Pack Goals are coming soon. Leaders will post team challenges here." },
-      funZone: { ready: false, message: "Questions and polls will launch in a future update." },
+      funZone: funZone.ready
+        ? { ready: true }
+        : { ready: false, message: `Fun Zone opens after ${PACK_PRIORITY2_MIGRATION} is applied.` },
       employeeVoice: { ready: settings.features.feedback, message: settings.features.feedback ? "Use Ideas for the Pack or leadership surveys when they are published." : "Surveys are not enabled yet." },
       ideas: { ready: settings.features.feedback }
     }

@@ -6,7 +6,13 @@ import "@/app/styles/team-engagement.css";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchAdminJson } from "@/lib/http/fetch-admin-json";
 import { humanizeUnknownError } from "@/lib/safe-url";
-import { BARK_OUT_REACTION_EMOJI, BARK_OUT_REACTION_LABELS, type BarkOutReaction } from "@/lib/team-engagement/constants";
+import {
+  BARK_OUT_REACTION_EMOJI,
+  BARK_OUT_REACTION_LABELS,
+  FEEDBACK_STATUS_LABELS,
+  type BarkOutReaction,
+  type FeedbackStatus
+} from "@/lib/team-engagement/constants";
 
 type BarkOutItem = {
   id: string;
@@ -17,6 +23,17 @@ type BarkOutItem = {
   publishedAt: string | null;
   reactions: Record<BarkOutReaction, number>;
   myReactions: BarkOutReaction[];
+  commentCount?: number;
+};
+
+type CommentItem = {
+  id: string;
+  parentCommentId: string | null;
+  author: { name: string; avatarUrl: string | null };
+  body: string;
+  createdAt: string;
+  canEdit: boolean;
+  canDelete: boolean;
 };
 
 type PackPayload = {
@@ -34,12 +51,35 @@ type PackPayload = {
   };
   activityFeed: BarkOutItem[];
   spotlight: BarkOutItem | null;
+  spotlightMeta: { category: string; caption: string | null } | null;
+  milestonesPreview: { ready: boolean; upcoming: MilestoneItem[]; recent: MilestoneItem[] };
+  funZonePreview: {
+    ready: boolean;
+    question: { id: string; prompt: string; responded: boolean; responseCount: number } | null;
+    poll: { id: string; prompt: string; options: { id: string; label: string; votes: number; selected: boolean }[]; voted: boolean } | null;
+    trivia: { id: string; title: string; prompt: string; answered: boolean } | null;
+  };
   personal: {
     receivedCount: number;
     sentCount: number;
     awaitingConfirmation: { id: string; recipientName: string; statusLabel: string }[];
   };
   sectionStatus: Record<string, { ready: boolean; message?: string }>;
+};
+
+type MilestoneItem = {
+  id: string;
+  title: string;
+  summary: string | null;
+  celebrationOn: string;
+  employee: { name: string; avatarUrl: string | null };
+};
+
+type FeedbackItem = {
+  id: string;
+  subject: string;
+  status: string;
+  created_at: string;
 };
 
 type HomePayload = {
@@ -81,6 +121,43 @@ function BarkOutCard({
   item: BarkOutItem;
   onReact: (id: string, reaction: BarkOutReaction, add: boolean) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const [comments, setComments] = useState<CommentItem[] | null>(null);
+  const [commentBody, setCommentBody] = useState("");
+  const [commentBusy, setCommentBusy] = useState(false);
+  const count = item.commentCount ?? comments?.length ?? 0;
+
+  async function loadComments() {
+    const { ok, body } = await fetchAdminJson<{ items: CommentItem[] }>(
+      `/api/admin/bark-outs?view=comments&barkOutId=${encodeURIComponent(item.id)}`
+    );
+    if (ok) setComments(body.items);
+  }
+
+  async function toggleComments() {
+    if (!open && comments === null) await loadComments();
+    setOpen((value) => !value);
+  }
+
+  async function submitComment(event: React.FormEvent) {
+    event.preventDefault();
+    if (!commentBody.trim()) return;
+    setCommentBusy(true);
+    try {
+      const { ok, body } = await fetchAdminJson<{ items: CommentItem[] }>("/api/admin/bark-outs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "create_bark_out_comment", barkOutId: item.id, body: commentBody })
+      });
+      if (ok) {
+        setComments(body.items);
+        setCommentBody("");
+      }
+    } finally {
+      setCommentBusy(false);
+    }
+  }
+
   return (
     <article className="pack-feed__item">
       <div className="pack-people" style={{ marginBottom: 8 }}>
@@ -97,7 +174,7 @@ function BarkOutCard({
       <p style={{ margin: "0 0 8px", lineHeight: 1.45 }}>{item.message}</p>
       <div className="pack-reactions">
         {(Object.keys(BARK_OUT_REACTION_LABELS) as BarkOutReaction[]).map((reaction) => {
-          const count = item.reactions[reaction] ?? 0;
+          const reactionCount = item.reactions[reaction] ?? 0;
           const mine = item.myReactions.includes(reaction);
           return (
             <button
@@ -107,10 +184,46 @@ function BarkOutCard({
               onClick={() => onReact(item.id, reaction, !mine)}
             >
               {BARK_OUT_REACTION_EMOJI[reaction]} {BARK_OUT_REACTION_LABELS[reaction]}
-              {count > 0 ? ` · ${count}` : ""}
+              {reactionCount > 0 ? ` · ${reactionCount}` : ""}
             </button>
           );
         })}
+      </div>
+      <div className="pack-comments">
+        <button type="button" className="pack-comments__toggle" onClick={() => void toggleComments()}>
+          {open ? "Hide" : "View"} {count > 0 ? `${count} comment${count === 1 ? "" : "s"}` : "comments"}
+        </button>
+        {open ? (
+          <>
+            {comments === null ? (
+              <p className="pack-muted" style={{ fontSize: 13 }}>
+                Loading conversation…
+              </p>
+            ) : comments.length === 0 ? (
+              <p className="pack-muted" style={{ fontSize: 13 }}>
+                Start the conversation — be the first to reply.
+              </p>
+            ) : (
+              <div className="pack-comments__list">
+                {comments.map((comment) => (
+                  <div key={comment.id} className="pack-comments__item">
+                    <Avatar name={comment.author.name} url={comment.author.avatarUrl} size={32} />
+                    <div>
+                      <strong style={{ fontSize: 13 }}>{comment.author.name}</strong>
+                      <p style={{ margin: "2px 0 0", whiteSpace: "pre-wrap" }}>{comment.body}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <form className="pack-comments__composer" onSubmit={(event) => void submitComment(event)}>
+              <textarea value={commentBody} maxLength={500} placeholder="Add a supportive comment…" onChange={(event) => setCommentBody(event.target.value)} />
+              <button type="submit" className="pack-btn pack-btn--primary" disabled={commentBusy}>
+                Post
+              </button>
+            </form>
+          </>
+        ) : null}
       </div>
     </article>
   );
@@ -136,6 +249,10 @@ export default function PackExperience() {
   const [recipient, setRecipient] = useState("");
   const [category, setCategory] = useState("");
   const [message, setMessage] = useState("");
+  const [ideas, setIdeas] = useState<FeedbackItem[] | null>(null);
+  const [funZone, setFunZone] = useState<PackPayload["funZonePreview"] | null>(null);
+  const [ideaTitle, setIdeaTitle] = useState("");
+  const [ideaBody, setIdeaBody] = useState("");
 
   const loadPack = useCallback(async () => {
     const { ok, body } = await fetchAdminJson<PackPayload & { error?: string }>("/api/admin/bark-outs?view=pack");
@@ -165,6 +282,30 @@ export default function PackExperience() {
   useEffect(() => {
     if (section === "bark_outs") void loadFeed();
   }, [section, loadFeed]);
+
+  const loadIdeas = useCallback(async () => {
+    const { ok, body } = await fetchAdminJson<{ items: FeedbackItem[] }>("/api/admin/bark-outs?view=feedback");
+    if (ok) setIdeas(body.items);
+  }, []);
+
+  const loadFunZone = useCallback(async () => {
+    const { ok, body } = await fetchAdminJson<PackPayload["funZonePreview"]>("/api/admin/bark-outs?view=fun_zone");
+    if (ok) setFunZone(body);
+  }, []);
+
+  async function votePoll(pollId: string, optionId: string) {
+    const { ok, body } = await fetchAdminJson<PackPayload["funZonePreview"]>("/api/admin/bark-outs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "vote_fun_poll", pollId, optionIds: [optionId] })
+    });
+    if (ok) setFunZone(body);
+  }
+
+  useEffect(() => {
+    if (section === "ideas") void loadIdeas();
+    if (section === "fun") void loadFunZone();
+  }, [section, loadIdeas, loadFunZone]);
 
   useEffect(() => {
     if (modalOpen && !home) void loadHome();
@@ -304,10 +445,11 @@ export default function PackExperience() {
                   <div>
                     <strong>{pack.spotlight.recipient.name}</strong>
                     <p className="pack-muted" style={{ margin: "4px 0 0" }}>
-                      Highlighted recognition
+                      {pack.spotlightMeta?.category ?? "Highlighted recognition"}
                     </p>
                   </div>
                 </div>
+                {pack.spotlightMeta?.caption ? <p className="pack-muted">{pack.spotlightMeta.caption}</p> : null}
                 <p style={{ fontStyle: "italic", margin: 0 }}>&ldquo;{pack.spotlight.message}&rdquo;</p>
               </>
             ) : (
@@ -360,22 +502,163 @@ export default function PackExperience() {
       ) : null}
 
       {section === "milestones" ? (
-        <SectionEmpty title="Milestones & Celebrations" body={pack.sectionStatus.milestones?.message ?? "Coming soon."} />
+        pack.milestonesPreview?.ready ? (
+          <div className="pack-grid">
+            <section className="pack-card">
+              <h2 className="pack-card__title">Upcoming celebrations</h2>
+              {pack.milestonesPreview.upcoming.length === 0 ? (
+                <SectionEmpty title="No upcoming milestones" body="We'll celebrate the next one together when hire dates are connected." />
+              ) : (
+                pack.milestonesPreview.upcoming.map((milestone) => (
+                  <article key={milestone.id} style={{ marginBottom: 14 }}>
+                    <div className="pack-people">
+                      <Avatar name={milestone.employee.name} url={milestone.employee.avatarUrl} />
+                      <div>
+                        <strong>{milestone.title}</strong>
+                        <p className="pack-muted" style={{ margin: "2px 0 0", fontSize: 13 }}>
+                          {milestone.celebrationOn} · {milestone.employee.name}
+                        </p>
+                      </div>
+                    </div>
+                    {milestone.summary ? <p style={{ fontSize: 14, margin: "8px 0 0" }}>{milestone.summary}</p> : null}
+                  </article>
+                ))
+              )}
+            </section>
+            <section className="pack-card">
+              <h2 className="pack-card__title">Recent celebrations</h2>
+              {pack.milestonesPreview.recent.length === 0 ? (
+                <p className="pack-muted">Recent milestones will appear here.</p>
+              ) : (
+                pack.milestonesPreview.recent.map((milestone) => (
+                  <p key={milestone.id} style={{ margin: "0 0 10px", fontSize: 14 }}>
+                    <strong>{milestone.title}</strong>
+                    <span className="pack-muted"> · {milestone.employee.name}</span>
+                  </p>
+                ))
+              )}
+            </section>
+          </div>
+        ) : (
+          <SectionEmpty title="Milestones & Celebrations" body={pack.sectionStatus.milestones?.message ?? "Coming soon."} />
+        )
       ) : null}
       {section === "goals" ? (
         <SectionEmpty title="Pack Goals" body={pack.sectionStatus.packGoals?.message ?? "Team challenges will appear here."} />
       ) : null}
       {section === "fun" ? (
-        <SectionEmpty title="Fun Zone" body={pack.sectionStatus.funZone?.message ?? "Questions and polls are on the way."} />
+        (funZone ?? pack.funZonePreview)?.ready ? (
+          <div className="pack-grid">
+            <section className="pack-card">
+              <h2 className="pack-card__title">Question of the day</h2>
+              {(funZone ?? pack.funZonePreview)?.question ? (
+                <>
+                  <p>{(funZone ?? pack.funZonePreview)!.question!.prompt}</p>
+                  <p className="pack-muted" style={{ fontSize: 13 }}>
+                    {(funZone ?? pack.funZonePreview)!.question!.responseCount} responses
+                    {(funZone ?? pack.funZonePreview)!.question!.responded ? " · You responded" : ""}
+                  </p>
+                </>
+              ) : (
+                <SectionEmpty title="No active questions" body="Check back for the next Pack question." />
+              )}
+            </section>
+            <section className="pack-card">
+              <h2 className="pack-card__title">Pack poll</h2>
+              {(funZone ?? pack.funZonePreview)?.poll ? (
+                <>
+                  <p>{(funZone ?? pack.funZonePreview)!.poll!.prompt}</p>
+                  <ul style={{ margin: "12px 0 0", padding: 0, listStyle: "none" }}>
+                    {(funZone ?? pack.funZonePreview)!.poll!.options.map((option) => (
+                      <li key={option.id} style={{ marginBottom: 6, fontSize: 14 }}>
+                        <button
+                          type="button"
+                          className={`pack-btn pack-btn--ghost ${option.selected ? "pack-react--mine" : ""}`}
+                          style={{ padding: "6px 10px", justifyContent: "flex-start" }}
+                          disabled={Boolean((funZone ?? pack.funZonePreview)!.poll!.voted && !option.selected)}
+                          onClick={() => void votePoll((funZone ?? pack.funZonePreview)!.poll!.id, option.id)}
+                        >
+                          {option.label}
+                          {option.votes > 0 ? <span className="pack-muted"> · {option.votes} votes</span> : null}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <SectionEmpty title="No active polls" body="Polls go live when leadership publishes one." />
+              )}
+            </section>
+          </div>
+        ) : (
+          <SectionEmpty title="Fun Zone" body={pack.sectionStatus.funZone?.message ?? "Questions and polls are on the way."} />
+        )
       ) : null}
       {section === "voice" ? (
         <SectionEmpty title="Employee Voice" body={pack.sectionStatus.employeeVoice?.message ?? "Surveys will post here when published."} />
       ) : null}
       {section === "ideas" ? (
-        <SectionEmpty
-          title="Ideas for the Pack"
-          body="Use Submit Request in the sidebar for complaints and formal requests. Pack suggestions inside Team Engagement will land here in the next release."
-        />
+        pack.sectionStatus.ideas?.ready ? (
+          <section className="pack-card">
+            <h2 className="pack-card__title">Ideas for the Pack</h2>
+            <form
+              style={{ marginBottom: 16 }}
+              onSubmit={(event) => {
+                event.preventDefault();
+                void (async () => {
+                  setBusy(true);
+                  try {
+                    await fetchAdminJson("/api/admin/bark-outs", {
+                      method: "POST",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({
+                        action: "submit_feedback",
+                        category: "team_culture",
+                        subject: ideaTitle,
+                        details: ideaBody
+                      })
+                    });
+                    setIdeaTitle("");
+                    setIdeaBody("");
+                    await loadIdeas();
+                  } finally {
+                    setBusy(false);
+                  }
+                })();
+              }}
+            >
+              <label className="pack-field">
+                Idea title
+                <input value={ideaTitle} required maxLength={120} onChange={(event) => setIdeaTitle(event.target.value)} />
+              </label>
+              <label className="pack-field">
+                What should we improve?
+                <textarea value={ideaBody} required rows={3} maxLength={800} onChange={(event) => setIdeaBody(event.target.value)} />
+              </label>
+              <button type="submit" className="pack-btn pack-btn--primary" disabled={busy}>
+                Submit idea
+              </button>
+            </form>
+            {ideas === null ? (
+              <p className="pack-muted">Loading your ideas…</p>
+            ) : ideas.length === 0 ? (
+              <SectionEmpty title="No ideas yet" body="Share something that would make The Pack even better." />
+            ) : (
+              <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                {ideas.map((item) => (
+                  <li key={item.id} style={{ padding: "10px 0", borderTop: "1px solid #e3eef3" }}>
+                    <strong>{item.subject}</strong>
+                    <span className="pack-pill" style={{ marginLeft: 8, fontSize: 11 }}>
+                      {FEEDBACK_STATUS_LABELS[item.status as FeedbackStatus] ?? item.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ) : (
+          <SectionEmpty title="Ideas for the Pack" body="Team feedback is not enabled on your account yet." />
+        )
       ) : null}
 
       {modalOpen ? (

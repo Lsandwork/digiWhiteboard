@@ -190,7 +190,15 @@ export const LEADERSHIP_ACTION_RULES = {
   save_retention: { permission: "engagement.manage_security", superAdminOnly: true },
   run_retention_purge: { permission: "engagement.manage_security", superAdminOnly: true },
   change_role: { permission: "engagement.manage_permissions", superAdminOnly: true },
-  set_role_permission: { permission: "engagement.manage_permissions", superAdminOnly: true }
+  set_role_permission: { permission: "engagement.manage_permissions", superAdminOnly: true },
+  feature_spotlight: { permission: "engagement.manage_team" },
+  clear_spotlight: { permission: "engagement.manage_team" },
+  remove_bark_out_comment: { permission: "engagement.moderate" },
+  save_fun_question: { permission: "engagement.manage_team" },
+  publish_fun_question: { permission: "engagement.manage_team" },
+  save_fun_poll: { permission: "engagement.manage_team" },
+  publish_fun_poll: { permission: "engagement.manage_team" },
+  sync_pack_milestones: { permission: "engagement.manage_team" }
 } as const satisfies Record<string, ActionRule>;
 export type LeadershipAction = keyof typeof LEADERSHIP_ACTION_RULES;
 
@@ -203,7 +211,14 @@ export const PARTICIPANT_ACTION_RULES = {
   unreact_bark_out: { permission: "engagement.participate", feature: "reactions" },
   report_bark_out: { permission: "engagement.participate", feature: "concern_reports" },
   submit_feedback: { permission: "engagement.participate", feature: "feedback" },
-  save_preferences: { permission: "engagement.participate" }
+  save_preferences: { permission: "engagement.participate" },
+  create_bark_out_comment: { permission: "engagement.participate", feature: "reactions" },
+  edit_bark_out_comment: { permission: "engagement.participate", feature: "reactions" },
+  delete_bark_out_comment: { permission: "engagement.participate", feature: "reactions" },
+  congratulate_milestone: { permission: "engagement.participate" },
+  answer_fun_question: { permission: "engagement.participate" },
+  vote_fun_poll: { permission: "engagement.participate" },
+  answer_fun_trivia: { permission: "engagement.participate" }
 } as const satisfies Record<string, ActionRule>;
 export type ParticipantAction = keyof typeof PARTICIPANT_ACTION_RULES;
 

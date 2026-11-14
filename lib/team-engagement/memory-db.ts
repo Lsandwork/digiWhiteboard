@@ -25,7 +25,17 @@ const UNIQUE_KEYS: Partial<Record<EngagementTable, { columns: string[]; where?: 
   team_engagement_reports: [{ columns: ["bark_out_id", "reporter_user_id"], where: (row) => row.status === "open" }],
   team_engagement_nominations: [
     { columns: ["program_id", "nominee_user_id", "period_label"], where: (row) => row.status !== "withdrawn" }
-  ]
+  ],
+  team_engagement_fun_question_responses: [{ columns: ["question_id", "responder_user_id"] }],
+  team_engagement_fun_poll_votes: [{ columns: ["poll_id", "voter_user_id"] }],
+  team_engagement_fun_trivia_answers: [{ columns: ["trivia_id", "responder_user_id"] }],
+  team_engagement_milestones: [
+    {
+      columns: ["employee_user_id", "kind", "celebration_on"],
+      where: (row) => row.status === "active" && row.employee_user_id != null
+    }
+  ],
+  team_engagement_spotlights: [{ columns: ["week_start"], where: (row) => row.active === true }]
 };
 
 const CASCADES: { parent: EngagementTable; child: EngagementTable; column: string }[] = [
@@ -33,7 +43,13 @@ const CASCADES: { parent: EngagementTable; child: EngagementTable; column: strin
   { parent: "team_engagement_bark_outs", child: "team_engagement_reactions", column: "bark_out_id" },
   { parent: "team_engagement_bark_outs", child: "team_engagement_reports", column: "bark_out_id" },
   { parent: "team_engagement_feedback", child: "team_engagement_feedback_events", column: "feedback_id" },
-  { parent: "team_engagement_programs", child: "team_engagement_nominations", column: "program_id" }
+  { parent: "team_engagement_programs", child: "team_engagement_nominations", column: "program_id" },
+  { parent: "team_engagement_bark_outs", child: "team_engagement_bark_out_comments", column: "bark_out_id" },
+  { parent: "team_engagement_milestones", child: "team_engagement_milestone_messages", column: "milestone_id" },
+  { parent: "team_engagement_fun_questions", child: "team_engagement_fun_question_responses", column: "question_id" },
+  { parent: "team_engagement_fun_polls", child: "team_engagement_fun_poll_options", column: "poll_id" },
+  { parent: "team_engagement_fun_polls", child: "team_engagement_fun_poll_votes", column: "poll_id" },
+  { parent: "team_engagement_fun_trivia", child: "team_engagement_fun_trivia_answers", column: "trivia_id" }
 ];
 
 function primaryKey(table: EngagementTable) {
