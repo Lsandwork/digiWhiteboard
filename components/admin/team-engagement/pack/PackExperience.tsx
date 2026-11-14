@@ -293,6 +293,15 @@ export default function PackExperience() {
     if (ok) setFunZone(body);
   }, []);
 
+  async function votePoll(pollId: string, optionId: string) {
+    const { ok, body } = await fetchAdminJson<PackPayload["funZonePreview"]>("/api/admin/bark-outs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "vote_fun_poll", pollId, optionIds: [optionId] })
+    });
+    if (ok) setFunZone(body);
+  }
+
   useEffect(() => {
     if (section === "ideas") void loadIdeas();
     if (section === "fun") void loadFunZone();
@@ -562,8 +571,16 @@ export default function PackExperience() {
                   <ul style={{ margin: "12px 0 0", padding: 0, listStyle: "none" }}>
                     {(funZone ?? pack.funZonePreview)!.poll!.options.map((option) => (
                       <li key={option.id} style={{ marginBottom: 6, fontSize: 14 }}>
-                        {option.label}
-                        {option.votes > 0 ? <span className="pack-muted"> · {option.votes} votes</span> : null}
+                        <button
+                          type="button"
+                          className={`pack-btn pack-btn--ghost ${option.selected ? "pack-react--mine" : ""}`}
+                          style={{ padding: "6px 10px", justifyContent: "flex-start" }}
+                          disabled={Boolean((funZone ?? pack.funZonePreview)!.poll!.voted && !option.selected)}
+                          onClick={() => void votePoll((funZone ?? pack.funZonePreview)!.poll!.id, option.id)}
+                        >
+                          {option.label}
+                          {option.votes > 0 ? <span className="pack-muted"> · {option.votes} votes</span> : null}
+                        </button>
                       </li>
                     ))}
                   </ul>
