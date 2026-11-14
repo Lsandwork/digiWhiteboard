@@ -138,6 +138,18 @@ function needsReview(dog: GingrRouteDog): boolean {
   return dog.transportPlan.status === "NEEDS_REVIEW";
 }
 
+/** The filter follows the booking's options; the tag only names ends the plan actually gives to the owner. */
+function ownerTag(dog: GingrRouteDog): string | null {
+  const plan = dog.transportPlan;
+  if (!plan.filters.ownerManaged) return null;
+  const start = plan.startingLocation.responsibleParty === "OWNER";
+  const end = plan.finalDestination.responsibleParty === "OWNER";
+  if (start && end) return "Owner-managed";
+  if (start) return "Owner drop-off";
+  if (end) return "Owner pick-up";
+  return null;
+}
+
 function instructionText(dog: GingrRouteDog): string | null {
   return dog.dropoffInstructions || dog.pickupInstructions || dog.notes;
 }
@@ -332,6 +344,7 @@ export function GingrRouteBoard({
                 {filtered.map((dog) => {
                   const note = instructionText(dog);
                   const review = needsReview(dog);
+                  const owner = ownerTag(dog);
                   return (
                     <tr
                       key={dog.id}
@@ -345,9 +358,7 @@ export function GingrRouteBoard({
                         </div>
                         <div className="grg-dog-tags">
                           {dog.transportPlan.isBoarding ? <span className="grg-tag grg-tag--club">Boarding</span> : null}
-                          {dog.transportPlan.filters.ownerManaged ? (
-                            <span className="grg-tag grg-tag--owner">Owner-managed</span>
-                          ) : null}
+                          {owner ? <span className="grg-tag grg-tag--owner">{owner}</span> : null}
                           {review ? (
                             <button
                               type="button"
