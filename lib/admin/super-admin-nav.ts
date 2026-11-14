@@ -11,6 +11,7 @@ export const SUPER_ADMIN_PRIMARY_TABS = [
   "sa_floor_hub",
   "sa_whiteboard_hub",
   "ms_hub",
+  "team_engagement",
   "sa_people_hub",
   "package_commissions",
   "sa_apps_hub",

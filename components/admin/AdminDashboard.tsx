@@ -100,6 +100,7 @@ import {
   isStaffDigiBoardOnlyLegacyRole,
   isSuperAdminLegacyRole,
   canUseAdminBoardSwitcher,
+  canParticipateInTeamEngagement,
   type UserAccess
 } from "@/lib/admin/permissions";
 import type { AdminUserRole } from "@/lib/admin/users";
@@ -947,7 +948,7 @@ export function AdminDashboard() {
 
         {tab === "management_support" ? (
           <ManagementSupportEngagementShell
-            showEngagement={hasPermission(userAccess, "engagement.participate")}
+            showEngagement={canParticipateInTeamEngagement(userAccess, currentRole)}
             mode={
               isHandlerPanel
                 ? "handler"

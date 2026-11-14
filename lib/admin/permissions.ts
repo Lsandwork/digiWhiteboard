@@ -1462,7 +1462,25 @@ export function canUseTeamEngagement(access: UserAccess | null | undefined, lega
   if (!tier) return false;
   if (tier === "super_admin") return true;
   const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
-  return hasPermission(effective, "engagement.view");
+  if (hasPermission(effective, "engagement.view")) return true;
+  // Stored matrices saved before engagement keys shipped may omit or clear leadership keys.
+  if (isAdminOrManagementLegacyRole(legacyRole)) {
+    return permissionsForRoles([tier]).includes("engagement.view");
+  }
+  return false;
+}
+
+/** Staff Bark Outs & suggestions — matrix grant, else static role defaults (never leadership-only). */
+export function canParticipateInTeamEngagement(
+  access: UserAccess | null | undefined,
+  legacyRole?: string | null
+) {
+  const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+  if (hasPermission(effective, "engagement.participate")) return true;
+  const tier = teamEngagementTier(access, legacyRole);
+  if (tier) return permissionsForRoles([tier]).includes("engagement.participate");
+  const key = legacyRoleToRoleKey(legacyRole);
+  return permissionsForRoles([key]).includes("engagement.participate");
 }
 
 export function isFrontDeskCoordinatorLegacyRole(legacyRole?: string | null) {
