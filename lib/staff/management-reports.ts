@@ -60,9 +60,17 @@ export type GroomerSubmissionDetails = {
   description: string;
 };
 
-export type SupportPriority = "Normal" | "High" | "Urgent";
+export type SupportPriority = "Low" | "Normal" | "High" | "Urgent";
 
-export type SupportAdminStatus = "Submitted" | "In Review" | "Needs More Info" | "Resolved" | "Closed";
+export type SupportAdminStatus =
+  | "New"
+  | "Acknowledged"
+  | "In Progress"
+  | "Submitted"
+  | "In Review"
+  | "Needs More Info"
+  | "Resolved"
+  | "Closed";
 
 export type SupportDepartment = "Grooming" | "Training" | "Front Desk" | "Other";
 
@@ -129,6 +137,12 @@ export type ManagementReport = {
   /** Support Command Center acknowledgment / escalation timestamps. */
   acknowledged_at?: string | null;
   acknowledged_by?: string | null;
+  in_progress_at?: string | null;
+  in_progress_by?: string | null;
+  resolved_at?: string | null;
+  resolved_by?: string | null;
+  /** Set after the management alert for a new complaint or request is stored. */
+  management_notified_at?: string | null;
   escalated_at?: string | null;
   escalated_by?: string | null;
   escalation_destination?: string | null;
@@ -220,6 +234,11 @@ function normalizeReport(report: ManagementReport): ManagementReport {
     hr_hub_hidden_by: report.hr_hub_hidden_by ?? null,
     acknowledged_at: report.acknowledged_at ?? null,
     acknowledged_by: report.acknowledged_by ?? null,
+    in_progress_at: report.in_progress_at ?? null,
+    in_progress_by: report.in_progress_by ?? null,
+    resolved_at: report.resolved_at ?? null,
+    resolved_by: report.resolved_by ?? null,
+    management_notified_at: report.management_notified_at ?? null,
     escalated_at: report.escalated_at ?? null,
     escalated_by: report.escalated_by ?? null,
     escalation_destination: report.escalation_destination ?? null
@@ -405,7 +424,9 @@ async function createGroomerSubmissionReport(
     updated_at: now,
     category,
     item_type: kind,
-    department: departmentForReportType(input.reportType)
+    department: departmentForReportType(input.reportType),
+    admin_status: "New",
+    priority: "Normal"
   };
 
   const state = await loadState(supabase);
@@ -485,7 +506,9 @@ async function createTrainerSubmissionReport(
     updated_at: now,
     category,
     item_type: kind,
-    department: departmentForReportType(input.reportType)
+    department: departmentForReportType(input.reportType),
+    admin_status: "New",
+    priority: "Normal"
   };
 
   const state = await loadState(supabase);
@@ -591,7 +614,9 @@ export async function createTeamLeadRequestReport(
     updated_at: now,
     category: normalizedCategory,
     item_type: "request",
-    department: departmentForReportType("team_lead_request")
+    department: departmentForReportType("team_lead_request"),
+    admin_status: "New",
+    priority: "Normal"
   };
 
   const state = await loadState(supabase);

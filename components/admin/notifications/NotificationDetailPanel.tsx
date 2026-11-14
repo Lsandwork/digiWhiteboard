@@ -4,6 +4,7 @@ import { ExternalLink } from "lucide-react";
 import type { AdminTab } from "@/lib/admin/types";
 import type { CrossoverReply } from "@/lib/staff/admin-ops";
 import type { ManagementReport } from "@/lib/staff/management-reports";
+import { canonicalSupportStatus } from "@/lib/staff/support-workflow";
 import type { EnrichedNotification } from "@/lib/staff/notification-hub";
 import {
   buildCrossoverThreadEntries,
@@ -14,7 +15,7 @@ import { NotificationReplyComposer } from "@/components/admin/notifications/Noti
 import { NotificationStatusBadge } from "@/components/admin/notifications/NotificationStatusBadge";
 import { NotificationTypeBadge } from "@/components/admin/notifications/NotificationTypeBadge";
 
-const SUPPORT_STATUSES = ["Submitted", "In Review", "Needs More Info", "Resolved", "Closed"] as const;
+const SUPPORT_STATUSES = ["New", "Acknowledged", "In Progress", "Resolved", "Closed"] as const;
 
 type NotificationDetailPanelProps = {
   notification: EnrichedNotification | null;
@@ -43,6 +44,9 @@ function sourceTabForNotification(notification: EnrichedNotification): AdminTab 
     notification.source_tab === "active_issues"
   ) {
     return "user_interactions";
+  }
+  if (notification.source_tab === "management_support") {
+    return notification.target.kind === "staff_email" ? "management_support" : "complaint_review";
   }
   if (notification.source_tab === "push_notices") return "push_notices";
   if (notification.source_tab === "vip_auto_book") return "vip_auto_book";
@@ -143,7 +147,7 @@ export function NotificationDetailPanel({
             <>
               <select
                 className="notif-hub-toolbar__select"
-                value={report.admin_status ?? "Submitted"}
+                value={canonicalSupportStatus(report.admin_status)}
                 disabled={busy}
                 onChange={(event) => onStatusChange(event.target.value)}
               >

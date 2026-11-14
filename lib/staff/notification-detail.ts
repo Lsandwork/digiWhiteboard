@@ -16,6 +16,7 @@ import {
   type NotificationSession
 } from "@/lib/staff/notification-hub";
 import { canReviewManagementSupport } from "@/lib/admin/users";
+import { redactSupportForSubmitter } from "@/lib/staff/management-support-admin";
 import { sessionCanAccessNotification, type StaffNotification } from "@/lib/staff/notifications";
 
 export type NotificationDetailPayload = {
@@ -63,12 +64,16 @@ export async function loadNotificationDetail(
     enriched.linkedCrossover ? crossoverRepliesForMessage(state, enriched.linkedCrossover.id) : [];
 
   const canManage = canReviewManagementSupport(session.role);
-  const canReplySupport = report ? canReplyToManagementReport(report, session) : false;
+  const visibleReport = report && !canManage ? redactSupportForSubmitter(report) : report;
+  const canReplySupport = visibleReport ? canReplyToManagementReport(visibleReport, session) : false;
   const canReplyCrossover = enriched.linkedCrossover ? canReplyToCrossover(session) : false;
+  const notification = visibleReport
+    ? { ...enriched, linkedReport: visibleReport }
+    : enriched;
 
   return {
-    notification: enriched,
-    report,
+    notification,
+    report: visibleReport,
     crossoverReplies,
     permissions: {
       canReply: canReplySupport || canReplyCrossover,

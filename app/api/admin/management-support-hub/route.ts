@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveSessionDisplayName } from "@/lib/admin/actor-display";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { canReviewManagementSupportWithAccess, isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
@@ -7,6 +8,7 @@ import {
   applySupportItemAction,
   loadStaffSupportInbox,
   listTrainerEntriesForAdmin,
+  SupportNotificationError,
   type SupportInboxFilter
 } from "@/lib/staff/management-support-admin";
 import type { ManagementReportType } from "@/lib/staff/management-reports";
@@ -14,6 +16,28 @@ import { getManagementReportById } from "@/lib/staff/management-reports";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+const ASSIGNABLE_ROLES = new Set(["owner_admin", "manager_admin", "assistant_manager"]);
+
+async function listSupportAssignees(supabase: ReturnType<typeof getServiceSupabase>) {
+  try {
+    const { data, error } = await supabase
+      .from("admin_users")
+      .select("id, full_name, email, role, status")
+      .eq("status", "active");
+    if (error || !data) return [];
+    return data
+      .filter((row) => ASSIGNABLE_ROLES.has(String(row.role)))
+      .map((row) => ({
+        id: String(row.id),
+        name: String(row.full_name || row.email || "Manager"),
+        role: String(row.role)
+      }))
+      .filter((row) => row.name.trim());
+  } catch {
+    return [];
+  }
+}
 
 function parseFilters(searchParams: URLSearchParams): SupportInboxFilter {
   const reportTypeRaw = searchParams.get("report_type") ?? searchParams.get("report_types");
@@ -75,8 +99,10 @@ export async function GET(request: Request) {
     }
 
     const payload = await loadStaffSupportInbox(supabase, filters);
+    const assignees = await listSupportAssignees(supabase);
     return NextResponse.json({
       ...payload,
+      assignees,
       currentUser: {
         email: session?.email ?? null,
         adminUserId: session?.adminUserId ?? null,
@@ -100,12 +126,22 @@ export async function POST(request: Request) {
     const body = (await request.json()) as Record<string, unknown>;
     const action = String(body.action ?? "");
     const id = String(body.id ?? "");
-    const actor = session?.email ?? session?.adminUserId ?? "admin";
     const supabase = getServiceSupabase();
+    const actor = (await resolveSessionDisplayName(supabase, session)) ?? session?.email ?? session?.adminUserId ?? "admin";
 
     if (!id) return NextResponse.json({ error: "Support item id is required." }, { status: 400 });
 
-    const updated = await applySupportItemAction(supabase, id, action, body, actor);
+    let updated;
+    let notificationDelivered = true;
+    let warning: string | null = null;
+    try {
+      updated = await applySupportItemAction(supabase, id, action, body, actor);
+    } catch (error) {
+      if (!(error instanceof SupportNotificationError)) throw error;
+      updated = error.report;
+      notificationDelivered = false;
+      warning = error.message;
+    }
 
     await writeAdminAuditLog({
       actorAdminId: session?.adminUserId ?? null,
@@ -116,7 +152,7 @@ export async function POST(request: Request) {
       details: { status: updated.admin_status, assigned_to: updated.assigned_to }
     });
 
-    return NextResponse.json({ ok: true, item: updated });
+    return NextResponse.json({ ok: true, item: updated, notificationDelivered, warning });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to update support item.";
     return NextResponse.json({ error: message }, { status: 400 });

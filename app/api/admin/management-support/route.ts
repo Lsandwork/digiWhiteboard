@@ -22,6 +22,12 @@ import {
 } from "@/lib/admin/users";
 import { dispatchStaffOpsNotificationEvent } from "@/lib/staff/admin-ops";
 import {
+  alertManagersOfNewSubmission,
+  applySubmitterSupportReply,
+  redactSupportForSubmitter,
+  SupportNotificationError
+} from "@/lib/staff/management-support-admin";
+import {
   createEmployeeWriteUpReport,
   createGroomerComplaintReport,
   createGroomerRequestReport,
@@ -62,6 +68,20 @@ async function actorContext(request: Request) {
   return { session, actor, actorDisplayName, access, role: session?.role, supabase };
 }
 
+async function deliverNewSubmissionAlert(
+  supabase: ReturnType<typeof getServiceSupabase>,
+  report: Awaited<ReturnType<typeof createGroomerComplaintReport>>,
+  actor: string
+) {
+  try {
+    const saved = await alertManagersOfNewSubmission(supabase, report, actor);
+    return { report: saved, delivered: true, warning: null as string | null };
+  } catch (error) {
+    const warning = error instanceof Error ? error.message : "Management alert did not send.";
+    return { report, delivered: false, warning };
+  }
+}
+
 const ADMIN_REPORT_TYPES = new Set([
   "employee_write_up",
   "owner_complaint_dog_handler",
@@ -86,7 +106,9 @@ export async function GET(request: Request) {
       if (!canSubmitTeamLeadRequest(role)) {
         return NextResponse.json({ error: "You do not have permission to view requests." }, { status: 403 });
       }
-      const requests = await listTeamLeadSubmissionsForCreator(supabase, actor, "team_lead_request", 100);
+      const requests = (await listTeamLeadSubmissionsForCreator(supabase, actor, "team_lead_request", 100)).map(
+        redactSupportForSubmitter
+      );
       return NextResponse.json({
         reports: requests,
         requests,
@@ -138,7 +160,7 @@ export async function GET(request: Request) {
         }
 
         return NextResponse.json({
-          reports,
+          reports: reports.map(redactSupportForSubmitter),
           currentUser: {
             email: session?.email ?? null,
             adminUserId: session?.adminUserId ?? null,
@@ -148,7 +170,7 @@ export async function GET(request: Request) {
       }
 
       if (canSubmitWriteUpForUser(access, role)) {
-        const reports = await listWriteUpsForCreator(supabase, actor, 100);
+        const reports = (await listWriteUpsForCreator(supabase, actor, 100)).map(redactSupportForSubmitter);
         return NextResponse.json({
           reports,
           currentUser: {
@@ -167,10 +189,12 @@ export async function GET(request: Request) {
         listGroomerSubmissionsForCreator(supabase, actor, "groomer_complaint", 100),
         listGroomerSubmissionsForCreator(supabase, actor, "groomer_request", 100)
       ]);
+      const safeComplaints = complaints.map(redactSupportForSubmitter);
+      const safeRequests = requests.map(redactSupportForSubmitter);
       return NextResponse.json({
-        reports: [...complaints, ...requests],
-        complaints,
-        requests,
+        reports: [...safeComplaints, ...safeRequests],
+        complaints: safeComplaints,
+        requests: safeRequests,
         currentUser: {
           email: session?.email ?? null,
           adminUserId: session?.adminUserId ?? null,
@@ -184,10 +208,12 @@ export async function GET(request: Request) {
         listTrainerSubmissionsForCreator(supabase, actor, "trainer_complaint", 100),
         listTrainerSubmissionsForCreator(supabase, actor, "trainer_request", 100)
       ]);
+      const safeComplaints = complaints.map(redactSupportForSubmitter);
+      const safeRequests = requests.map(redactSupportForSubmitter);
       return NextResponse.json({
-        reports: [...complaints, ...requests],
-        complaints,
-        requests,
+        reports: [...safeComplaints, ...safeRequests],
+        complaints: safeComplaints,
+        requests: safeRequests,
         currentUser: {
           email: session?.email ?? null,
           adminUserId: session?.adminUserId ?? null,
@@ -310,18 +336,7 @@ export async function POST(request: Request) {
         ? await createGroomerComplaintReport(supabase, description, actor, actorDisplayName, category)
         : await createGroomerRequestReport(supabase, description, actor, actorDisplayName, category);
 
-      await dispatchStaffOpsNotificationEvent(supabase, {
-        eventType: "auto_issue",
-        sourceTable: "management_reports",
-        sourceId: report.id,
-        sourceTab: "push_notices",
-        title: report.title,
-        body: report.summary,
-        priority: "Urgent",
-        urgent: true,
-        needsManagementReview: true,
-        actor: actorDisplayName
-      });
+      const alert = await deliverNewSubmissionAlert(supabase, report, actorDisplayName);
 
       await writeAdminAuditLog({
         actorAdminId: session?.adminUserId ?? null,
@@ -332,7 +347,7 @@ export async function POST(request: Request) {
         details: { status: report.status }
       });
 
-      return NextResponse.json({ ok: true, report });
+      return NextResponse.json({ ok: true, report: alert.report, alertDelivered: alert.delivered, warning: alert.warning });
     }
 
     if (action === "create_trainer_complaint" || action === "create_trainer_request") {
@@ -346,18 +361,7 @@ export async function POST(request: Request) {
         ? await createTrainerComplaintReport(supabase, description, actor, actorDisplayName, category)
         : await createTrainerRequestReport(supabase, description, actor, actorDisplayName, category);
 
-      await dispatchStaffOpsNotificationEvent(supabase, {
-        eventType: "auto_issue",
-        sourceTable: "management_reports",
-        sourceId: report.id,
-        sourceTab: "push_notices",
-        title: report.title,
-        body: report.summary,
-        priority: "Urgent",
-        urgent: true,
-        needsManagementReview: true,
-        actor: actorDisplayName
-      });
+      const alert = await deliverNewSubmissionAlert(supabase, report, actorDisplayName);
 
       await writeAdminAuditLog({
         actorAdminId: session?.adminUserId ?? null,
@@ -368,7 +372,7 @@ export async function POST(request: Request) {
         details: { status: report.status }
       });
 
-      return NextResponse.json({ ok: true, report });
+      return NextResponse.json({ ok: true, report: alert.report, alertDelivered: alert.delivered, warning: alert.warning });
     }
 
     if (action === "create_team_lead_request") {
@@ -380,18 +384,7 @@ export async function POST(request: Request) {
       const category = body.category != null ? String(body.category) : null;
       const report = await createTeamLeadRequestReport(supabase, description, actor, actorDisplayName, category);
 
-      await dispatchStaffOpsNotificationEvent(supabase, {
-        eventType: "auto_issue",
-        sourceTable: "management_reports",
-        sourceId: report.id,
-        sourceTab: "push_notices",
-        title: report.title,
-        body: report.summary,
-        priority: "Urgent",
-        urgent: true,
-        needsManagementReview: true,
-        actor: actorDisplayName
-      });
+      const alert = await deliverNewSubmissionAlert(supabase, report, actorDisplayName);
 
       await writeAdminAuditLog({
         actorAdminId: session?.adminUserId ?? null,
@@ -402,7 +395,27 @@ export async function POST(request: Request) {
         details: { status: report.status }
       });
 
-      return NextResponse.json({ ok: true, report });
+      return NextResponse.json({ ok: true, report: alert.report, alertDelivered: alert.delivered, warning: alert.warning });
+    }
+
+    if (action === "reply_to_submission") {
+      const id = String(body.id ?? "");
+      const message = String(body.body ?? "");
+      if (!id) return NextResponse.json({ error: "Submission id is required." }, { status: 400 });
+      try {
+        const report = await applySubmitterSupportReply(supabase, id, message, actor, session?.role ?? "staff");
+        return NextResponse.json({ ok: true, report: redactSupportForSubmitter(report), notificationDelivered: true });
+      } catch (error) {
+        if (error instanceof SupportNotificationError) {
+          return NextResponse.json({
+            ok: true,
+            report: redactSupportForSubmitter(error.report),
+            notificationDelivered: false,
+            warning: error.message
+          });
+        }
+        throw error;
+      }
     }
 
     return NextResponse.json({ error: "Unsupported action." }, { status: 400 });

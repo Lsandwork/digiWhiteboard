@@ -16,8 +16,9 @@ import { NotificationStatusBadge } from "@/components/admin/notifications/Notifi
 import { NotificationTypeBadge } from "@/components/admin/notifications/NotificationTypeBadge";
 import { QUICK_REPLIES } from "@/lib/staff/notification-hub";
 import { RichText } from "@/components/admin/ui/RichText";
+import { canonicalSupportStatus } from "@/lib/staff/support-workflow";
 
-const SUPPORT_STATUSES = ["Submitted", "In Review", "Needs More Info", "Resolved", "Closed"] as const;
+const SUPPORT_STATUSES = ["New", "Acknowledged", "In Progress", "Resolved", "Closed"] as const;
 
 type NotificationResponseModalProps = {
   open: boolean;
@@ -56,7 +57,7 @@ function sourceTabLabel(tab: string | null | undefined): string {
   }
 }
 
-function sourceTabForReport(report: ManagementReport | null, sourceTab: string): AdminTab | null {
+function sourceTabForReport(report: ManagementReport | null, sourceTab: string, targetKind?: string): AdminTab | null {
   if (
     sourceTab === "user_interactions" ||
     sourceTab === "crossover_communication" ||
@@ -64,6 +65,9 @@ function sourceTabForReport(report: ManagementReport | null, sourceTab: string):
     sourceTab === "active_issues"
   ) {
     return "user_interactions";
+  }
+  if (sourceTab === "management_support") {
+    return targetKind === "staff_email" ? "management_support" : "complaint_review";
   }
   if (sourceTab === "push_notices") return "push_notices";
   if (sourceTab === "vip_auto_book") return "vip_auto_book";
@@ -154,7 +158,7 @@ export function NotificationResponseModal({
         )
       : [];
 
-  const linkedTab = notification ? sourceTabForReport(report, notification.source_tab) : null;
+  const linkedTab = notification ? sourceTabForReport(report, notification.source_tab, notification.target.kind) : null;
   const relatedTo =
     report?.related_dog_name ||
     report?.related_owner_name ||
@@ -338,7 +342,7 @@ export function NotificationResponseModal({
                 <>
                   <select
                     className="notif-hub-toolbar__select"
-                    value={report.admin_status ?? "Submitted"}
+                    value={canonicalSupportStatus(report.admin_status)}
                     disabled={busy}
                     onChange={(event) => onStatusChange(event.target.value)}
                   >
@@ -364,8 +368,11 @@ export function NotificationResponseModal({
                   <button type="button" className="crossover-btn crossover-btn--outline" disabled={busy} onClick={() => onSupportAction("mark_reviewed")}>
                     Mark Resolved
                   </button>
-                  <button type="button" className="crossover-btn crossover-btn--outline" disabled={busy} onClick={() => onStatusChange("In Review")}>
-                    Mark In Review
+                  <button type="button" className="crossover-btn crossover-btn--outline" disabled={busy} onClick={() => onStatusChange("Acknowledged")}>
+                    Acknowledge
+                  </button>
+                  <button type="button" className="crossover-btn crossover-btn--outline" disabled={busy} onClick={() => onStatusChange("In Progress")}>
+                    Mark in progress
                   </button>
                   {report.admin_status !== "Closed" ? (
                     <button type="button" className="crossover-btn crossover-btn--outline" disabled={busy} onClick={() => onSupportAction("close")}>

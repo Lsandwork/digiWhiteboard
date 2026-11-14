@@ -5,7 +5,8 @@ import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { canReviewManagementSupport } from "@/lib/admin/users";
 import {
   applySubmitterSupportReply,
-  applySupportItemAction
+  applySupportItemAction,
+  redactSupportForSubmitter
 } from "@/lib/staff/management-support-admin";
 import { canViewManagementReport } from "@/lib/staff/notification-hub";
 import { getManagementReportById } from "@/lib/staff/management-reports";
@@ -53,9 +54,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "You do not have permission to view this item." }, { status: 403 });
     }
 
+    const canReview = canReviewManagementSupport(session?.role);
     return NextResponse.json({
-      report,
-      canReview: canReviewManagementSupport(session?.role),
+      report: canReview ? report : redactSupportForSubmitter(report),
+      canReview,
       canReply:
         canReviewManagementSupport(session?.role) ||
         report.created_by?.trim().toLowerCase() === session?.email?.trim().toLowerCase()

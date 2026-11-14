@@ -14,6 +14,7 @@ import type { AdminTab } from "@/lib/admin/types";
 import type { ManagementReport, ManagementReportType } from "@/lib/staff/management-reports";
 import type { SupportHubStats, SupportInboxRow, TrainerEntryAdminRow } from "@/lib/staff/management-support-admin";
 import { caseDisplayTitle, effectiveCategory, submissionTypeLabel } from "@/lib/staff/support-case-display";
+import { SupportWorkspace } from "@/components/admin/support-workspace/SupportWorkspace";
 
 type HubPayload = {
   stats: SupportHubStats;
@@ -383,185 +384,29 @@ export function ManagementSupportHubPanel({
 }
 
 /** Classic support inbox (used by complaint review and deep links that still want the table). */
-export function ManagementSupportInboxPanel({ onCardFilter }: { onCardFilter?: (card: string) => void }) {
-  const hub = useSupportHub(undefined, undefined);
-  const cards = useMemo(() => [
-    { id: "new_complaints", label: "New Complaints", value: hub.data?.stats.new_complaints ?? 0 },
-    { id: "new_requests", label: "New Requests", value: hub.data?.stats.new_requests ?? 0 },
-    { id: "needs_review", label: "Needs Review", value: hub.data?.stats.needs_review ?? 0 },
-    { id: "urgent_items", label: "Urgent Items", value: hub.data?.stats.urgent_items ?? 0 },
-    { id: "open_items", label: "Open Items", value: hub.data?.stats.open_items ?? 0 },
-    { id: "closed_this_week", label: "Closed This Week", value: hub.data?.stats.closed_this_week ?? 0 }
-  ], [hub.data?.stats]);
-
-  return (
-    <div className="space-y-5">
-      <header className="admin-page-header">
-        <div>
-          <h2 className="admin-page-title">Management Support Inbox</h2>
-          <p className="admin-page-subtitle">Review, assign, respond to, and track all groomer and trainer support submissions.</p>
-        </div>
-        <button type="button" className="crossover-btn crossover-btn--outline inline-flex items-center gap-2" onClick={() => void hub.load()}>
-          <RefreshCw className="h-4 w-4" /> Refresh
-        </button>
-      </header>
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {cards.map((card) => (
-          <button
-            key={card.id}
-            type="button"
-            className="admin-card p-4 text-left transition hover:border-fitdog-orange/40"
-            onClick={() => {
-              hub.setFilters({ ...hub.filters, card: card.id });
-              onCardFilter?.(card.id);
-            }}
-          >
-            <p className="text-3xl font-black text-white">{card.value}</p>
-            <p className="text-sm text-admin-muted">{card.label}</p>
-          </button>
-        ))}
-      </div>
-
-      <section className="crossover-card p-5 space-y-4">
-        <h3 className="crossover-card__title">Support Inbox</h3>
-        <SupportFilters filters={hub.filters} setFilters={hub.setFilters} />
-        {hub.loading ? <p className="text-sm text-admin-muted">Loading inbox…</p> : null}
-        <SupportTable rows={hub.data?.items ?? []} nameColumn="Submitted By" onView={(row) => hub.setSelected(row.report)} />
-      </section>
-
-      <SupportDetailModal open={Boolean(hub.selected)} item={hub.selected} busy={hub.busy} onClose={() => hub.setSelected(null)} onAction={hub.runAction} />
-    </div>
-  );
+export function ManagementSupportInboxPanel(_props: { onCardFilter?: (card: string) => void }) {
+  return <SupportWorkspace initialKind="all" />;
 }
 
-const COMPLAINT_LOG_TYPES: ManagementReportType[] = ["groomer_complaint", "trainer_complaint"];
-const REQUEST_LOG_TYPES: ManagementReportType[] = ["groomer_request", "trainer_request"];
-
-function CombinedSupportLogPage({
-  title,
-  subtitle,
-  reportTypes,
-  initialFocus,
-  nameColumn
-}: {
-  title: string;
-  subtitle: string;
-  reportTypes: ManagementReportType[];
-  /** Prefocus the log on one source while still allowing All / other sources. */
-  initialFocus?: ManagementReportType;
-  nameColumn: string;
-}) {
-  const [sourceFocus, setSourceFocus] = useState<ManagementReportType | "all">(initialFocus ?? "all");
-  const activeTypes = sourceFocus === "all" ? reportTypes : [sourceFocus];
-  const hub = useSupportHub(activeTypes);
-
-  useEffect(() => {
-    setSourceFocus(initialFocus ?? "all");
-  }, [initialFocus]);
-
-  const sourceOptions = useMemo(() => {
-    const options: Array<{ id: ManagementReportType | "all"; label: string }> = [{ id: "all", label: "All" }];
-    if (reportTypes.some((type) => type.startsWith("groomer_"))) {
-      options.push({
-        id: reportTypes.find((type) => type.startsWith("groomer_"))!,
-        label: "Groomer"
-      });
-    }
-    if (reportTypes.some((type) => type.startsWith("trainer_"))) {
-      options.push({
-        id: reportTypes.find((type) => type.startsWith("trainer_"))!,
-        label: "Trainer"
-      });
-    }
-    return options;
-  }, [reportTypes]);
-
-  return (
-    <div className="space-y-5">
-      <header className="admin-page-header">
-        <div>
-          <h2 className="admin-page-title">{title}</h2>
-          <p className="admin-page-subtitle">{subtitle}</p>
-        </div>
-        <button type="button" className="crossover-btn crossover-btn--outline inline-flex items-center gap-2" onClick={() => void hub.load()}>
-          <RefreshCw className="h-4 w-4" /> Refresh
-        </button>
-      </header>
-      <section className="crossover-card p-5 space-y-4">
-        <div className="flex flex-wrap gap-2">
-          {sourceOptions.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              className={`crossover-btn ${sourceFocus === option.id ? "crossover-btn--active" : "crossover-btn--ghost"}`}
-              onClick={() => setSourceFocus(option.id)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <SupportFilters filters={hub.filters} setFilters={hub.setFilters} />
-        {hub.loading ? <p className="text-sm text-admin-muted">Loading…</p> : null}
-        <SupportTable
-          rows={hub.data?.items ?? []}
-          nameColumn={nameColumn}
-          showSource
-          onView={(row) => hub.setSelected(row.report)}
-        />
-      </section>
-      <SupportDetailModal open={Boolean(hub.selected)} item={hub.selected} busy={hub.busy} onClose={() => hub.setSelected(null)} onAction={hub.runAction} />
-    </div>
-  );
-}
+const COMPLAINT_TYPES: ManagementReportType[] = ["groomer_complaint", "trainer_complaint"];
+const REQUEST_TYPES: ManagementReportType[] = ["groomer_request", "trainer_request", "team_lead_request"];
 
 export function GroomerComplaintsAdminPanel() {
-  return (
-    <CombinedSupportLogPage
-      title="Complaints"
-      subtitle="One combined log for groomer and trainer complaints. Filter by source, assign follow-up, and respond to the submitter."
-      reportTypes={COMPLAINT_LOG_TYPES}
-      initialFocus="groomer_complaint"
-      nameColumn="Submitted By"
-    />
-  );
+  return <SupportWorkspace initialKind="complaint" reportTypes={COMPLAINT_TYPES} />;
 }
 
 export function TrainerComplaintsAdminPanel() {
-  return (
-    <CombinedSupportLogPage
-      title="Complaints"
-      subtitle="One combined log for groomer and trainer complaints. Filter by source, assign follow-up, and respond to the submitter."
-      reportTypes={COMPLAINT_LOG_TYPES}
-      initialFocus="trainer_complaint"
-      nameColumn="Submitted By"
-    />
-  );
+  return <SupportWorkspace initialKind="complaint" reportTypes={COMPLAINT_TYPES} />;
 }
 
 export function GroomerRequestsAdminPanel() {
-  return (
-    <CombinedSupportLogPage
-      title="Requests"
-      subtitle="One combined log for groomer and trainer requests. Filter by source and track resolution status."
-      reportTypes={REQUEST_LOG_TYPES}
-      initialFocus="groomer_request"
-      nameColumn="Submitted By"
-    />
-  );
+  return <SupportWorkspace initialKind="request" reportTypes={REQUEST_TYPES} />;
 }
 
 export function TrainerRequestsAdminPanel() {
-  return (
-    <CombinedSupportLogPage
-      title="Requests"
-      subtitle="One combined log for groomer and trainer requests. Filter by source and track resolution status."
-      reportTypes={REQUEST_LOG_TYPES}
-      initialFocus="trainer_request"
-      nameColumn="Submitted By"
-    />
-  );
+  return <SupportWorkspace initialKind="request" reportTypes={REQUEST_TYPES} />;
 }
+
 
 export function AdminTrainerEntriesPanel() {
   const { showToast } = useToast();
