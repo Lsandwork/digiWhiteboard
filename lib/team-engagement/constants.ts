@@ -54,15 +54,18 @@ export type BarkOutCategory = {
 };
 
 export const DEFAULT_BARK_OUT_CATEGORIES: BarkOutCategory[] = [
-  { key: "above_and_beyond", label: "Above and beyond", description: "Went past what the shift asked for.", active: true },
-  { key: "helping_coworker", label: "Helping a coworker", description: "Stepped in to support a teammate.", active: true },
+  { key: "above_and_beyond", label: "Going Above & Beyond", description: "Went past what the shift asked for.", active: true },
   { key: "teamwork", label: "Teamwork", description: "Made the team stronger together.", active: true },
-  { key: "positive_attitude", label: "Positive attitude", description: "Kept the energy calm and upbeat.", active: true },
-  { key: "customer_service", label: "Customer service", description: "Made a pet parent's day easier.", active: true },
+  { key: "dog_care", label: "Amazing Dog Care", description: "Exceptional care for the dogs in our pack.", active: true },
+  { key: "problem_solving", label: "Problem Solving", description: "Found a fix when something went sideways.", active: true },
+  { key: "initiative", label: "Taking Initiative", description: "Saw what needed doing and jumped in.", active: true },
+  { key: "positive_attitude", label: "Positive Attitude", description: "Kept the energy calm and upbeat.", active: true },
+  { key: "helping_coworker", label: "Helping a Teammate", description: "Stepped in to support a teammate.", active: true },
+  { key: "leadership", label: "Leadership", description: "Led by example on the floor.", active: true },
+  { key: "customer_service", label: "Customer Appreciation", description: "Made a pet parent's day easier.", active: true },
+  { key: "positive_contribution", label: "Other", description: "Made Fitdog better in a way worth naming.", active: true },
   { key: "reliability", label: "Reliability", description: "Showed up and followed through.", active: true },
-  { key: "problem_solving", label: "Problem-solving", description: "Found a fix when something went sideways.", active: true },
-  { key: "cross_department", label: "Supporting another department", description: "Helped a team outside their own.", active: true },
-  { key: "positive_contribution", label: "Positive contribution", description: "Made Fitdog better in a way worth naming.", active: true }
+  { key: "cross_department", label: "Supporting Another Department", description: "Helped a team outside their own.", active: true }
 ];
 
 export const BARK_OUT_STATUSES = [
@@ -133,9 +136,15 @@ export const MODERATION_REASON_LABELS: Record<ModerationReasonCode, string> = {
 export const BARK_OUT_REACTIONS = ["kudos", "thanks", "celebrate"] as const;
 export type BarkOutReaction = (typeof BARK_OUT_REACTIONS)[number];
 export const BARK_OUT_REACTION_LABELS: Record<BarkOutReaction, string> = {
-  kudos: "Kudos",
-  thanks: "Thank you",
-  celebrate: "Celebrate"
+  kudos: "Amazing",
+  thanks: "Appreciation",
+  celebrate: "Support"
+};
+
+export const BARK_OUT_REACTION_EMOJI: Record<BarkOutReaction, string> = {
+  kudos: "⭐",
+  thanks: "❤️",
+  celebrate: "🙌"
 };
 
 export const DEVELOPMENT_RECORD_TYPES = [

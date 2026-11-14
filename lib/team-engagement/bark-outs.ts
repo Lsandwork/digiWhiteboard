@@ -49,8 +49,8 @@ const POLICY_COOLDOWN_REJECTIONS = 3;
 
 export type BarkOutView = {
   id: string;
-  author: { userId: string | null; name: string };
-  recipient: { userId: string | null; name: string; departments: string[] };
+  author: { userId: string | null; name: string; avatarUrl: string | null };
+  recipient: { userId: string | null; name: string; departments: string[]; avatarUrl: string | null };
   category: { key: string; label: string };
   message: string;
   context: string | null;
@@ -112,16 +112,35 @@ async function loadReactions(ctx: ServiceContext, ids: string[]) {
   return { counts, mine };
 }
 
+async function avatarMap(ctx: ServiceContext, ids: Array<string | null | undefined>) {
+  const unique = [...new Set(ids.filter((id): id is string => Boolean(id)))];
+  const entries = await Promise.all(unique.map(async (id) => [id, await ctx.loadAvatar(id)] as const));
+  return new Map(entries);
+}
+
 export async function barkOutViews(ctx: ServiceContext, rows: BarkOutRow[]): Promise<BarkOutView[]> {
   const label = await categoryLabel(ctx);
+  const avatars = await avatarMap(
+    ctx,
+    rows.flatMap((row) => [row.author_user_id, row.recipient_user_id])
+  );
   const { counts, mine } = await loadReactions(
     ctx,
     rows.filter((row) => row.status === "published").map((row) => row.id)
   );
   return rows.map((row) => ({
     id: row.id,
-    author: { userId: row.author_user_id, name: row.author_name },
-    recipient: { userId: row.recipient_user_id, name: row.recipient_name, departments: row.recipient_departments },
+    author: {
+      userId: row.author_user_id,
+      name: row.author_name,
+      avatarUrl: row.author_user_id ? avatars.get(row.author_user_id) ?? null : null
+    },
+    recipient: {
+      userId: row.recipient_user_id,
+      name: row.recipient_name,
+      departments: row.recipient_departments,
+      avatarUrl: row.recipient_user_id ? avatars.get(row.recipient_user_id) ?? null : null
+    },
     category: { key: row.category, label: label(row.category) },
     message: row.message,
     context: row.context,
