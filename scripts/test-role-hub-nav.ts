@@ -30,7 +30,7 @@ for (const role of HUB_NAV_ROLES) {
       ? 20
       : role === "assistant_manager" || role === "owner_admin" || role === "manager_admin"
         ? 11
-        : 10;
+        : 12;
   assert.ok(icons <= cap, `${role} sidebar icons must be <= ${cap}, got ${icons}`);
   assert.ok(icons >= 1, `${role} must have at least one sidebar tab`);
 
@@ -70,6 +70,14 @@ for (const role of HUB_NAV_ROLES) {
       nav.some((entry) => entry.type === "route" && entry.id === "gingr-route-generator"),
       true,
       "front desk sidebar includes Gingr Route Generator"
+    );
+  }
+
+  if (role === "groomer" || role === "trainer" || role === "overnight") {
+    assert.equal(
+      nav.some((entry) => entry.type === "item" && entry.tab === "team_engagement"),
+      true,
+      `${role} sidebar includes Team Engagement`
     );
   }
 

@@ -101,6 +101,7 @@ import {
   isSuperAdminLegacyRole,
   canUseAdminBoardSwitcher,
   canParticipateInTeamEngagement,
+  canUseTeamEngagement,
   type UserAccess
 } from "@/lib/admin/permissions";
 import type { AdminUserRole } from "@/lib/admin/users";
@@ -118,6 +119,7 @@ import { BodyChecksPanel } from "@/components/admin/body-checks/BodyChecksPanel"
 import { ReportsPanel } from "@/components/admin/ReportsPanel";
 import { TlDigiBoardPanel } from "@/components/admin/TlDigiBoardPanel";
 import TeamEngagementPanel from "@/components/admin/team-engagement/TeamEngagementPanel";
+import TeamEngagementParticipationPanel from "@/components/admin/team-engagement/TeamEngagementParticipationPanel";
 import { ManagementSupportEngagementShell } from "@/components/admin/team-engagement/ManagementSupportEngagementShell";
 import { LobbySlideshowUploadPanel } from "@/components/admin/LobbySlideshowUploadPanel";
 import { CastTvPanel } from "@/components/admin/CastTvPanel";
@@ -948,7 +950,10 @@ export function AdminDashboard() {
 
         {tab === "management_support" ? (
           <ManagementSupportEngagementShell
-            showEngagement={canParticipateInTeamEngagement(userAccess, currentRole)}
+            showEngagement={
+              canParticipateInTeamEngagement(userAccess, currentRole) &&
+              !canAccessAdminTab(userAccess, "team_engagement", currentRole, board, { isDemo })
+            }
             mode={
               isHandlerPanel
                 ? "handler"
@@ -965,7 +970,13 @@ export function AdminDashboard() {
           />
         ) : null}
 
-        {tab === "team_engagement" ? <TeamEngagementPanel /> : null}
+        {tab === "team_engagement" ? (
+          canUseTeamEngagement(userAccess, currentRole) ? (
+            <TeamEngagementPanel />
+          ) : (
+            <TeamEngagementParticipationPanel />
+          )
+        ) : null}
 
         {tab === "ms_hub" ? <ManagementSupportHubPanel onNavigate={(nextTab) => setActiveTab(nextTab)} /> : null}
         {tab === "ms_groomer_complaints" ? <GroomerComplaintsAdminPanel /> : null}
