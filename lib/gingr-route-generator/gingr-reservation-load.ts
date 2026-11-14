@@ -56,6 +56,14 @@ const ANIMAL_OWNER_LOOKUP_CONCURRENCY = 4;
 const DATE_WINDOW_BACK_DAYS = 14;
 const DATE_WINDOW_FORWARD_DAYS = 7;
 const WINDOW_PULL_MAX_PAGES = 6;
+const MAX_ANIMAL_SCOPED_PULLS = 48;
+const ANIMAL_PULL_CONCURRENCY = 4;
+const MAX_DETAIL_PULLS = 60;
+const DETAIL_PULL_CONCURRENCY = 4;
+
+function reservationIdOf(reservation: GingrReservation): string | null {
+  return pickString(reservation.reservation_id, reservation.id);
+}
 
 async function resolveOwnerIds(
   client: GingrClient,
@@ -148,6 +156,57 @@ async function enrichFromDateWindow(
   return mergeGingrReservationsById(reservations, relevant);
 }
 
+async function enrichFromAnimalScopedPulls(
+  client: GingrClient,
+  reservations: GingrReservation[],
+  routeDate: string
+): Promise<GingrReservation[]> {
+  const animals = new Set<string>();
+  for (const reservation of reservations) {
+    const animalId = animalIdFromGingrReservation(reservation);
+    if (animalId) animals.add(animalId);
+  }
+  if (!animals.size) return reservations;
+
+  const start = addCalendarDays(routeDate, -DATE_WINDOW_BACK_DAYS);
+  const end = addCalendarDays(routeDate, DATE_WINDOW_FORWARD_DAYS);
+  const extra: GingrReservation[] = [];
+  const animalList = [...animals].slice(0, MAX_ANIMAL_SCOPED_PULLS);
+  for (let offset = 0; offset < animalList.length; offset += ANIMAL_PULL_CONCURRENCY) {
+    const batch = animalList.slice(offset, offset + ANIMAL_PULL_CONCURRENCY);
+    const batches = await Promise.all(
+      batch.map((animalId) => client.listReservationsForAnimal(animalId, start, end))
+    );
+    for (const rows of batches) extra.push(...rows);
+  }
+  if (!extra.length) return reservations;
+  return mergeGingrReservationsById(reservations, extra);
+}
+
+async function enrichFromReservationDetails(
+  client: GingrClient,
+  reservations: GingrReservation[]
+): Promise<GingrReservation[]> {
+  const ids = new Set<string>();
+  for (const reservation of reservations) {
+    const id = reservationIdOf(reservation);
+    if (id) ids.add(id);
+  }
+  if (!ids.size) return reservations;
+
+  const extra: GingrReservation[] = [];
+  const idList = [...ids].slice(0, MAX_DETAIL_PULLS);
+  for (let offset = 0; offset < idList.length; offset += DETAIL_PULL_CONCURRENCY) {
+    const batch = idList.slice(offset, offset + DETAIL_PULL_CONCURRENCY);
+    const rows = await Promise.all(batch.map((id) => client.getReservationById(id)));
+    for (const row of rows) {
+      if (row) extra.push(row);
+    }
+  }
+  if (!extra.length) return reservations;
+  return mergeGingrReservationsById(reservations, extra);
+}
+
 /**
  * Date-scoped reservations plus checked-in rows, a nearby date window, and
  * per-owner pulls so nested `service_items` / sibling transport reservations
@@ -163,6 +222,8 @@ export async function loadGingrReservationsForRouteDate(
   ]);
   let merged = mergeGingrReservationsById(byDate, checkedIn);
   merged = await enrichFromDateWindow(client, merged, date);
+  merged = await enrichFromAnimalScopedPulls(client, merged, date);
   merged = await enrichFromOwnerReservations(client, merged);
+  merged = await enrichFromReservationDetails(client, merged);
   return merged;
 }

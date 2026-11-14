@@ -60,14 +60,18 @@ async function loadFitdogSignupDogs(date: string): Promise<{ dogs: GingrRouteDog
 export async function loadGingrRouteSchedule(options: {
   date: string;
   refresh?: boolean;
+  /** When true, return the last imported CSV/PDF for this date instead of live Gingr. */
+  useUpload?: boolean;
 }) {
   const date = isValidDate(options.date) ? options.date : todayPacificDateKey();
 
   if (!options.refresh) {
-    const uploaded = readGingrUploadOverlay(date);
-    if (uploaded) return { ...uploaded, cacheHit: true as const };
+    if (options.useUpload) {
+      const uploaded = readGingrUploadOverlay(date);
+      if (uploaded) return { ...uploaded, cacheHit: true as const };
+    }
     const cached = readGingrRouteCache(date);
-    if (cached) return { ...cached, cacheHit: true as const };
+    if (cached && cached.source === "gingr_api") return { ...cached, cacheHit: true as const };
   } else {
     invalidateGingrRouteCache(date);
   }

@@ -35,7 +35,9 @@ const NAME_KEYS = [
   "service_name",
   "service_type",
   "display_name",
-  "description"
+  "description",
+  "value",
+  "label"
 ] as const;
 
 /** Option names only. Free-text descriptions can mention pick-ups without being one. */
@@ -873,6 +875,44 @@ function listServiceLikeRows(reservation: Record<string, unknown>): Array<Record
   return listReservationServiceArrays(reservation);
 }
 
+function looksLikeExplicitServiceAddonText(text: string): boolean {
+  const trimmed = String(text || "").trim();
+  if (!trimmed || trimmed.length > 220) return false;
+  return (
+    /^(before|after)\s+(the\s+)?outing\b/i.test(trimmed) ||
+    /^boarding\s*@/i.test(trimmed) ||
+    /\bfitdog to\s+(pick\s*up|drop\s*off)\b/i.test(trimmed) ||
+    /\bowner\s+to\s+(drop\s*off|pick\s*up)\b/i.test(trimmed) ||
+    /\bowner\s+pick\s*up\b/i.test(trimmed) ||
+    /\bservice\s+addons?\s*(?:\||-|–)/i.test(trimmed)
+  );
+}
+
+/** When nested arrays are missing, scan short strings anywhere on the reservation payload. */
+function deepTransportCandidates(reservation: Record<string, unknown>): TransportCandidate[] {
+  const out: TransportCandidate[] = [];
+  const seen = new Set<string>();
+  for (const text of collectGingrTextValues(reservation)) {
+    if (!looksLikeExplicitServiceAddonText(text)) continue;
+    for (const part of splitAppointmentOptionParts(text)) {
+      if (!looksLikeExplicitServiceAddonText(part) && !looksLikeTransportToken(normalizeToken(part))) continue;
+      if (!classifyAppointmentOption(part)) continue;
+      const key = part.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        text: part,
+        optionId: null,
+        scheduledDate: null,
+        source: "addon",
+        cost: undefined,
+        assignedTo: undefined
+      });
+    }
+  }
+  return out;
+}
+
 /** Every appointment-option-like text on the reservation (never the reservation type). */
 export function collectReservationTransportCandidates(
   reservation: Record<string, unknown>
@@ -936,11 +976,18 @@ export function collectReservationTransportCandidates(
         emptyInherited
       ),
       ...collectCandidatesFromValue(reservation.r_addons, "addon", emptyInherited),
+      ...collectCandidatesFromValue(reservation.r_addon, "addon", emptyInherited),
       ...collectCandidatesFromValue(reservation.s_addons, "addon", emptyInherited),
+      ...collectCandidatesFromValue(reservation.s_addon, "addon", emptyInherited),
+      ...collectCandidatesFromValue(reservation.line_items, "addon", emptyInherited),
+      ...collectCandidatesFromValue(reservation.selected_options, "addon", emptyInherited),
+      ...collectCandidatesFromValue(reservation.custom_fields, "addon", emptyInherited),
+      ...collectCandidatesFromValue(reservation.answers, "addon", emptyInherited),
       ...collectCandidatesFromValue(reservation.services, "service", emptyInherited)
     ].filter((candidate) => !isInternalBoardingTaxiMarker(candidate));
+    const fromDeep = deepTransportCandidates(reservation);
     const seen = new Set<string>();
-    return [...fromRows, ...fromValues].filter((candidate) => {
+    return [...fromRows, ...fromValues, ...fromDeep].filter((candidate) => {
       const key = `${candidate.text}|${candidate.scheduledDate ?? ""}|${candidate.optionId ?? ""}`;
       if (seen.has(key)) return false;
       seen.add(key);
