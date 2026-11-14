@@ -524,6 +524,26 @@
   color: var(--grg-muted);
 }
 
+.grg-booked-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.grg-booked-kicker {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--grg-muted);
+  margin-bottom: 0.1rem;
+}
+
+.grg-booked--activity {
+  font-weight: 600;
+}
+
 .grg-dog-activity {
   display: flex;
   align-items: center;

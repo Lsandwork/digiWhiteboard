@@ -1814,6 +1814,13 @@ void (async () => {
     );
     assert.equal(splitAddons.dogs[0]!.startLocation, "home");
     assert.equal(splitAddons.dogs[0]!.endLocation, "home");
+    assert.equal(splitAddons.dogs[0]!.reservationType, "Sports Sign Ups");
+    assert.deepEqual(splitAddons.dogs[0]!.bookedActivityLabels, ["Adventure Hike"]);
+    assert.equal(splitAddons.dogs[0]!.reservationIds.length, 3, "addon rows are sibling reservations, not activities");
+    assert.ok(
+      !splitAddons.dogs[0]!.appointmentOptions.some((label) => /adventure hike/i.test(label)),
+      "activity name must not appear as appointment option"
+    );
 
     const [rdY, rdM, rdD] = routeDate.split("-");
     const gingrSlashDate = `${Number(rdM)}/${Number(rdD)}/${rdY}`;
@@ -1835,9 +1842,44 @@ void (async () => {
       routeDate
     ).dogs[0];
     assert.ok(serviceItems, "Annie service_items fixture");
+    assert.equal(serviceItems!.reservationIds.length, 1, "single Gingr reservation, not two services");
+    assert.equal(serviceItems!.reservationType, "Sports Sign Ups");
+    assert.deepEqual(serviceItems!.bookedActivityLabels, ["Adventure Hike"]);
+    assert.deepEqual(serviceItems!.activities, ["adventure_hike"], "reservation type is not a second route activity");
     assert.ok(serviceItems!.appointmentOptions.length >= 2, "service_items carry Service Addons");
+    assert.ok(
+      serviceItems!.appointmentOptions.every((label) => !/adventure hike/i.test(label)),
+      "appointment options are transport addons only"
+    );
     assert.equal(serviceItems!.startLocation, "home");
     assert.equal(serviceItems!.endLocation, "home");
+    assert.equal(serviceItems!.transportPlan.startingLocation.locationType, "HOME");
+    assert.equal(serviceItems!.transportPlan.finalDestination.locationType, "HOME");
+
+    const groupClass = normalizeGingrRouteReservations(
+      [
+        reservation({
+          reservation_id: "9801",
+          animal_id: 9800,
+          a_name: "Maisie",
+          owner: ownerHome(),
+          type: "Group Class",
+          services: [{ name: "Activity | Scent Works", scheduled_at: `${routeDate}T11:00:00-07:00` }],
+          service_items: [
+            { name: "Before Outing - Fitdog to Pick Up @ Home", scheduled_at: `${gingrSlashDate} 12:00 am` }
+          ]
+        })
+      ],
+      routeDate
+    ).dogs[0];
+    assert.ok(groupClass, "Group Class + Activity fixture");
+    assert.equal(groupClass!.reservationType, "Group Class");
+    assert.deepEqual(groupClass!.bookedActivityLabels, ["Scent Works"]);
+    assert.deepEqual(groupClass!.activities, ["scent_works"]);
+    assert.ok(
+      groupClass!.appointmentOptions.some((label) => /before outing/i.test(label)),
+      "Group Class transport addons classify separately from activity"
+    );
 
     // 11. Sport Sign Ups is a qualifying class service.
     const sport = normalizeGingrRouteReservations(

@@ -166,6 +166,8 @@ export function fitdogSignupsToRouteDogs(signups: FitdogClassSignup[], date: str
         imageUrl: null,
         activities: [],
         activityLabels: [],
+        reservationType: null,
+        bookedActivityLabels: [],
         ...routeDogTransportFields({ activities: [], options: [], homeAddress: null, addressStatus: "ok" }),
         isTaxi: false,
         assignedTo: null,
@@ -224,6 +226,7 @@ export function fitdogSignupsToRouteDogs(signups: FitdogClassSignup[], date: str
   for (const dog of dogs) {
     dog.activities = sortGingrRouteActivities(activitySets.get(dog.id)!);
     dog.activityLabels = dog.activities.map((id) => GINGR_ROUTE_ACTIVITY_BY_ID[id].label);
+    dog.bookedActivityLabels = [...dog.activityLabels];
     dog.routeVanKey = resolveRouteVanKey({ assignedLabels: [], isTaxi: dog.isTaxi, activities: dog.activities });
     applyTransportFields(dog, optionSets.get(dog.id)!);
     if (!dog.pickup && !dog.dropoff) dog.addressStatus = "ok";

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, MapPin, Search, Truck } from "lucide-react";
-import { dogHasSportSignUp } from "@/lib/gingr-route-generator/activities";
+import { buildGingrBookedDisplay } from "@/lib/gingr-route-generator/booking-display";
 import type { GingrRouteDog } from "@/lib/gingr-route-generator/normalize";
 import type { GingrAppointmentOption } from "@/lib/gingr-route-generator/transportation";
 import {
@@ -73,19 +73,41 @@ function vanName(key: GingrRouteDog["routeVanKey"]): string {
 }
 
 function bookedAs(dog: GingrRouteDog): string {
-  const labels = dog.activityLabels.filter((label) => label !== "Club" && label !== "Taxi");
-  const activity = labels.join(", ");
-  const visit = dog.visitLabel;
-  if (dogHasSportSignUp(dog.activities) && !dog.activities.includes("sport_sign_ups")) {
-    const sport = activity || "Sports Sign Ups";
-    return visit ? `Sports Sign Ups · ${sport} · ${visit}` : `Sports Sign Ups · ${sport}`;
+  return buildGingrBookedDisplay({
+    reservationType: dog.reservationType,
+    bookedActivityLabels: dog.bookedActivityLabels,
+    visitLabel: dog.visitLabel,
+    isTaxi: dog.isTaxi
+  }).summary;
+}
+
+function BookedAsView({ dog }: { dog: GingrRouteDog }) {
+  const booked = buildGingrBookedDisplay({
+    reservationType: dog.reservationType,
+    bookedActivityLabels: dog.bookedActivityLabels,
+    visitLabel: dog.visitLabel,
+    isTaxi: dog.isTaxi
+  });
+  if (!booked.reservationType && !booked.activities.length) {
+    return <div className="grg-booked">{booked.summary}</div>;
   }
-  if (activity && visit) return `${activity} · ${visit}`;
-  if (activity) return activity;
-  if (visit && dog.isTaxi) return `${visit} · Taxi`;
-  if (visit) return visit;
-  if (dog.isTaxi) return "Taxi Service";
-  return "Scheduled";
+  return (
+    <div className="grg-booked-stack">
+      {booked.reservationType ? (
+        <div className="grg-booked">
+          <span className="grg-booked-kicker">Reservation type</span>
+          {booked.reservationType}
+        </div>
+      ) : null}
+      {booked.activities.length ? (
+        <div className="grg-booked grg-booked--activity">
+          <span className="grg-booked-kicker">Activity</span>
+          {booked.activities.join(", ")}
+        </div>
+      ) : null}
+      {dog.visitLabel ? <div className="grg-dog-owner">{dog.visitLabel}</div> : null}
+    </div>
+  );
 }
 
 type EndCell = {
@@ -394,7 +416,7 @@ export function GingrRouteBoard({
                         </div>
                       </td>
                       <td>
-                        <div className="grg-booked">{bookedAs(dog)}</div>
+                        <BookedAsView dog={dog} />
                         {dog.homeAddress ? <div className="grg-dog-owner">{dog.homeAddress}</div> : null}
                         <button type="button" className="grg-options-btn" onClick={() => setOpenId(dog.id)}>
                           {dog.appointmentOptions.length
