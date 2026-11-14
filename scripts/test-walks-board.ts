@@ -165,7 +165,8 @@ assert.deepEqual([...WALK_BOARD_ALARM_HOURS], [8, 10, 12, 14, 16, 18]);
   assert.match(panel, /Mark Complete/);
   assert.match(panel, /cannot be snoozed/);
   assert.match(panel, /physical whiteboard/);
-  assert.match(panel, /Upload pictures/);
+  assert.doesNotMatch(panel, /Upload pictures/);
+  assert.doesNotMatch(panel, /tab=bulk_photo_upload/);
   assert.match(readFileSync(join(process.cwd(), "app/globals.css"), "utf8"), /overflow-wrap:\s*anywhere/);
 }
 

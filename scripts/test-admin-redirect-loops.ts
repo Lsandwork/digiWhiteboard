@@ -55,7 +55,7 @@ function adminRedirectStep(
   }
 
   if (isAdminDashboardPath(pathname) && !isDemo && isLobbyDigiBoardOnlyLegacyRole(role)) {
-    const marketingStaffTabs = ["crossover_communication", "bulk_photo_upload", "media_library", "help"];
+    const marketingStaffTabs = ["crossover_communication", "media_library", "help"];
     if (board === "staff" && (tab === null || marketingStaffTabs.includes(tab))) {
       if (!tab) {
         return { pathname: "/admin", board: "staff", tab: "crossover_communication" };
