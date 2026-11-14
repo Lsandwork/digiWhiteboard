@@ -86,6 +86,27 @@ import {
   voteFunPoll
 } from "@/lib/team-engagement/pack-features";
 import {
+  employeeVoiceCatalog,
+  listVoiceSurveysLeadership,
+  publishVoiceSurvey,
+  saveVoiceSurvey,
+  submitVoiceSurvey,
+  voiceSurveyResults
+} from "@/lib/team-engagement/employee-voice";
+import {
+  archivePackGoal,
+  listPackGoalsLeadership,
+  packGoalsEmployeeView,
+  publishPackGoal,
+  savePackGoal,
+  updatePackGoalProgress
+} from "@/lib/team-engagement/pack-goals";
+import {
+  funZoneManagementView,
+  ideasManagementView,
+  packEngagementOverview
+} from "@/lib/team-engagement/pack-leadership";
+import {
   announcementsForEmployee,
   archiveAnnouncement,
   assignDepartmentManager,
@@ -244,6 +265,20 @@ export async function runLeadershipView(ctx: ServiceContext, view: LeadershipVie
       return integrationsView(ctx);
     case "system_health":
       return systemHealthView(ctx);
+    case "pack_overview":
+      return packEngagementOverview(ctx);
+    case "pack_goals_admin":
+      return listPackGoalsLeadership(ctx);
+    case "employee_voice_admin":
+      return listVoiceSurveysLeadership(ctx);
+    case "fun_zone_admin":
+      return funZoneManagementView(ctx);
+    case "pack_ideas_admin":
+      return ideasManagementView(ctx);
+    case "pack_milestones_admin":
+      return milestonesView(ctx);
+    case "voice_survey_results":
+      return voiceSurveyResults(ctx, params);
   }
 }
 
@@ -331,6 +366,18 @@ export async function runLeadershipAction(ctx: ServiceContext, action: Leadershi
       return publishFunPoll(ctx, body);
     case "sync_pack_milestones":
       return syncPackMilestones(ctx, ctx.loadStaffHr ? await ctx.loadStaffHr() : []);
+    case "save_pack_goal":
+      return savePackGoal(ctx, body);
+    case "publish_pack_goal":
+      return publishPackGoal(ctx, body);
+    case "update_pack_goal_progress":
+      return updatePackGoalProgress(ctx, body);
+    case "archive_pack_goal":
+      return archivePackGoal(ctx, body);
+    case "save_voice_survey":
+      return saveVoiceSurvey(ctx, body);
+    case "publish_voice_survey":
+      return publishVoiceSurvey(ctx, body);
   }
 }
 
@@ -338,7 +385,18 @@ export async function runLeadershipAction(ctx: ServiceContext, action: Leadershi
 // Employee Bark Outs & suggestions (every staff role)
 // ---------------------------------------------------------------------------------------------
 
-export const PARTICIPANT_VIEWS = ["home", "pack", "feed", "mine", "feedback", "milestones", "fun_zone", "comments"] as const;
+export const PARTICIPANT_VIEWS = [
+  "home",
+  "pack",
+  "feed",
+  "mine",
+  "feedback",
+  "milestones",
+  "fun_zone",
+  "comments",
+  "pack_goals",
+  "employee_voice"
+] as const;
 export type ParticipantView = (typeof PARTICIPANT_VIEWS)[number];
 
 export function isParticipantView(value: string): value is ParticipantView {
@@ -410,6 +468,10 @@ export async function runParticipantView(ctx: ServiceContext, view: ParticipantV
       return funZoneView(ctx);
     case "comments":
       return listBarkOutComments(ctx, { barkOutId: params.barkOutId });
+    case "pack_goals":
+      return packGoalsEmployeeView(ctx);
+    case "employee_voice":
+      return employeeVoiceCatalog(ctx);
   }
 }
 
@@ -447,5 +509,7 @@ export async function runParticipantAction(ctx: ServiceContext, action: Particip
       return voteFunPoll(ctx, body);
     case "answer_fun_trivia":
       return answerFunTrivia(ctx, body);
+    case "submit_voice_survey":
+      return submitVoiceSurvey(ctx, body);
   }
 }

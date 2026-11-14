@@ -798,18 +798,20 @@ function addMonthsIso(hireDate: string, months: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-export async function syncPackMilestones(ctx: ServiceContext, staff: StaffHrRow[]) {
-  requireStorage(ctx);
-  if (!ctx.actor.tier) throw forbiddenError();
-  await assertPackTable(ctx, "team_engagement_milestones");
-  const today = pacificTodayIso(ctx);
-  const directory = await ctx.directory();
+export async function syncPackMilestonesCore(input: {
+  db: ServiceContext["db"];
+  staff: StaffHrRow[];
+  directory: Awaited<ReturnType<ServiceContext["directory"]>>;
+  now?: () => Date;
+}) {
+  const ctxLike = { now: input.now ?? (() => new Date()) } as ServiceContext;
+  const today = pacificTodayIso(ctxLike);
   const ops: DbOp[] = [];
-  const now = nowIso(ctx);
+  const now = nowIso(ctxLike);
 
-  for (const member of staff) {
+  for (const member of input.staff) {
     if (!member.admin_user_id || !member.hire_date) continue;
-    const employee = directory.byId.get(member.admin_user_id);
+    const employee = input.directory.byId.get(member.admin_user_id);
     if (!employee?.active) continue;
     for (const rule of ANNIVERSARY_KINDS) {
       const celebrationOn = addMonthsIso(member.hire_date, rule.months);
@@ -859,8 +861,20 @@ export async function syncPackMilestones(ctx: ServiceContext, staff: StaffHrRow[
     }
   }
 
-  if (ops.length) await ctx.db.commit(ops);
+  if (ops.length) await input.db.commit(ops);
   return { generated: ops.length };
+}
+
+export async function syncPackMilestones(ctx: ServiceContext, staff: StaffHrRow[]) {
+  requireStorage(ctx);
+  if (!ctx.actor.tier) throw forbiddenError();
+  await assertPackTable(ctx, "team_engagement_milestones");
+  return syncPackMilestonesCore({
+    db: ctx.db,
+    staff,
+    directory: await ctx.directory(),
+    now: ctx.now
+  });
 }
 
 export async function saveFunQuestion(

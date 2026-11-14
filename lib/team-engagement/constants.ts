@@ -2,6 +2,19 @@ import type { DepartmentKey } from "@/lib/admin/permissions";
 
 export const TEAM_ENGAGEMENT_MIGRATION = "supabase/migrations/103_team_engagement.sql";
 export const PACK_PRIORITY2_MIGRATION = "supabase/migrations/105_pack_priority2.sql";
+export const PACK_PRIORITY3_MIGRATION = "supabase/migrations/107_pack_priority3.sql";
+
+export const PACK_GOAL_TYPES = ["numeric", "completion", "participation", "milestone", "timebound"] as const;
+export type PackGoalType = (typeof PACK_GOAL_TYPES)[number];
+
+export const PACK_GOAL_STATUSES = ["draft", "active", "completed", "archived"] as const;
+export type PackGoalStatus = (typeof PACK_GOAL_STATUSES)[number];
+
+export const VOICE_SURVEY_STATUSES = ["draft", "scheduled", "active", "closed", "archived"] as const;
+export type VoiceSurveyStatus = (typeof VOICE_SURVEY_STATUSES)[number];
+
+export const VOICE_QUESTION_TYPES = ["single", "multi", "rating", "yes_no", "text"] as const;
+export type VoiceQuestionType = (typeof VOICE_QUESTION_TYPES)[number];
 
 export const SPOTLIGHT_CATEGORIES = [
   "above_and_beyond",
@@ -223,6 +236,7 @@ export const FEEDBACK_CATEGORY_LABELS: Record<FeedbackCategory, string> = {
 export const FEEDBACK_STATUSES = [
   "submitted",
   "under_review",
+  "needs_information",
   "approved",
   "in_progress",
   "implemented",
@@ -234,6 +248,7 @@ export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number];
 export const FEEDBACK_STATUS_LABELS: Record<FeedbackStatus, string> = {
   submitted: "Submitted",
   under_review: "Under review",
+  needs_information: "More information needed",
   approved: "Approved",
   in_progress: "In progress",
   implemented: "Implemented",

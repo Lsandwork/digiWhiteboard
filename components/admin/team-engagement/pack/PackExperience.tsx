@@ -251,6 +251,10 @@ export default function PackExperience() {
   const [message, setMessage] = useState("");
   const [ideas, setIdeas] = useState<FeedbackItem[] | null>(null);
   const [funZone, setFunZone] = useState<PackPayload["funZonePreview"] | null>(null);
+  const [packGoals, setPackGoals] = useState<{ active: Array<{ id: string; title: string; description: string; progressPercent: number; endsOn: string | null }> } | null>(null);
+  const [voiceSurveys, setVoiceSurveys] = useState<
+    Array<{ id: string; title: string; introduction: string | null; completed: boolean; questions: Array<{ id: string; prompt: string; questionType: string; options: unknown[] }> }>
+  | null>(null);
   const [ideaTitle, setIdeaTitle] = useState("");
   const [ideaBody, setIdeaBody] = useState("");
 
@@ -302,10 +306,24 @@ export default function PackExperience() {
     if (ok) setFunZone(body);
   }
 
+  type PackGoalsState = { active: Array<{ id: string; title: string; description: string; progressPercent: number; endsOn: string | null }> };
+
+  const loadPackGoals = useCallback(async () => {
+    const { ok, body } = await fetchAdminJson<PackGoalsState>("/api/admin/bark-outs?view=pack_goals");
+    if (ok) setPackGoals(body);
+  }, []);
+
+  const loadVoice = useCallback(async () => {
+    const { ok, body } = await fetchAdminJson<{ items: NonNullable<typeof voiceSurveys> }>("/api/admin/bark-outs?view=employee_voice");
+    if (ok) setVoiceSurveys(body.items);
+  }, []);
+
   useEffect(() => {
     if (section === "ideas") void loadIdeas();
     if (section === "fun") void loadFunZone();
-  }, [section, loadIdeas, loadFunZone]);
+    if (section === "goals") void loadPackGoals();
+    if (section === "voice") void loadVoice();
+  }, [section, loadIdeas, loadFunZone, loadPackGoals, loadVoice]);
 
   useEffect(() => {
     if (modalOpen && !home) void loadHome();
@@ -544,7 +562,27 @@ export default function PackExperience() {
         )
       ) : null}
       {section === "goals" ? (
-        <SectionEmpty title="Pack Goals" body={pack.sectionStatus.packGoals?.message ?? "Team challenges will appear here."} />
+        packGoals === null ? (
+          <p className="pack-muted">Loading Pack Goals…</p>
+        ) : packGoals.active.length === 0 ? (
+          <SectionEmpty title="Pack Goals" body="When leadership publishes a team goal, progress will show here." />
+        ) : (
+          <section className="pack-card">
+            <h2 className="pack-card__title">Active Pack Goals</h2>
+            {packGoals.active.map((goal) => (
+              <article key={goal.id} style={{ marginBottom: 16 }}>
+                <strong>{goal.title}</strong>
+                <p className="pack-muted" style={{ margin: "4px 0", fontSize: 13 }}>
+                  {goal.endsOn ? `Target by ${goal.endsOn}` : "In progress"} · {goal.progressPercent}% complete
+                </p>
+                <p style={{ margin: 0 }}>{goal.description}</p>
+                <div className="pack-progress" style={{ marginTop: 8, height: 8, background: "#e8f2f7", borderRadius: 8 }}>
+                  <div style={{ width: `${goal.progressPercent}%`, height: "100%", background: "var(--pack-blue)", borderRadius: 8 }} />
+                </div>
+              </article>
+            ))}
+          </section>
+        )
       ) : null}
       {section === "fun" ? (
         (funZone ?? pack.funZonePreview)?.ready ? (
@@ -595,7 +633,63 @@ export default function PackExperience() {
         )
       ) : null}
       {section === "voice" ? (
-        <SectionEmpty title="Employee Voice" body={pack.sectionStatus.employeeVoice?.message ?? "Surveys will post here when published."} />
+        voiceSurveys === null ? (
+          <p className="pack-muted">Loading surveys…</p>
+        ) : voiceSurveys.length === 0 ? (
+          <SectionEmpty title="Employee Voice" body="When a survey is published, you can respond here. Anonymous surveys never show your name to leadership." />
+        ) : (
+          voiceSurveys.map((survey) => (
+            <section key={survey.id} className="pack-card" style={{ marginBottom: 16 }}>
+              <h2 className="pack-card__title">{survey.title}</h2>
+              {survey.introduction ? <p className="pack-muted">{survey.introduction}</p> : null}
+              {survey.completed ? (
+                <p className="pack-muted">You already completed this survey. Thank you.</p>
+              ) : (
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const form = event.currentTarget;
+                    const answers: Record<string, unknown> = {};
+                    survey.questions.forEach((q) => {
+                      const field = form.elements.namedItem(`q-${q.id}`) as HTMLInputElement | HTMLTextAreaElement | null;
+                      if (field) answers[q.id] = q.questionType === "rating" ? Number(field.value) : field.value;
+                    });
+                    void (async () => {
+                      await fetchAdminJson("/api/admin/bark-outs", {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ action: "submit_voice_survey", surveyId: survey.id, answers })
+                      });
+                      await loadVoice();
+                    })();
+                  }}
+                >
+                  {survey.questions.map((q) => (
+                    <label key={q.id} className="pack-field">
+                      {q.prompt}
+                      {q.questionType === "text" ? (
+                        <textarea name={`q-${q.id}`} rows={3} required={false} />
+                      ) : q.questionType === "rating" ? (
+                        <select name={`q-${q.id}`} defaultValue="3">
+                          {[1, 2, 3, 4, 5].map((n) => (
+                            <option key={n} value={n}>
+                              {n}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input name={`q-${q.id}`} />
+                      )}
+                    </label>
+                  ))}
+                  <button type="submit" className="pack-btn pack-btn--primary">
+                    Submit survey
+                  </button>
+                </form>
+              )}
+            </section>
+          ))
+        )
       ) : null}
       {section === "ideas" ? (
         pack.sectionStatus.ideas?.ready ? (
