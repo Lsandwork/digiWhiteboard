@@ -588,10 +588,6 @@ function optionPhase(option: GingrAppointmentOption): string {
 }
 
 function DogDialog({ dog, onClose }: { dog: GingrRouteDog; onClose: () => void }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") onClose();
@@ -610,7 +606,7 @@ function DogDialog({ dog, onClose }: { dog: GingrRouteDog; onClose: () => void }
   const start = endCell(dog, "start");
   const finish = endCell(dog, "end");
 
-  if (!mounted) return null;
+  if (typeof document === "undefined") return null;
 
   return createPortal(
     <div className="grg-sheet-backdrop" onClick={onClose}>
