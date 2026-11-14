@@ -324,7 +324,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     key: "team_engagement",
     label: "Team Engagement",
     permissions: [
-      p("engagement.participate", "Join Bark Outs & Suggestions", "Read the Bark Out feed, react, report concerns, and send suggestions."),
+      p("engagement.participate", "Join Bark Outs & Suggestions", "Read the Bark Out feed, react, and send suggestions."),
       p("engagement.create_bark_out", "Post Bark Outs", "Recognize a coworker with a moderated Bark Out."),
       p("engagement.view", "Open Manage Team Engagement", "Management, Admin, and Super Admin workspace for team engagement."),
       p("engagement.view_all_departments", "See Every Department", "View engagement data for all departments instead of assigned teams only."),
