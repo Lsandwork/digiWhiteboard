@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
+import { revokeAdminSessionsForUser } from "@/lib/admin/session-revocation";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { canManageAdminUsers } from "@/lib/admin/permissions";
 import { legacyRoleToRoleKey, type DepartmentKey, type RoleKey } from "@/lib/admin/permissions";
@@ -98,6 +99,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     status: body.status,
     force_password_change: body.force_password_change
   });
+
+  if (body.status === "disabled") {
+    revokeAdminSessionsForUser(id);
+  }
 
   if (body.primary_role || body.additional_roles || body.departments) {
     const additionalRoles = parseRoleKeys(body.additional_roles).filter((r) => r !== primaryRoleKey);

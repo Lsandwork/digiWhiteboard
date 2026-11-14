@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies, headers } from "next/headers";
 import type { NextResponse } from "next/server";
+import { isAdminSessionRevoked } from "@/lib/admin/session-revocation";
 import { ADMIN_SESSION_COOKIE, SESSION_TTL_MS, getSessionSecret } from "@/lib/admin/session-constants";
 import { isDemoIdentity, isDemoModeEnabled, isDemoRequestAllowed } from "@/lib/demo/policy";
 
@@ -259,6 +260,7 @@ function requestPathname(request: Request) {
 export function getAdminSessionFromRequest(request: Request) {
   const session = sessionFromCookieHeader(request.headers.get("cookie") ?? "");
   if (!session) return null;
+  if (isAdminSessionRevoked(session.adminUserId)) return null;
   const pathname = requestPathname(request);
   if (isDemoIdentity(session) && !isDemoRequestAllowed(request.method, pathname)) return null;
   // Temporary-password sessions may only finish the password change (middleware does not cover /api).

@@ -31,6 +31,7 @@
     "test:security-auth-gates": "tsx scripts/test-security-auth-gates.ts",
     "test:public-board-feed": "tsx scripts/test-public-board-feed.ts",
     "test:security-migrations": "tsx scripts/test-security-migrations.ts",
+    "test:security-followups": "tsx scripts/test-security-followups.ts",
     "test:login-throttle": "tsx scripts/test-login-throttle.ts",
     "test:photo-proxy-security": "tsx scripts/test-photo-proxy-security.ts",
     "test:safe-redirect": "tsx scripts/test-safe-redirect.ts",

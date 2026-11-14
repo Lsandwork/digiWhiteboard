@@ -10,8 +10,13 @@ export const maxDuration = 60;
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
-    const screenId = String(body.screenId ?? body.screen_id ?? "default").trim() || "default";
-    const userAgent = request.headers.get("user-agent");
+    const screenId = String(body.screenId ?? body.screen_id ?? "default")
+      .trim()
+      .slice(0, 64) || "default";
+    if (!/^[a-zA-Z0-9._:-]+$/.test(screenId)) {
+      return NextResponse.json({ ok: false, error: "Invalid screen id." }, { status: 400 });
+    }
+    const userAgent = request.headers.get("user-agent")?.slice(0, 512) ?? null;
 
     const heartbeat = await recordCastTvHeartbeat(getCastTvSupabase(), {
       screenId,
