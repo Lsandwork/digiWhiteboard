@@ -42,7 +42,9 @@ for (const role of roles) {
         : requestedBoard;
     const firstTab = firstAccessibleAdminTab(access, role, requestedBoard);
     const accessBoard =
-      firstTab === "my_shift" || firstTab === "crossover_communication" ? "staff" : resolvedBoard;
+      firstTab === "my_shift" || firstTab === "ops_command_center" || firstTab === "crossover_communication"
+        ? "staff"
+        : resolvedBoard;
 
     assert.equal(
       (ADMIN_TABS as readonly string[]).includes(firstTab),
@@ -69,14 +71,14 @@ for (const role of roles) {
     );
     assert.equal(
       firstAccessibleAdminTab(access, role, "staff"),
-      "my_shift",
-      `${role} staff landing tab is My Shift`
+      "ops_command_center",
+      `${role} staff landing tab is Floor (ops command center)`
     );
   } else {
     assert.equal(
       firstAccessibleAdminTab(access, role, "staff"),
-      "crossover_communication",
-      "marketing staff landing tab remains Team Log"
+      "user_interactions",
+      "marketing staff landing tab remains Team Log (User Interactions)"
     );
   }
 }
@@ -98,8 +100,8 @@ assert.equal(
 );
 assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "groomer"), "ops_command_center", "groomer", "staff"),
-  false,
-  "groomer does not get a standalone Ops Command Center tab"
+  true,
+  "groomer lands on Floor via the Ops Command Center tab"
 );
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "yard_links", "daycare", "staff"), false);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "hr_hub", "daycare", "staff"), false);

@@ -838,6 +838,7 @@ export const TEAM_LEADER_TABS = [
 ] as const;
 
 export const GROOMER_TABS = [
+  "ops_command_center",
   "my_shift",
   "user_interactions",
   "crossover_communication",
@@ -853,6 +854,7 @@ export const GROOMER_TABS = [
 ] as const;
 
 export const TRAINER_TABS = [
+  "ops_command_center",
   "my_shift",
   "user_interactions",
   "trainer_ops",
@@ -869,6 +871,7 @@ export const TRAINER_TABS = [
 ] as const;
 
 export const DOG_HANDLER_TABS = [
+  "ops_command_center",
   "my_shift",
   "user_interactions",
   "crossover_communication",
@@ -885,6 +888,7 @@ export const DOG_HANDLER_TABS = [
 
 /** Overnight staff panel — core overnight tools plus floor body checks. */
 export const OVERNIGHT_TABS = [
+  "ops_command_center",
   "my_shift",
   "crossover_communication",
   "body_checks",
@@ -923,6 +927,7 @@ export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   overnight: [
     "view_admin_panel",
     "view_my_shift",
+    "view_ops_command_center",
     "view_front_desk_log",
     "create_front_desk_log",
     "edit_front_desk_log",
@@ -1961,7 +1966,11 @@ export function firstAccessibleAdminTab(
       ? "lobby"
       : board;
 
-  // Prefer My Shift homepage when the role can open it.
+  // Prefer the Floor workstation when the role can open it (My Shift stays in nav).
+  if (resolvedBoard === "staff" && canAccessAdminTab(access, "ops_command_center", legacyRole, "staff", options)) {
+    return "ops_command_center";
+  }
+
   if (resolvedBoard === "staff" && canAccessAdminTab(access, "my_shift", legacyRole, "staff", options)) {
     return "my_shift";
   }
@@ -2023,7 +2032,7 @@ export function firstAccessibleAdminTab(
     for (const tab of OVERNIGHT_TABS) {
       if (canAccessAdminTab(access, tab, legacyRole, resolvedBoard, options)) return tab;
     }
-    return "my_shift";
+    return "ops_command_center";
   }
 
   if (isMarketingLegacyRole(legacyRole) && resolvedBoard === "lobby") {

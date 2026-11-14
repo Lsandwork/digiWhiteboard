@@ -59,7 +59,7 @@ for (const role of ROLES) {
   assert.equal(canAccessAdminTab(access, "my_shift", "front_desk_coordinator", "staff"), true);
   assert.equal(canAccessAdminTab(access, "ops_command_center", "front_desk_coordinator", "staff"), true);
   assert.equal(canAccessAdminTab(access, "push_notices", "front_desk_coordinator", "staff"), true);
-  assert.equal(firstAccessibleAdminTab(access, "front_desk_coordinator", "staff"), "my_shift");
+  assert.equal(firstAccessibleAdminTab(access, "front_desk_coordinator", "staff"), "ops_command_center");
   console.log("ok - coordinator keeps My Shift / Ops Command Center / Push Notices");
 }
 

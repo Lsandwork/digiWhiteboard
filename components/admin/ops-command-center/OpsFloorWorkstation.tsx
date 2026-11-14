@@ -31,6 +31,14 @@ const RUFFOPS_MARK = "/assets/ruffops/brand/ruffops-mark.svg";
 
 type StationView = "floor" | "issues" | "desk" | "yard" | "driver" | "overnight";
 type FloorFilter = "needs" | "late" | "onsite" | "arriving" | "pickup" | "care" | "all";
+type IssuesPane = "work" | "alerts";
+
+type DogSearchHit = {
+  id: string;
+  name: string;
+  ownerName: string | null;
+  gingrAnimalId?: string | null;
+};
 
 const FILTERS: Array<{ id: FloorFilter; label: string }> = [
   { id: "needs", label: "Needs a person" },
@@ -79,7 +87,7 @@ function priorityRank(priority: string) {
   return 3;
 }
 
-function issueItems(snapshot: OpsCommandCenterSnapshot | null): OpsWorkItem[] {
+function mergeWorkItems(snapshot: OpsCommandCenterSnapshot | null): OpsWorkItem[] {
   if (!snapshot) return [];
   const open = snapshot.openWork?.length ? snapshot.openWork : [];
   const extra = snapshot.needsAttention
@@ -118,6 +126,8 @@ export function OpsFloorWorkstation({
   const [error, setError] = useState<string | null>(null);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
+  const [issuesPane, setIssuesPane] = useState<IssuesPane>("work");
+  const [dogHits, setDogHits] = useState<DogSearchHit[]>([]);
   const [clock, setClock] = useState(pacificClock());
   const inFlight = useRef(false);
 
@@ -164,6 +174,37 @@ export function OpsFloorWorkstation({
     };
   }, [load]);
 
+  useEffect(() => {
+    const term = query.trim();
+    if (term.length < 2) {
+      setDogHits([]);
+      return;
+    }
+    const handle = window.setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/admin/ops-command-center?q=${encodeURIComponent(term)}`, { cache: "no-store" });
+        const body = await readResponseJson<{ dogs?: DogSearchHit[]; boardDogs?: DogSearchHit[] }>(res);
+        if (!res.ok) return;
+        const ops = (body.dogs || []).map((d) => ({
+          id: d.id,
+          name: d.name,
+          ownerName: d.ownerName ?? null,
+          gingrAnimalId: "gingrAnimalId" in d ? (d as DogSearchHit).gingrAnimalId : null
+        }));
+        const board = (body.boardDogs || []).map((d) => ({
+          id: `board:${d.id}`,
+          name: d.name,
+          ownerName: d.ownerName ?? null,
+          gingrAnimalId: "gingrAnimalId" in d ? (d as DogSearchHit).gingrAnimalId : null
+        }));
+        setDogHits([...ops, ...board]);
+      } catch {
+        setDogHits([]);
+      }
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [query]);
+
   const allRows = useMemo(() => (live?.floor ? buildFloorRows(live.floor) : []), [live?.floor]);
 
   const visibleRows = useMemo(() => {
@@ -191,7 +232,7 @@ export function OpsFloorWorkstation({
       overdue: floor?.overduePickups.length ?? 0,
       care: floor?.medicalWatch.length ?? allRows.filter((r) => r.flags.length).length,
       onSite: floor?.onSite.length ?? 0,
-      issues: issueItems(snapshot).length,
+      issues: mergeWorkItems(snapshot).length + (snapshot?.alertFeed?.length ?? 0),
       deskIn: snapshot?.boardCounts.checkingIn ?? 0,
       deskOut: snapshot?.boardCounts.checkingOut ?? 0
     };
@@ -244,6 +285,11 @@ export function OpsFloorWorkstation({
     onNavigate("crossover_communication");
   }
 
+  const workItems = useMemo(() => mergeWorkItems(snapshot), [snapshot]);
+  const alertItems = useMemo(() => snapshot?.alertFeed ?? [], [snapshot]);
+  const recentEvents = snapshot?.recentEvents?.slice(0, 8) ?? [];
+  const roleTools = snapshot?.tools ?? [];
+
   const showRail = view === "floor" || view === "issues";
 
   return (
@@ -256,16 +302,47 @@ export function OpsFloorWorkstation({
             <p className="ops-floor__brand-sub">Fitdog floor</p>
           </div>
         </div>
-        <label className="ops-floor__search">
-          <Search size={16} aria-hidden />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Dog, owner, or Gingr ID"
-            aria-label="Search the floor"
-          />
-        </label>
+        <div className="ops-floor__search-wrap">
+          <label className="ops-floor__search">
+            <Search size={16} aria-hidden />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Dog, owner, or Gingr ID"
+              aria-label="Search the floor"
+            />
+          </label>
+          {dogHits.length ? (
+            <div className="ops-floor__search-hits" role="listbox">
+              {dogHits.slice(0, 8).map((hit) => (
+                <button
+                  key={hit.id}
+                  type="button"
+                  className="ops-floor__search-hit"
+                  onClick={() => {
+                    const match = allRows.find(
+                      (row) =>
+                        row.dogName.toLowerCase() === hit.name.toLowerCase() ||
+                        row.animalId === hit.gingrAnimalId ||
+                        row.animalId === hit.id
+                    );
+                    if (match) setSelectedRowId(match.id);
+                    if (hit.id.startsWith("board:")) setView("desk");
+                    setQuery(hit.name);
+                    setDogHits([]);
+                  }}
+                >
+                  <p className="ops-floor__dog">{hit.name}</p>
+                  <p className="ops-floor__sub">
+                    {hit.ownerName || "Owner unknown"}
+                    {hit.gingrAnimalId ? ` · Gingr #${hit.gingrAnimalId}` : ""}
+                  </p>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
         <div className="ops-floor__meta">
           <span className="ops-floor__clock">{clock} PT</span>
           <span
@@ -349,8 +426,24 @@ export function OpsFloorWorkstation({
         <div className={`ops-floor__stage${showRail ? "" : " ops-floor__stage--solo"}`}>
           <main className="ops-floor__main">
             {error ? (
-              <div className="ops-floor__banner" role="alert">
+              <div className="ops-floor__health ops-floor__health--warn" role="alert">
                 <p>{error}</p>
+              </div>
+            ) : null}
+            {snapshot?.stale && !snapshot.pending ? (
+              <div className="ops-floor__health ops-floor__health--warn" role="status">
+                Live data is delayed. You are seeing the last good copy from RuffOps.
+              </div>
+            ) : null}
+            {snapshot?.gingrHealth?.status === "offline" ? (
+              <div className="ops-floor__health ops-floor__health--warn" role="status">
+                {snapshot.gingrHealth.detail || "Gingr may be stale. Open Gingr to confirm reservations."}
+              </div>
+            ) : null}
+            {snapshot?.staffOpsHealth?.status === "error" ? (
+              <div className="ops-floor__health ops-floor__health--danger" role="status">
+                {snapshot.staffOpsHealth.detail ||
+                  "Staff ops feed failed. An empty Issues list does not mean All Clear."}
               </div>
             ) : null}
 
@@ -393,8 +486,27 @@ export function OpsFloorWorkstation({
                     <span>On site now</span>
                   </button>
                 </div>
+                <div className="ops-floor__quick-links" aria-label="Shortcuts">
+                  <button type="button" onClick={() => onNavigate("my_shift")}>
+                    My Shift
+                  </button>
+                  <button type="button" onClick={() => onNavigate("active_issues")}>
+                    Active issues
+                  </button>
+                  <button type="button" onClick={() => onNavigate("owner_follow_up")}>
+                    Owner follow-ups
+                  </button>
+                  <button type="button" onClick={() => onNavigate("crossover_communication")}>
+                    Team log
+                  </button>
+                  {roleTools.map((tool) => (
+                    <button key={tool.tab} type="button" onClick={() => onNavigate(tool.tab)}>
+                      {tool.label}
+                    </button>
+                  ))}
+                </div>
                 <p className="ops-floor__gingr-note">
-                  Primary button opens Gingr when the reservation needs to change. Team log opens internal comms only.
+                  Open Gingr changes reservations. Team log, issues, and driver timestamps stay in RuffOps.
                 </p>
                 {loading && !allRows.length ? (
                   <p className="ops-floor__empty">Loading live floor from Gingr…</p>
@@ -475,7 +587,11 @@ export function OpsFloorWorkstation({
 
             {view === "issues" ? (
               <IssuesTable
-                items={issueItems(snapshot).filter(
+                pane={issuesPane}
+                onPaneChange={setIssuesPane}
+                workCount={workItems.length}
+                alertCount={alertItems.length}
+                items={(issuesPane === "work" ? workItems : alertItems).filter(
                   (item) =>
                     !query.trim() ||
                     [item.title, item.dogName, item.detail].some((part) =>
@@ -492,12 +608,12 @@ export function OpsFloorWorkstation({
 
             {view === "desk" ? (
               <div className="ops-floor__embedded">
-                <FrontDeskCommandPanel onNavigate={onNavigate} />
+                <FrontDeskCommandPanel onNavigate={onNavigate} theme="floor" />
               </div>
             ) : null}
             {view === "yard" ? (
               <div className="ops-floor__embedded">
-                <YardCommandPanel onNavigate={onNavigate} />
+                <YardCommandPanel onNavigate={onNavigate} theme="floor" />
               </div>
             ) : null}
             {view === "driver" ? (
@@ -576,6 +692,43 @@ export function OpsFloorWorkstation({
               ) : (
                 <p className="ops-floor__sub">No allergy or medicine flags on site.</p>
               )}
+
+              <h3>Recent activity</h3>
+              {live?.ownerActivity?.length ? (
+                live.ownerActivity.slice(0, 6).map((item) => (
+                  <div key={item.id} className="ops-floor__slot">
+                    <span className="ops-floor__sub">
+                      {new Date(item.at).toLocaleTimeString("en-US", {
+                        timeZone: "America/Los_Angeles",
+                        hour: "numeric",
+                        minute: "2-digit"
+                      })}
+                    </span>
+                    <div>
+                      <p className="ops-floor__dog">{item.summary}</p>
+                      <p className="ops-floor__sub">{item.ownerName}</p>
+                    </div>
+                  </div>
+                ))
+              ) : recentEvents.length ? (
+                recentEvents.map((event) => (
+                  <div key={event.id} className="ops-floor__slot">
+                    <span className="ops-floor__sub">
+                      {new Date(event.occurredAt).toLocaleTimeString("en-US", {
+                        timeZone: "America/Los_Angeles",
+                        hour: "numeric",
+                        minute: "2-digit"
+                      })}
+                    </span>
+                    <div>
+                      <p className="ops-floor__dog">{event.title}</p>
+                      <p className="ops-floor__sub">{event.sourceModule}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="ops-floor__sub">Activity appears as Gingr and staff workflows sync.</p>
+              )}
             </aside>
           ) : null}
         </div>
@@ -635,11 +788,19 @@ export function OpsFloorWorkstation({
 
 function IssuesTable({
   items,
+  pane,
+  onPaneChange,
+  workCount,
+  alertCount,
   busyItemId,
   onAction,
   onNavigate
 }: {
   items: OpsWorkItem[];
+  pane: IssuesPane;
+  onPaneChange: (pane: IssuesPane) => void;
+  workCount: number;
+  alertCount: number;
   busyItemId: string | null;
   onAction: (id: string, action: WorkItemAction, title?: string | null) => Promise<void>;
   onNavigate: (tab: string) => void;
@@ -647,11 +808,31 @@ function IssuesTable({
   return (
     <>
       <div className="ops-floor__head">
-        <h2>Issues</h2>
+        <h2>Issues & alerts</h2>
         <p>
-          Internal work queue. One primary action per row. Open Gingr only when billing or reservations need to change
-          there.
+          Same work-item actions as before — Clear, Hide, Archive, In progress, and Resolve stay available. Delete needs
+          a second confirmation so it is not accidental.
         </p>
+      </div>
+      <div className="ops-floor__issues-tabs" role="tablist" aria-label="Issue feeds">
+        <button
+          type="button"
+          className={`ops-floor__chip${pane === "work" ? " is-active" : ""}`}
+          role="tab"
+          aria-selected={pane === "work"}
+          onClick={() => onPaneChange("work")}
+        >
+          Work queue ({workCount})
+        </button>
+        <button
+          type="button"
+          className={`ops-floor__chip${pane === "alerts" ? " is-active" : ""}`}
+          role="tab"
+          aria-selected={pane === "alerts"}
+          onClick={() => onPaneChange("alerts")}
+        >
+          Alerts ({alertCount})
+        </button>
       </div>
       {items.length ? (
         <div className="ops-floor__table-wrap">
@@ -680,50 +861,15 @@ function IssuesTable({
                       ? "Follow up"
                       : "Resolve";
                 return (
-                  <tr key={item.id}>
-                    <td>
-                      <span className={`ops-floor__pill ${tone}`}>{item.priority}</span>
-                    </td>
-                    <td>
-                      <p className="ops-floor__dog">{item.title}</p>
-                      {item.detail ? <p className="ops-floor__sub">{item.detail}</p> : null}
-                    </td>
-                    <td className="ops-floor__sub">{item.dogName || "—"}</td>
-                    <td className="ops-floor__sub">{item.dueAt ? new Date(item.dueAt).toLocaleString() : "—"}</td>
-                    <td>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        <button
-                          type="button"
-                          className="ops-floor__act"
-                          disabled={busyItemId === item.id}
-                          onClick={() => {
-                            if (primary === "Open Gingr") {
-                              window.open("/gingr", "_blank", "noopener,noreferrer");
-                              return;
-                            }
-                            if (item.hrefTab) onNavigate(item.hrefTab);
-                            else void onAction(item.id, "resolved", item.title);
-                          }}
-                        >
-                          {busyItemId === item.id ? "…" : primary}
-                        </button>
-                        {availableActionsForKind(item.kind)
-                          .filter((a) => a !== "delete" && a !== "resolved")
-                          .slice(0, 2)
-                          .map((action) => (
-                            <button
-                              key={action}
-                              type="button"
-                              className="ops-floor__act ops-floor__act--ghost"
-                              disabled={busyItemId === item.id}
-                              onClick={() => void onAction(item.id, action, item.title)}
-                            >
-                              {workItemActionLabel(action)}
-                            </button>
-                          ))}
-                      </div>
-                    </td>
-                  </tr>
+                  <IssueRow
+                    key={item.id}
+                    item={item}
+                    tone={tone}
+                    primary={primary}
+                    busy={busyItemId === item.id}
+                    onAction={onAction}
+                    onNavigate={onNavigate}
+                  />
                 );
               })}
             </tbody>
@@ -733,5 +879,128 @@ function IssuesTable({
         <p className="ops-floor__empty">No open issues or follow-ups in the staff ops feed.</p>
       )}
     </>
+  );
+}
+
+function IssueRow({
+  item,
+  tone,
+  primary,
+  busy,
+  onAction,
+  onNavigate
+}: {
+  item: OpsWorkItem;
+  tone: string;
+  primary: string;
+  busy: boolean;
+  onAction: (id: string, action: WorkItemAction, title?: string | null) => Promise<void>;
+  onNavigate: (tab: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const actions = availableActionsForKind(item.kind);
+  const secondary = actions.filter((a) => a !== "delete" && a !== "resolved");
+
+  return (
+    <tr>
+      <td>
+        <span className={`ops-floor__pill ${tone}`}>{item.priority}</span>
+      </td>
+      <td>
+        <p className="ops-floor__dog">{item.title}</p>
+        {item.detail ? <p className="ops-floor__sub">{item.detail}</p> : null}
+      </td>
+      <td className="ops-floor__sub">{item.dogName || "—"}</td>
+      <td className="ops-floor__sub">{item.dueAt ? new Date(item.dueAt).toLocaleString() : "—"}</td>
+      <td>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+          <button
+            type="button"
+            className="ops-floor__act"
+            disabled={busy}
+            onClick={() => {
+              if (primary === "Open Gingr") {
+                window.open("/gingr", "_blank", "noopener,noreferrer");
+                return;
+              }
+              if (item.hrefTab) onNavigate(item.hrefTab);
+              else void onAction(item.id, "resolved", item.title);
+            }}
+          >
+            {busy ? "…" : primary}
+          </button>
+          {item.hrefTab ? (
+            <button type="button" className="ops-floor__act ops-floor__act--ghost" disabled={busy} onClick={() => onNavigate(item.hrefTab!)}>
+              Open
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="ops-floor__act ops-floor__act--ghost"
+            disabled={busy}
+            aria-expanded={expanded}
+            onClick={() => {
+              setExpanded((v) => !v);
+              setConfirmDelete(false);
+            }}
+          >
+            More
+          </button>
+        </div>
+        {expanded ? (
+          <div className="ops-floor__confirm-delete" style={{ marginTop: 8 }}>
+            {secondary.map((action) => (
+              <button
+                key={action}
+                type="button"
+                className="ops-floor__act ops-floor__act--ghost"
+                disabled={busy}
+                onClick={() => void onAction(item.id, action, item.title)}
+              >
+                {workItemActionLabel(action)}
+              </button>
+            ))}
+            {actions.includes("resolved") ? (
+              <button
+                type="button"
+                className="ops-floor__act ops-floor__act--ghost"
+                disabled={busy}
+                onClick={() => void onAction(item.id, "resolved", item.title)}
+              >
+                Resolve
+              </button>
+            ) : null}
+            {actions.includes("delete") ? (
+              confirmDelete ? (
+                <>
+                  <span className="ops-floor__sub">Remove this row?</span>
+                  <button
+                    type="button"
+                    className="ops-floor__act ops-floor__act--danger"
+                    disabled={busy}
+                    onClick={() => void onAction(item.id, "delete", item.title)}
+                  >
+                    Confirm delete
+                  </button>
+                  <button type="button" className="ops-floor__act ops-floor__act--ghost" onClick={() => setConfirmDelete(false)}>
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="ops-floor__act ops-floor__act--danger"
+                  disabled={busy}
+                  onClick={() => setConfirmDelete(true)}
+                >
+                  Delete…
+                </button>
+              )
+            ) : null}
+          </div>
+        ) : null}
+      </td>
+    </tr>
   );
 }

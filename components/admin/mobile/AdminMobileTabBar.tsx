@@ -17,8 +17,8 @@ const PRIMARY: TabDef[] = [
     label: "Home",
     icon: Home,
     tabs: [
-      "my_shift",
       "ops_command_center",
+      "my_shift",
       "front_desk_command",
       "yard_command",
       "overnight_command",

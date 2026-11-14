@@ -39,14 +39,13 @@ for (const tab of [
   "bulk_photo_upload",
   "users",
   "overnight_command",
-  "ops_command_center",
   "staff_directory"
 ] as const) {
   assert.equal(canAccessAdminTab(access, tab, "overnight", "staff"), false, `overnight does not open ${tab}`);
 }
 
 assert.deepEqual(accessibleAdminBoards(access, "overnight"), ["staff"]);
-assert.equal(firstAccessibleAdminTab(access, "overnight", "staff"), "my_shift");
+assert.equal(firstAccessibleAdminTab(access, "overnight", "staff"), "ops_command_center");
 assert.equal(canCreateFrontDeskLogForRole("overnight"), true);
 assert.equal(canEditFrontDeskLogForRole("overnight"), true);
 assert.equal(canFileStaffComplaint("overnight"), true);
@@ -65,6 +64,7 @@ function itemLabels(entries: NavEntry[]): string[] {
 
 const nav = buildStaffPanelNav(visible, "staff", "overnight");
 assert.deepEqual(itemLabels(nav), [
+  "Live Floor",
   "My Shift",
   "Team Log",
   "Body Checks",

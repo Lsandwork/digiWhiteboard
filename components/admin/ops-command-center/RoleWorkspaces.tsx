@@ -57,7 +57,14 @@ function toCard(dog: BoardDog, status?: string | null): OpsDogCardModel {
   };
 }
 
-export function FrontDeskCommandPanel({ onNavigate }: { onNavigate?: (tab: string) => void }) {
+export function FrontDeskCommandPanel({
+  onNavigate,
+  theme = "admin"
+}: {
+  onNavigate?: (tab: string) => void;
+  theme?: "admin" | "floor";
+}) {
+  const floor = theme === "floor";
   const [arriving, setArriving] = useState<BoardDog[]>([]);
   const [leaving, setLeaving] = useState<BoardDog[]>([]);
   const [selected, setSelected] = useState<OpsDogCardModel | null>(null);
@@ -93,27 +100,41 @@ export function FrontDeskCommandPanel({ onNavigate }: { onNavigate?: (tab: strin
   }, [load]);
 
   return (
-    <section className="space-y-4">
-      <header className="rounded-2xl border border-admin-border bg-admin-card p-4">
-        <h2 className="admin-text-emphasis text-xl font-semibold">Front Desk Command Center</h2>
-        <p className="mt-1 text-sm text-admin-muted">
-          Speed surface for arriving, ready for pickup, and checkout. Payments/packages stay in Gingr — use Open in Gingr.
+    <section className={floor ? "ops-floor__station" : "space-y-4"}>
+      <header className={floor ? "ops-floor__station-head" : "rounded-2xl border border-admin-border bg-admin-card p-4"}>
+        <h2 className={floor ? undefined : "admin-text-emphasis text-xl font-semibold"}>Front desk</h2>
+        <p className={floor ? undefined : "mt-1 text-sm text-admin-muted"}>
+          Arriving on the left, leaving on the right. Check in and checkout happen in Gingr — use Team Log here for owner
+          notes.
         </p>
-        {feedError ? <p className="mt-2 text-xs text-amber-200">{feedError}</p> : null}
+        {feedError ? (
+          <p className={floor ? "ops-floor__sub" : "mt-2 text-xs text-amber-200"} style={floor ? { marginTop: 8 } : undefined}>
+            {feedError}
+          </p>
+        ) : null}
       </header>
       <div className="grid gap-4 lg:grid-cols-2">
-        <Lane title="Arriving soon / checking in" dogs={arriving.map((d) => toCard(d, "arrived"))} onOpen={setSelected} />
-        <Lane title="Ready / checking out" dogs={leaving.map((d) => toCard(d, "ready_for_pickup"))} onOpen={setSelected} />
+        <Lane
+          title="Arriving soon / checking in"
+          dogs={arriving.map((d) => toCard(d, "arrived"))}
+          onOpen={setSelected}
+          theme={theme}
+        />
+        <Lane title="Ready / checking out" dogs={leaving.map((d) => toCard(d, "ready_for_pickup"))} onOpen={setSelected} theme={theme} />
       </div>
-      <div className="flex flex-wrap gap-2">
-        <button type="button" className="admin-btn-secondary" onClick={() => onNavigate?.("owner_follow_up")}>
-          Owner needs contact
+      <div className={floor ? "ops-floor__quick-links" : "flex flex-wrap gap-2"}>
+        <button
+          type="button"
+          className={floor ? undefined : "admin-btn-secondary"}
+          onClick={() => onNavigate?.("owner_follow_up")}
+        >
+          Owner follow-up
         </button>
-        <button type="button" className="admin-btn-secondary" onClick={() => onNavigate?.("grooming_push")}>
+        <button type="button" className={floor ? undefined : "admin-btn-secondary"} onClick={() => onNavigate?.("grooming_push")}>
           Grooming ready
         </button>
-        <a className="admin-btn-primary" href="/gingr">
-          Open in Gingr
+        <a className={floor ? undefined : "admin-btn-primary"} href="/gingr">
+          Open Gingr
         </a>
       </div>
       <OpsSidePanel open={Boolean(selected)} title={selected?.name || "Dog"} onClose={() => setSelected(null)}>
@@ -136,28 +157,40 @@ export function FrontDeskCommandPanel({ onNavigate }: { onNavigate?: (tab: strin
 function Lane({
   title,
   dogs,
-  onOpen
+  onOpen,
+  theme = "admin"
 }: {
   title: string;
   dogs: OpsDogCardModel[];
   onOpen: (dog: OpsDogCardModel) => void;
+  theme?: "admin" | "floor";
 }) {
+  const floor = theme === "floor";
   return (
-    <section className="rounded-2xl border border-admin-border bg-admin-card p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="admin-text-emphasis text-sm font-semibold">{title}</h3>
-        <span className="text-xs text-admin-muted">{dogs.length}</span>
+    <section className={floor ? "ops-floor__lane" : "rounded-2xl border border-admin-border bg-admin-card p-4"}>
+      <div className={floor ? "ops-floor__lane-head" : "mb-3 flex items-center justify-between"}>
+        <h3 className={floor ? undefined : "admin-text-emphasis text-sm font-semibold"}>{title}</h3>
+        <span className={floor ? "ops-floor__sub" : "text-xs text-admin-muted"}>{dogs.length}</span>
       </div>
       <div className="space-y-2">
-        {dogs.length ? dogs.map((dog) => <OpsDogCard key={dog.id} dog={dog} onOpen={() => onOpen(dog)} />) : (
-          <p className="text-sm text-admin-muted">None right now.</p>
+        {dogs.length ? (
+          dogs.map((dog) => <OpsDogCard key={dog.id} dog={dog} theme={theme} onOpen={() => onOpen(dog)} />)
+        ) : (
+          <p className={floor ? "ops-floor__sub" : "text-sm text-admin-muted"}>None right now.</p>
         )}
       </div>
     </section>
   );
 }
 
-export function YardCommandPanel({ onNavigate }: { onNavigate?: (tab: string) => void }) {
+export function YardCommandPanel({
+  onNavigate,
+  theme = "admin"
+}: {
+  onNavigate?: (tab: string) => void;
+  theme?: "admin" | "floor";
+}) {
+  const floor = theme === "floor";
   const [dogs, setDogs] = useState<BoardDog[]>([]);
   useEffect(() => {
     void (async () => {
@@ -190,28 +223,35 @@ export function YardCommandPanel({ onNavigate }: { onNavigate?: (tab: string) =>
   }, [dogs]);
 
   return (
-    <section className="space-y-4">
-      <header className="rounded-2xl border border-admin-border bg-admin-card p-4">
-        <h2 className="admin-text-emphasis text-xl font-semibold">Yard Command Center</h2>
-        <p className="mt-1 text-sm text-admin-muted">Prioritize overdue walks, breaks, and movement — not another report screen.</p>
+    <section className={floor ? "ops-floor__station" : "space-y-4"}>
+      <header className={floor ? "ops-floor__station-head" : "rounded-2xl border border-admin-border bg-admin-card p-4"}>
+        <h2 className={floor ? undefined : "admin-text-emphasis text-xl font-semibold"}>Yard</h2>
+        <p className={floor ? undefined : "mt-1 text-sm text-admin-muted"}>
+          Where on-site dogs are standing. Log moves in Team Log — room changes still follow Gingr and board state.
+        </p>
       </header>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className={floor ? "ops-floor__yard-grid" : "grid gap-3 sm:grid-cols-2 xl:grid-cols-3"}>
         {Object.entries(groups).map(([label, list]) => (
-          <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="admin-text-emphasis text-sm font-semibold">{label}</p>
-              <span className="admin-text-emphasis text-lg font-semibold">{list.length}</span>
+          <div key={label} className={floor ? "ops-floor__yard-tile" : "rounded-2xl border border-white/10 bg-white/[0.03] p-3"}>
+            <div className={floor ? "ops-floor__lane-head" : "mb-2 flex items-center justify-between"}>
+              <p className={floor ? "ops-floor__dog" : "admin-text-emphasis text-sm font-semibold"}>{label}</p>
+              <span className={floor ? "ops-floor__sub" : "admin-text-emphasis text-lg font-semibold"}>{list.length}</span>
             </div>
             <div className="space-y-2">
-              {list.slice(0, 5).map((dog) => (
-                <OpsDogCard key={dog.id} dog={toCard(dog, "yard")} compact />
+              {list.slice(0, 8).map((dog) => (
+                <OpsDogCard key={dog.id} dog={toCard(dog, "yard")} theme={theme} compact />
               ))}
+              {list.length > 8 ? <p className="ops-floor__sub">+{list.length - 8} more on floor list</p> : null}
             </div>
           </div>
         ))}
       </div>
-      <button type="button" className="admin-btn-primary" onClick={() => onNavigate?.("walks_board")}>
-        Open Walks Board alarm
+      <button
+        type="button"
+        className={floor ? "ops-floor__act" : "admin-btn-primary"}
+        onClick={() => onNavigate?.("walks_board")}
+      >
+        Walks board
       </button>
     </section>
   );

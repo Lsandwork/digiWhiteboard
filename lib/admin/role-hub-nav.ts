@@ -72,8 +72,8 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionId: "management_home",
     sectionLabel: "Management",
     primary: [
+      { tab: "ops_command_center", label: "Live Floor" },
       { tab: "my_shift" },
-      { tab: "ops_command_center" },
       { tab: "sa_floor_hub" },
       { tab: "sa_whiteboard_hub" },
       { tab: "ms_hub", label: "Support" },
@@ -88,8 +88,8 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionId: "front_desk_home",
     sectionLabel: "Front Desk Coordinator",
     primary: [
-      { tab: "my_shift" },
       { tab: "ops_command_center", label: "Live Floor" },
+      { tab: "my_shift" },
       { tab: "sa_floor_hub" },
       { tab: "sa_whiteboard_hub" },
       { tab: "sa_apps_hub", label: "Apps" },
@@ -104,8 +104,8 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionId: "team_lead_home",
     sectionLabel: "Team Lead",
     primary: [
-      { tab: "my_shift" },
       { tab: "ops_command_center", label: "Live Floor" },
+      { tab: "my_shift" },
       { tab: "yard_command" },
       { tab: "ruffops_checklist" },
       { tab: "sa_floor_hub" },
@@ -120,8 +120,8 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionId: "trainer_home",
     sectionLabel: "Trainer",
     primary: [
-      { tab: "my_shift" },
       { tab: "ops_command_center", label: "Live Floor" },
+      { tab: "my_shift" },
       { tab: "trainer_ops" },
       { tab: "trainer_push" },
       { tab: "package_commissions", label: "Commissions" },
@@ -137,8 +137,8 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionId: "groomer_home",
     sectionLabel: "Groomer",
     primary: [
-      { tab: "my_shift" },
       { tab: "ops_command_center", label: "Live Floor" },
+      { tab: "my_shift" },
       { tab: "grooming_push" },
       { tab: "whiteboard_preview" },
       { tab: "sa_floor_hub" },
@@ -153,8 +153,8 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionId: "handler_home",
     sectionLabel: "My Panel",
     primary: [
-      { tab: "my_shift" },
       { tab: "ops_command_center", label: "Live Floor" },
+      { tab: "my_shift" },
       { tab: "sa_floor_hub" },
       { tab: "sa_apps_hub", label: "Apps" },
       { tab: "management_support", label: "Submit Request" },
@@ -167,6 +167,7 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionId: "handler_home",
     sectionLabel: "My Panel",
     primary: [
+      { tab: "ops_command_center", label: "Live Floor" },
       { tab: "my_shift" },
       { tab: "sa_floor_hub" },
       { tab: "sa_apps_hub", label: "Apps" },
@@ -180,6 +181,7 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionId: "handler_home",
     sectionLabel: "My Panel",
     primary: [
+      { tab: "ops_command_center", label: "Live Floor" },
       { tab: "my_shift" },
       { tab: "sa_floor_hub" },
       { tab: "sa_apps_hub", label: "Apps" },
@@ -193,6 +195,7 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionId: "overnight_home",
     sectionLabel: "Overnight",
     primary: [
+      { tab: "ops_command_center", label: "Live Floor" },
       { tab: "my_shift" },
       { tab: "crossover_communication" },
       { tab: "body_checks" },
