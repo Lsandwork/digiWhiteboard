@@ -551,7 +551,7 @@ function canonicalOptionLabel(name: string, reading: OptionReading): string {
  * the text is not a transportation or boarding option (an activity name, a note).
  */
 function stripServiceAddonPrefix(name: string): string {
-  return name.replace(/^(service\s+addons?\s*[-:|]\s*)/i, "").trim();
+  return name.replace(/^(service\s+addons?\s*(?:-|:|\|)\s*)/i, "").trim();
 }
 
 export function classifyAppointmentOption(
