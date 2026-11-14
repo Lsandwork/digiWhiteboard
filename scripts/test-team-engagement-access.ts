@@ -241,13 +241,20 @@ function directoryTarget(p: Person) {
 }
 
 async function testTabVisibility() {
-  // 6. Standard employees never see the tab, even when the role matrix is changed to grant engagement keys.
+  // 6. Standard employees get the participation tab; leadership keys alone must not unlock Manage Team Engagement.
   for (const role of STANDARD_LEGACY_ROLES) {
     const access = accessFromLegacyRole(`user-${role}`, `${role}@fitdog.test`, role);
-    assert.equal(canAccessAdminTab(access, "team_engagement", role, "staff"), false, `${role} must not see the tab`);
-    assert.equal(canUseTeamEngagement(access, role), false, `${role} must not use Team Engagement`);
+  if (role === "marketing") {
+      assert.equal(canAccessAdminTab(access, "team_engagement", role, "staff"), false, "marketing staff board has no Team Engagement tab");
+    } else {
+      assert.equal(canAccessAdminTab(access, "team_engagement", role, "staff"), true, `${role} sees the staff Team Engagement tab`);
+    }
+    assert.equal(canUseTeamEngagement(access, role), false, `${role} must not use Manage Team Engagement`);
     const granted = { ...access, permissions: [...access.permissions, ...ALL_ENGAGEMENT] };
-    assert.equal(canAccessAdminTab(granted, "team_engagement", role, "staff"), false, `${role} with matrix grants still has no tab`);
+    assert.equal(canUseTeamEngagement(granted, role), false, `${role} with leadership matrix grants still has no manage workspace`);
+    if (role !== "marketing") {
+      assert.equal(canAccessAdminTab(granted, "team_engagement", role, "staff"), true, `${role} tab stays participation-only`);
+    }
     const actor = actorFor(
       { id: "aaaaaaaa-0000-4000-8000-0000000009" + String(STANDARD_LEGACY_ROLES.indexOf(role)).padStart(2, "0"), name: "Pat Staff", email: `${role}@fitdog.test`, legacyRole: role, primaryRole: access.primaryRole, departments: [] },
       { addPermissions: ALL_ENGAGEMENT }
@@ -371,7 +378,7 @@ async function testApiRefusals() {
     const db = populatedDb();
     await expectStatus(await handleParticipantGet(request("/api/admin/bark-outs?view=feed"), handlerDeps(db, actorFor(PEOPLE.groomer))), 200, "groomer reads the feed");
     const viewer: Person = { id: "eeeeeeee-0000-4000-8000-000000000001", name: "Val Viewer", email: "val@fitdog.test", legacyRole: "viewer", primaryRole: "viewer", departments: [] };
-    await expectStatus(await handleParticipantGet(request("/api/admin/bark-outs?view=feed"), handlerDeps(db, actorFor(viewer))), 403, "viewer has no feed");
+    await expectStatus(await handleParticipantGet(request("/api/admin/bark-outs?view=feed"), handlerDeps(db, actorFor(viewer))), 200, "viewer participates in Team Engagement");
   }
 }
 

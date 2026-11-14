@@ -952,6 +952,7 @@ export const OVERNIGHT_TABS = [
   "staff_training",
   "crossover_communication",
   "body_checks",
+  "team_engagement",
   "management_support",
   "notifications",
   "settings",
@@ -1000,7 +1001,7 @@ export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   maintenance: [...STAFF_VIEWER_PERMISSIONS, ...ENGAGEMENT_PARTICIPANT_PERMISSIONS],
   staff: [...STAFF_VIEWER_PERMISSIONS, ...ENGAGEMENT_PARTICIPANT_PERMISSIONS],
   marketing: MARKETING_PERMISSIONS,
-  viewer: STAFF_VIEWER_PERMISSIONS
+  viewer: [...STAFF_VIEWER_PERMISSIONS, ...ENGAGEMENT_PARTICIPANT_PERMISSIONS]
 };
 
 /** Map legacy admin_users.role values to RBAC role keys. */
@@ -1731,10 +1732,12 @@ export function canAccessAdminTab(
 ): boolean {
   if (tab === "demo_push") return options?.isDemo === true && board === "staff";
 
-  // Checked before the full-admin early return so the tab never opens for staff roles or demo sessions.
+  // Leadership → Manage Team Engagement; all other staff → participation workspace (not demo).
   if (tab === "team_engagement") {
     if (board !== "staff" || options?.isDemo) return false;
-    return canUseTeamEngagement(access, legacyRole);
+    if (canUseTeamEngagement(access, legacyRole)) return true;
+    if (teamEngagementTier(access, legacyRole)) return false;
+    return canParticipateInTeamEngagement(access, legacyRole);
   }
 
   if (tab === "staff_training") {

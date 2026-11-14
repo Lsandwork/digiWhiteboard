@@ -51,7 +51,7 @@ export const PEOPLE = {
 
 export type PersonKey = keyof typeof PEOPLE;
 
-/** Standard (non-leadership) dashboard roles. None of them may open Manage Team Engagement. */
+/** Standard (non-leadership) dashboard roles. They use the staff Team Engagement tab, not the leadership workspace. */
 export const STANDARD_LEGACY_ROLES = [
   "front_desk_coordinator",
   "team_leader",
