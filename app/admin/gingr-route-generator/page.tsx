@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { ToastProvider } from "@/components/admin/ui/ToastProvider";
 import { GingrRouteGeneratorPageClient } from "@/components/gingr-route-generator/GingrRouteGeneratorPageClient";
 import { getAdminSession } from "@/lib/admin/session";
-import { canAccessRouteGenerator } from "@/lib/admin/permissions";
+import { canAccessGingrRouteGenerator } from "@/lib/admin/permissions";
 import { resolveSessionAccess } from "@/lib/admin/resolve-user-access";
 import { getAdminUserById } from "@/lib/admin/users";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -18,7 +18,7 @@ export default async function GingrRouteGeneratorPage() {
   const access = await resolveSessionAccess(session, supabase);
   const adminUser = session.adminUserId ? await getAdminUserById(supabase, session.adminUserId) : null;
 
-  if (!canAccessRouteGenerator(access, session.role)) {
+  if (!canAccessGingrRouteGenerator(access, session.role)) {
     redirect(
       session.role === "marketing"
         ? "/admin?board=marketing&tab=sa_apps_hub"

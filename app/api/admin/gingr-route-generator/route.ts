@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { getUserAccess } from "@/lib/admin/user-access";
-import { accessFromLegacyRole, canAccessRouteGenerator } from "@/lib/admin/permissions";
+import { accessFromLegacyRole, canAccessGingrRouteGenerator } from "@/lib/admin/permissions";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { loadGingrRouteSchedule, todayPacificDateKey } from "@/lib/gingr-route-generator/service";
 
@@ -19,7 +19,7 @@ async function requireGingrRouteAccess(request: Request) {
     ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
     : accessFromLegacyRole(session.adminUserId ?? null, session.email ?? null, session.role);
 
-  if (!canAccessRouteGenerator(access, session.role)) {
+  if (!canAccessGingrRouteGenerator(access, session.role)) {
     return {
       error: NextResponse.json(
         { error: "You do not have access to Gingr Route Generator." },

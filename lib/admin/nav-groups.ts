@@ -810,10 +810,18 @@ export function buildRoleHubStaffNav(visibleTabs: AdminTab[], role: string): Nav
   if (!isHubNavRole(role)) return [];
   const config = ROLE_HUB_NAV[role];
   const visible = new Set(visibleTabs);
-  const leaves = config.primary
-    .filter((item) => visible.has(item.tab))
-    .slice(0, 10)
-    .map((item) => leaf(item.tab, item.label));
+  const cap = role === "front_desk_coordinator" ? 20 : 10;
+  const leaves: NavEntry[] = [];
+  for (const item of config.primary) {
+    if (leaves.length >= cap) break;
+    if (item.routeId === "gingr-route-generator") {
+      leaves.push(GINGR_ROUTE_GENERATOR_NAV_ROUTE);
+      continue;
+    }
+    if (item.tab && visible.has(item.tab)) {
+      leaves.push(leaf(item.tab, item.label));
+    }
+  }
   return sectionEntries(config.sectionId, config.sectionLabel, leaves);
 }
 

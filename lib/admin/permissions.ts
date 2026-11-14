@@ -807,6 +807,7 @@ export const FRONT_DESK_COORDINATOR_TABS = [
   "media_library",
   "yard_links",
   "walks_board",
+  "body_checks",
   "notifications",
   "management_support",
   "settings",
@@ -1429,6 +1430,24 @@ export function canAccessRouteGenerator(
 }
 
 /**
+ * Gingr Route Generator — same accounts as Route Generator, plus Front Desk Coordinators.
+ * The older Samsara Route Generator tab stays transportation / management only.
+ */
+export function canAccessGingrRouteGenerator(
+  access?: UserAccess | null,
+  legacyRole?: string | null
+): boolean {
+  if (
+    isFrontDeskCoordinatorLegacyRole(legacyRole) ||
+    legacyRole === "front_desk" ||
+    hasAnyRole(access, ["front_desk_coordinator"])
+  ) {
+    return true;
+  }
+  return canAccessRouteGenerator(access, legacyRole);
+}
+
+/**
  * Live Fleet — Admin, Management, Front Desk Coordinators, and Transportation.
  * Broader than Route Generator so ops staff can monitor vans without generating routes.
  */
@@ -1746,7 +1765,10 @@ export function canAccessAdminTab(
     if (isFullAdminLegacyRole(legacyRole)) return true;
     // Avoid circular imports: mirror role-hub-nav primary membership.
     if (legacyRole === "assistant_manager") return true;
-    if (legacyRole === "front_desk_coordinator" || legacyRole === "team_leader") {
+    if (legacyRole === "front_desk_coordinator") {
+      return tab === "sa_whiteboard_hub" || tab === "sa_apps_hub";
+    }
+    if (legacyRole === "team_leader") {
       return tab === "sa_floor_hub" || tab === "sa_whiteboard_hub" || tab === "sa_apps_hub";
     }
     if (

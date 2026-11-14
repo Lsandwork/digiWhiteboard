@@ -118,7 +118,7 @@ import { TlDigiBoardPanel } from "@/components/admin/TlDigiBoardPanel";
 import { LobbySlideshowUploadPanel } from "@/components/admin/LobbySlideshowUploadPanel";
 import { CastTvPanel } from "@/components/admin/CastTvPanel";
 import { SuperAdminHubPanel, SuperAdminNestedReturnBar } from "@/components/admin/SuperAdminHubPanel";
-import { isHubNavRole, isSuperAdminHubTab } from "@/lib/admin/role-hub-nav";
+import { isHubNavRole, isSuperAdminHubTab, rolePrimaryTabs } from "@/lib/admin/role-hub-nav";
 
 const defaultStaff: StaffBoardSettings = {
   refresh_interval_ms: 2000,
@@ -789,8 +789,13 @@ export function AdminDashboard() {
         ) : null}
         <TabErrorBoundary tab={tab}>
 
-        {showRoleHubNav ? (
-          <SuperAdminNestedReturnBar tab={tab} onNavigate={(nextTab) => setActiveTab(nextTab)} />
+        {showRoleHubNav &&
+        !(isHubNavRole(hubNavRole) && rolePrimaryTabs(hubNavRole).includes(tab)) ? (
+          <SuperAdminNestedReturnBar
+            tab={tab}
+            role={hubNavRole}
+            onNavigate={(nextTab) => setActiveTab(nextTab)}
+          />
         ) : null}
 
         {(showRoleHubNav || (board === "marketing" && tab === "sa_apps_hub")) && isSuperAdminHubTab(tab) ? (
