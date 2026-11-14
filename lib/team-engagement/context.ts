@@ -47,12 +47,22 @@ export interface AccessControlPort {
   isPermissionLocked(role: RoleKey, permission: string): boolean;
 }
 
+export type StaffHrSnapshot = {
+  admin_user_id: string | null;
+  name: string;
+  hire_date: string | null;
+  birthday_month: number | null;
+  birthday_day: number | null;
+  show_birthday: boolean;
+};
+
 export type ServiceContext = {
   db: EngagementDb;
   actor: EngagementActor;
   storageReady: boolean;
   now: () => Date;
   directory: () => Promise<EngagementDirectory>;
+  loadStaffHr?: () => Promise<StaffHrSnapshot[]>;
   settings: () => Promise<EngagementSettings>;
   moderationAi: (redact: readonly string[]) => ModerationAi | null;
   aiConfigured: () => boolean;

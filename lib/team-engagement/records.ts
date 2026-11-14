@@ -326,7 +326,7 @@ export async function listFeedback(ctx: ServiceContext, input: { status?: unknow
   if (typeof input.status === "string" && (FEEDBACK_STATUSES as readonly string[]).includes(input.status)) {
     filters.push({ column: "status", op: "eq", value: input.status });
   } else if (input.status === "open") {
-    filters.push({ column: "status", op: "in", value: ["submitted", "under_review", "planned"] });
+    filters.push({ column: "status", op: "in", value: ["submitted", "under_review", "approved", "in_progress", "planned"] });
   }
   if (typeof input.category === "string" && (FEEDBACK_CATEGORIES as readonly string[]).includes(input.category)) {
     filters.push({ column: "category", op: "eq", value: input.category });

@@ -604,7 +604,7 @@ export function buildTrainerNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "trainer_support",
       "Management",
-      compactEntries([...singles(["management_support"], visible)])
+      compactEntries([...singles(["team_engagement", "management_support"], visible)])
     )
   );
 
@@ -676,7 +676,7 @@ export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "team_lead_management_support",
       "Management",
-      compactEntries([...singles(["management_support"], visible)])
+      compactEntries([...singles(["team_engagement", "management_support"], visible)])
     )
   );
 
@@ -743,7 +743,7 @@ export function buildGroomerNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "groomer_support",
       "Management",
-      compactEntries([...singles(["management_support"], visible)])
+      compactEntries([...singles(["team_engagement", "management_support"], visible)])
     )
   );
 
@@ -821,9 +821,9 @@ export function buildRoleHubStaffNav(visibleTabs: AdminTab[], role: string): Nav
   const cap =
     role === "front_desk_coordinator"
       ? 20
-      : role === "assistant_manager"
+      : role === "assistant_manager" || role === "owner_admin" || role === "manager_admin"
         ? 11
-        : 10;
+        : 12;
   const leaves: NavEntry[] = [];
   for (const item of config.primary) {
     if (leaves.length >= cap) break;

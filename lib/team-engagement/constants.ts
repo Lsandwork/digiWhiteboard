@@ -1,6 +1,25 @@
 import type { DepartmentKey } from "@/lib/admin/permissions";
 
 export const TEAM_ENGAGEMENT_MIGRATION = "supabase/migrations/103_team_engagement.sql";
+export const PACK_PRIORITY2_MIGRATION = "supabase/migrations/105_pack_priority2.sql";
+
+export const SPOTLIGHT_CATEGORIES = [
+  "above_and_beyond",
+  "behind_the_scenes",
+  "team_player",
+  "problem_solver",
+  "quiet_achiever",
+  "made_someones_day"
+] as const;
+export type SpotlightCategory = (typeof SPOTLIGHT_CATEGORIES)[number];
+export const SPOTLIGHT_CATEGORY_LABELS: Record<SpotlightCategory, string> = {
+  above_and_beyond: "Above & Beyond",
+  behind_the_scenes: "Behind-the-Scenes Hero",
+  team_player: "Ultimate Team Player",
+  problem_solver: "Problem Solver",
+  quiet_achiever: "Quiet Achiever",
+  made_someones_day: "Made Someone's Day"
+};
 
 export const ENGAGEMENT_DEPARTMENTS: DepartmentKey[] = [
   "front_desk",
@@ -54,15 +73,18 @@ export type BarkOutCategory = {
 };
 
 export const DEFAULT_BARK_OUT_CATEGORIES: BarkOutCategory[] = [
-  { key: "above_and_beyond", label: "Above and beyond", description: "Went past what the shift asked for.", active: true },
-  { key: "helping_coworker", label: "Helping a coworker", description: "Stepped in to support a teammate.", active: true },
+  { key: "above_and_beyond", label: "Going Above & Beyond", description: "Went past what the shift asked for.", active: true },
   { key: "teamwork", label: "Teamwork", description: "Made the team stronger together.", active: true },
-  { key: "positive_attitude", label: "Positive attitude", description: "Kept the energy calm and upbeat.", active: true },
-  { key: "customer_service", label: "Customer service", description: "Made a pet parent's day easier.", active: true },
+  { key: "dog_care", label: "Amazing Dog Care", description: "Exceptional care for the dogs in our pack.", active: true },
+  { key: "problem_solving", label: "Problem Solving", description: "Found a fix when something went sideways.", active: true },
+  { key: "initiative", label: "Taking Initiative", description: "Saw what needed doing and jumped in.", active: true },
+  { key: "positive_attitude", label: "Positive Attitude", description: "Kept the energy calm and upbeat.", active: true },
+  { key: "helping_coworker", label: "Helping a Teammate", description: "Stepped in to support a teammate.", active: true },
+  { key: "leadership", label: "Leadership", description: "Led by example on the floor.", active: true },
+  { key: "customer_service", label: "Customer Appreciation", description: "Made a pet parent's day easier.", active: true },
+  { key: "positive_contribution", label: "Other", description: "Made Fitdog better in a way worth naming.", active: true },
   { key: "reliability", label: "Reliability", description: "Showed up and followed through.", active: true },
-  { key: "problem_solving", label: "Problem-solving", description: "Found a fix when something went sideways.", active: true },
-  { key: "cross_department", label: "Supporting another department", description: "Helped a team outside their own.", active: true },
-  { key: "positive_contribution", label: "Positive contribution", description: "Made Fitdog better in a way worth naming.", active: true }
+  { key: "cross_department", label: "Supporting Another Department", description: "Helped a team outside their own.", active: true }
 ];
 
 export const BARK_OUT_STATUSES = [
@@ -133,9 +155,15 @@ export const MODERATION_REASON_LABELS: Record<ModerationReasonCode, string> = {
 export const BARK_OUT_REACTIONS = ["kudos", "thanks", "celebrate"] as const;
 export type BarkOutReaction = (typeof BARK_OUT_REACTIONS)[number];
 export const BARK_OUT_REACTION_LABELS: Record<BarkOutReaction, string> = {
-  kudos: "Kudos",
-  thanks: "Thank you",
-  celebrate: "Celebrate"
+  kudos: "Amazing",
+  thanks: "Appreciation",
+  celebrate: "Support"
+};
+
+export const BARK_OUT_REACTION_EMOJI: Record<BarkOutReaction, string> = {
+  kudos: "⭐",
+  thanks: "❤️",
+  celebrate: "🙌"
 };
 
 export const DEVELOPMENT_RECORD_TYPES = [
@@ -192,15 +220,30 @@ export const FEEDBACK_CATEGORY_LABELS: Record<FeedbackCategory, string> = {
   other: "Other"
 };
 
-export const FEEDBACK_STATUSES = ["submitted", "under_review", "planned", "resolved", "declined"] as const;
+export const FEEDBACK_STATUSES = [
+  "submitted",
+  "under_review",
+  "approved",
+  "in_progress",
+  "implemented",
+  "declined",
+  "planned",
+  "resolved"
+] as const;
 export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number];
 export const FEEDBACK_STATUS_LABELS: Record<FeedbackStatus, string> = {
   submitted: "Submitted",
   under_review: "Under review",
+  approved: "Approved",
+  in_progress: "In progress",
+  implemented: "Implemented",
+  declined: "Not moving forward",
   planned: "Planned",
-  resolved: "Resolved",
-  declined: "Not moving forward"
+  resolved: "Resolved"
 };
+
+export const BARK_OUT_COMMENT_MAX = 500;
+export const MILESTONE_MESSAGE_MAX = 400;
 
 export const PROGRAM_TYPES = [
   "employee_of_the_month",
