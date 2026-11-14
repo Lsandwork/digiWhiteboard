@@ -65,6 +65,7 @@ import {
   type LeadershipView,
   type ParticipantAction
 } from "@/lib/team-engagement/permissions";
+import { packDashboard } from "@/lib/team-engagement/pack-dashboard";
 import {
   announcementsForEmployee,
   archiveAnnouncement,
@@ -302,7 +303,7 @@ export async function runLeadershipAction(ctx: ServiceContext, action: Leadershi
 // Employee Bark Outs & suggestions (every staff role)
 // ---------------------------------------------------------------------------------------------
 
-export const PARTICIPANT_VIEWS = ["home", "feed", "mine", "feedback"] as const;
+export const PARTICIPANT_VIEWS = ["home", "pack", "feed", "mine", "feedback"] as const;
 export type ParticipantView = (typeof PARTICIPANT_VIEWS)[number];
 
 export function isParticipantView(value: string): value is ParticipantView {
@@ -360,6 +361,8 @@ export async function runParticipantView(ctx: ServiceContext, view: ParticipantV
   switch (view) {
     case "home":
       return participantHome(ctx);
+    case "pack":
+      return packDashboard(ctx);
     case "feed":
       return employeeFeed(ctx, params);
     case "mine":
