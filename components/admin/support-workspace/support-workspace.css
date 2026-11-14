@@ -22,7 +22,7 @@
   display: block;
   font-size: 1.6rem;
   line-height: 1.1;
-  color: white;
+  color: var(--fitdog-text, #f4f8ff);
 }
 
 .support-workspace__stat span {
@@ -37,7 +37,7 @@
 }
 
 .support-workspace__stat--alert strong {
-  color: #ffb020;
+  color: var(--fitdog-warning, #ffb020);
 }
 
 .support-workspace__filters {
@@ -94,7 +94,7 @@
 .support-workspace__item h3 {
   margin: 6px 0 0;
   font-size: 1rem;
-  color: white;
+  color: var(--fitdog-text, #f4f8ff);
 }
 
 .support-workspace__item p {
@@ -128,7 +128,7 @@
 
 .support-workspace__facts dd {
   margin: 0;
-  color: white;
+  color: var(--fitdog-text, #f4f8ff);
 }
 
 .support-workspace__original,
