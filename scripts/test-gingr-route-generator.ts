@@ -18,6 +18,7 @@ import {
 import {
   appointmentOptionLabel,
   classifyTransportationText,
+  diagnoseReservationTransportPipeline,
   isInternalBoardingTaxiMarker
 } from "../lib/gingr-route-generator/transportation";
 import {
@@ -1873,6 +1874,23 @@ void (async () => {
     ).dogs[0];
     assert.ok(stringOptions, "string appointment_options fixture");
     assert.ok(stringOptions!.appointmentOptions.length >= 2);
+
+    const pipelineDiag = diagnoseReservationTransportPipeline(
+      reservation({
+        reservation_id: "9706",
+        animal_id: 9700,
+        a_name: "Annie",
+        owner: ownerHome(),
+        type: "Sports Sign Ups",
+        service_items: [
+          { name: "Before Outing - Fitdog to Pick Up @ Home", scheduled_at: `${routeDate}T08:00:00-07:00` },
+          { name: "Activity | Adventure Hike", scheduled_at: `${routeDate}T09:00:00-07:00` },
+          { name: "After Outing - Fitdog to Drop Off @ Home", scheduled_at: `${routeDate}T15:00:00-07:00` }
+        ]
+      }) as Record<string, unknown>,
+      routeDate
+    );
+    assert.equal(pipelineDiag.filter((row) => row.accepted).length, 2, "pipeline accepts before/after");
 
     const buriedAddonField = normalizeGingrRouteReservations(
       [

@@ -28,6 +28,12 @@ export function animalIdFromGingrReservation(reservation: GingrReservation): str
   return pickString(reservation.animal_id, record.a_id, record.animalId, animal?.id);
 }
 
+export function animalNameFromGingrReservation(reservation: GingrReservation): string | null {
+  const record = reservation as Record<string, unknown>;
+  const animal = asRecord(reservation.animal) ?? asRecord(record.pet) ?? asRecord(record.dog);
+  return pickString(record.a_name, record.animal_name, record.pet_name, animal?.name, animal?.a_name);
+}
+
 function ownerIdFromReservation(reservation: GingrReservation): string | null {
   const record = reservation as Record<string, unknown>;
   const owner =

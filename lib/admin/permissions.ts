@@ -1559,6 +1559,14 @@ export function canAccessGingrRouteGenerator(
   return canAccessRouteGenerator(access, legacyRole);
 }
 
+/** Raw Gingr reservation diagnostics — Owner/Manager Admin only (not front desk). */
+export function canAccessGingrRouteDiagnostics(
+  access?: UserAccess | null,
+  legacyRole?: string | null
+): boolean {
+  return isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access) || hasAnyRole(access, ["super_admin", "admin"]);
+}
+
 /**
  * Live Fleet — Admin, Management, Front Desk Coordinators, and Transportation.
  * Broader than Route Generator so ops staff can monitor vans without generating routes.

@@ -1125,6 +1125,92 @@ export type GingrReservationRouteOptions = {
  * each classified on its own. An overnight stay adds Boarding @ Fitdog Club;
  * a taxi adds its Fitdog home legs.
  */
+export type GingrTransportPipelineDiagnosis = {
+  text: string;
+  optionId: string | null;
+  scheduledDate: string | null;
+  source: string;
+  classified: boolean;
+  phase: GingrAppointmentOption["phase"] | null;
+  optionName: string | null;
+  appliesToRouteDate: boolean | string;
+  accepted: boolean;
+  skipReason: string | null;
+};
+
+/** Trace how each transport candidate is classified and filtered for a route date. */
+export function diagnoseReservationTransportPipeline(
+  reservation: Record<string, unknown>,
+  routeDate: string,
+  context: { qualifyingServiceOnDate?: boolean; qualifyingServiceDates?: string[] } = {}
+): GingrTransportPipelineDiagnosis[] {
+  const occupancy = resolveBoardingOccupancy(reservation, routeDate);
+  const reservationId = idText(reservation.reservation_id) ?? idText(reservation.id);
+  const stayDay = overnightStayDay(occupancy, routeDate);
+  const dateContext = {
+    routeDate,
+    multiDayStay: isOvernightStay(occupancy),
+    occupancy,
+    qualifyingServiceOnDate: context.qualifyingServiceOnDate ?? true,
+    activityDays: new Set(context.qualifyingServiceDates ?? [])
+  };
+  const rows: GingrTransportPipelineDiagnosis[] = [];
+  for (const candidate of collectReservationTransportCandidates(reservation)) {
+    for (const part of splitAppointmentOptionParts(candidate.text)) {
+      const option = classifyAppointmentOption(part, {
+        optionId: candidate.optionId,
+        source: "gingr",
+        reservationId,
+        stayDay
+      });
+      if (!option) {
+        rows.push({
+          text: part,
+          optionId: candidate.optionId,
+          scheduledDate: candidate.scheduledDate,
+          source: candidate.source,
+          classified: false,
+          phase: null,
+          optionName: null,
+          appliesToRouteDate: false,
+          accepted: false,
+          skipReason: "classifyAppointmentOption returned null (not a transport addon)"
+        });
+        continue;
+      }
+      if (option.transportationType === "TAXI") {
+        rows.push({
+          text: part,
+          optionId: candidate.optionId,
+          scheduledDate: candidate.scheduledDate,
+          source: candidate.source,
+          classified: true,
+          phase: option.phase,
+          optionName: option.optionName,
+          appliesToRouteDate: true,
+          accepted: false,
+          skipReason: "taxi row (handled separately, not an appointment option)"
+        });
+        continue;
+      }
+      const applies = optionAppliesToRouteDate(option, candidate.scheduledDate, dateContext);
+      rows.push({
+        text: part,
+        optionId: candidate.optionId,
+        scheduledDate: candidate.scheduledDate,
+        source: candidate.source,
+        classified: true,
+        phase: option.phase,
+        optionName: option.optionName,
+        appliesToRouteDate: applies,
+        accepted: applies !== false,
+        skipReason: applies === false ? "optionAppliesToRouteDate returned false" : null
+      });
+    }
+  }
+  return rows;
+}
+
 export function collectReservationRouteOptions(
   reservation: Record<string, unknown>,
   routeDate: string,
