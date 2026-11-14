@@ -3,6 +3,8 @@ import type { DepartmentKey } from "@/lib/admin/permissions";
 export const TEAM_ENGAGEMENT_MIGRATION = "supabase/migrations/103_team_engagement.sql";
 export const PACK_PRIORITY2_MIGRATION = "supabase/migrations/105_pack_priority2.sql";
 export const PACK_PRIORITY3_MIGRATION = "supabase/migrations/107_pack_priority3.sql";
+export const PACK_PHASE4_MIGRATION = "supabase/migrations/109_pack_phase4.sql";
+export const PACK_PHASE4_COMMIT = "supabase/migrations/110_team_engagement_commit_phase4.sql";
 
 export const PACK_GOAL_TYPES = ["numeric", "completion", "participation", "milestone", "timebound"] as const;
 export type PackGoalType = (typeof PACK_GOAL_TYPES)[number];
@@ -241,6 +243,7 @@ export const FEEDBACK_STATUSES = [
   "in_progress",
   "implemented",
   "declined",
+  "not_moving_forward",
   "planned",
   "resolved"
 ] as const;
@@ -253,6 +256,7 @@ export const FEEDBACK_STATUS_LABELS: Record<FeedbackStatus, string> = {
   in_progress: "In progress",
   implemented: "Implemented",
   declined: "Not moving forward",
+  not_moving_forward: "Not moving forward",
   planned: "Planned",
   resolved: "Resolved"
 };

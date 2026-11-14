@@ -68,6 +68,18 @@ import {
 } from "@/lib/team-engagement/permissions";
 import { packDashboard } from "@/lib/team-engagement/pack-dashboard";
 import {
+  funZonePhase4View,
+  joinPackGoal,
+  publishPackEvent,
+  publishWouldYouRather,
+  rsvpPackEvent,
+  saveVoiceOutcome,
+  submitTeamPulse,
+  teamPulseView,
+  voteWouldYouRather,
+  youSaidWeDidView
+} from "@/lib/team-engagement/pack-phase4";
+import {
   answerFunQuestion,
   answerFunTrivia,
   clearSpotlight,
@@ -379,6 +391,12 @@ export async function runLeadershipAction(ctx: ServiceContext, action: Leadershi
       return saveVoiceSurvey(ctx, body);
     case "publish_voice_survey":
       return publishVoiceSurvey(ctx, body);
+    case "save_voice_outcome":
+      return saveVoiceOutcome(ctx, body);
+    case "publish_would_you_rather":
+      return publishWouldYouRather(ctx, body);
+    case "publish_pack_event":
+      return publishPackEvent(ctx, body);
   }
 }
 
@@ -396,7 +414,9 @@ export const PARTICIPANT_VIEWS = [
   "fun_zone",
   "comments",
   "pack_goals",
-  "employee_voice"
+  "employee_voice",
+  "team_pulse",
+  "you_said_we_did"
 ] as const;
 export type ParticipantView = (typeof PARTICIPANT_VIEWS)[number];
 
@@ -473,14 +493,20 @@ export async function runParticipantView(ctx: ServiceContext, view: ParticipantV
       return myFeedback(ctx);
     case "milestones":
       return milestonesView(ctx);
-    case "fun_zone":
-      return funZoneView(ctx);
+    case "fun_zone": {
+      const [core, phase4] = await Promise.all([funZoneView(ctx), funZonePhase4View(ctx)]);
+      return { ...core, phase4 };
+    }
     case "comments":
       return listBarkOutComments(ctx, { barkOutId: params.barkOutId });
     case "pack_goals":
       return packGoalsEmployeeView(ctx);
     case "employee_voice":
       return employeeVoiceCatalog(ctx);
+    case "team_pulse":
+      return teamPulseView(ctx);
+    case "you_said_we_did":
+      return youSaidWeDidView(ctx);
   }
 }
 
@@ -520,5 +546,13 @@ export async function runParticipantAction(ctx: ServiceContext, action: Particip
       return answerFunTrivia(ctx, body);
     case "submit_voice_survey":
       return submitVoiceSurvey(ctx, body);
+    case "join_pack_goal":
+      return joinPackGoal(ctx, body);
+    case "submit_team_pulse":
+      return submitTeamPulse(ctx, body);
+    case "vote_would_you_rather":
+      return voteWouldYouRather(ctx, body);
+    case "rsvp_pack_event":
+      return rsvpPackEvent(ctx, body);
   }
 }

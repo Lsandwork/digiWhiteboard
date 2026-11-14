@@ -6,7 +6,8 @@ import type { ServiceContext } from "@/lib/team-engagement/context";
 import { commentCounts, milestonesView, packTablesReady, resolvePackSpotlight, funZoneView } from "@/lib/team-engagement/pack-features";
 import type { DbFilter } from "@/lib/team-engagement/types";
 import { barkOutPostingState } from "@/lib/team-engagement/bark-out-posting";
-import { PACK_PRIORITY2_MIGRATION, PACK_PRIORITY3_MIGRATION } from "@/lib/team-engagement/constants";
+import { PACK_PHASE4_COMMIT, PACK_PHASE4_MIGRATION, PACK_PRIORITY2_MIGRATION, PACK_PRIORITY3_MIGRATION } from "@/lib/team-engagement/constants";
+import { packPhase4Ready } from "@/lib/team-engagement/pack-phase4";
 import { packGoalsEmployeeView } from "@/lib/team-engagement/pack-goals";
 import { employeeVoiceCatalog } from "@/lib/team-engagement/employee-voice";
 
@@ -110,6 +111,8 @@ export async function packDashboard(ctx: ServiceContext) {
   ]);
   const pack2Ready = Object.values(packReady).every(Boolean);
   const pack3Ready = goalsCatalog.ready && voiceCatalog.ready;
+  const phase4Tables = await packPhase4Ready(ctx);
+  const pack4Ready = Object.values(phase4Tables).every(Boolean);
 
   const awaiting = mine.sent.filter((row) => row.status === "awaiting_confirmation" || row.status === "pending_review");
   const avatarUrl = await ctx.loadAvatar(ctx.actor.userId);
@@ -159,8 +162,10 @@ export async function packDashboard(ctx: ServiceContext) {
       priority3Ready: pack3Ready,
       migrations: [
         ...(pack2Ready ? [] : [PACK_PRIORITY2_MIGRATION, "supabase/migrations/106_team_engagement_commit_pack_tables.sql"]),
-        ...(pack3Ready ? [] : [PACK_PRIORITY3_MIGRATION, "supabase/migrations/108_team_engagement_commit_priority3.sql"])
-      ]
+        ...(pack3Ready ? [] : [PACK_PRIORITY3_MIGRATION, "supabase/migrations/108_team_engagement_commit_priority3.sql"]),
+        ...(pack4Ready ? [] : [PACK_PHASE4_MIGRATION, PACK_PHASE4_COMMIT])
+      ],
+      priority4Ready: pack4Ready
     },
     packStorageReady: pack2Ready,
     personal: {
