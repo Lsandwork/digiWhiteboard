@@ -1856,6 +1856,56 @@ void (async () => {
     assert.equal(serviceItems!.transportPlan.startingLocation.locationType, "HOME");
     assert.equal(serviceItems!.transportPlan.finalDestination.locationType, "HOME");
 
+    const nestedAddons = normalizeGingrRouteReservations(
+      [
+        reservation({
+          reservation_id: "9851",
+          animal_id: 9850,
+          a_name: "Rory",
+          owner: ownerHome(),
+          type: "Sports Sign Ups",
+          services: [
+            {
+              name: "Activity | Adventure Hike",
+              scheduled_at: `${routeDate}T09:00:00-07:00`,
+              addons: [
+                { name: "Before Outing - Fitdog to Pick Up @ Home" },
+                { name: "After Outing - Fitdog to Drop Off @ Home" }
+              ]
+            }
+          ]
+        })
+      ],
+      routeDate
+    ).dogs[0];
+    assert.ok(nestedAddons, "nested services[].addons fixture");
+    assert.ok(nestedAddons!.appointmentOptions.length >= 2);
+    assert.equal(nestedAddons!.startLocation, "home");
+    assert.equal(nestedAddons!.endLocation, "home");
+
+    const rAddons = normalizeGingrRouteReservations(
+      [
+        reservation({
+          reservation_id: "9852",
+          animal_id: 9852,
+          a_name: "Rita",
+          owner: ownerHome(),
+          type: "Sports Sign Ups",
+          start_date: "2026-01-01T08:00:00-07:00",
+          services: [{ name: "Activity | Adventure Hike", scheduled_at: `${routeDate}T09:00:00-07:00` }],
+          r_addons: [
+            { addon_name: "Before Outing - Fitdog to Pick Up @ Home", scheduled_at: "2026-01-01" },
+            { addon_name: "After Outing - Fitdog to Drop Off @ Home", scheduled_at: "2026-01-01" }
+          ]
+        })
+      ],
+      routeDate
+    ).dogs[0];
+    assert.ok(rAddons, "r_addons fixture");
+    assert.ok(rAddons!.appointmentOptions.length >= 2, "r_addons carry Service Addons");
+    assert.equal(rAddons!.startLocation, "home", "outing addons apply on activity day despite booking date");
+    assert.equal(rAddons!.endLocation, "home");
+
     const groupClass = normalizeGingrRouteReservations(
       [
         reservation({

@@ -823,12 +823,18 @@ function serviceRowTransportCandidates(reservation: Record<string, unknown>): Tr
       gingrTimestampDateKey(row.scheduled_until) ||
       gingrTimestampDateKey(row.date);
     const optionId = idText(row.id) ?? idText(row.option_id) ?? idText(row.addon_id) ?? idText(row.service_id);
-    const addText = (text: string, source: TransportCandidate["source"]) => {
+    const inherited = {
+      optionId,
+      scheduledDate,
+      cost: row.cost,
+      assignedTo: row.assigned_to
+    };
+    const addText = (text: string, source: TransportCandidate["source"], date: string | null = scheduledDate) => {
       if (!text || !looksLikeTransportToken(normalizeToken(text))) return;
       out.push({
         text,
         optionId,
-        scheduledDate,
+        scheduledDate: date,
         source,
         cost: row.cost,
         assignedTo: row.assigned_to
@@ -842,6 +848,14 @@ function serviceRowTransportCandidates(reservation: Record<string, unknown>): Tr
     if (description) addText(description, "addon");
     for (const text of collectGingrTextValues(row.addonData ?? row.addon_data)) {
       addText(text, "addon");
+    }
+    for (const candidate of collectCandidatesFromValue(row, "addon", inherited)) {
+      if (candidate.text === description) continue;
+      const rowName = String(
+        row.name ?? row.service ?? row.type ?? row.s_name ?? row.s_type ?? row.addon_name ?? ""
+      ).trim();
+      if (candidate.text === rowName) continue;
+      out.push(candidate);
     }
   }
   return out;
@@ -900,6 +914,9 @@ export function collectReservationTransportCandidates(
       ...collectCandidatesFromValue(reservation.appointment_options, "addon", emptyInherited),
       ...collectCandidatesFromValue(reservation.options, "addon", emptyInherited),
       ...collectCandidatesFromValue(reservation.reservation_options, "addon", emptyInherited),
+      ...collectCandidatesFromValue(reservation.service_items, "addon", emptyInherited),
+      ...collectCandidatesFromValue(reservation.r_addons, "addon", emptyInherited),
+      ...collectCandidatesFromValue(reservation.s_addons, "addon", emptyInherited),
       ...collectCandidatesFromValue(reservation.services, "service", emptyInherited)
     ].filter((candidate) => !isInternalBoardingTaxiMarker(candidate));
     const seen = new Set<string>();
@@ -976,7 +993,19 @@ function optionAppliesToRouteDate(
     activityDays: Set<string>;
   }
 ): boolean | string {
-  if (scheduledDate) return scheduledDate === context.routeDate;
+  if (scheduledDate) {
+    if (scheduledDate === context.routeDate) return true;
+    // Outing transport addons are often dated to reservation start, not the activity row.
+    if (
+      context.qualifyingServiceOnDate &&
+      !context.multiDayStay &&
+      (option.phase === "BEFORE" || option.phase === "AFTER") &&
+      context.activityDays.has(context.routeDate)
+    ) {
+      return true;
+    }
+    return false;
+  }
   if (option.transportationType === "TAXI") return !context.multiDayStay;
   if (option.phase === "BOARDING") return true;
   if (!context.multiDayStay) return true;
