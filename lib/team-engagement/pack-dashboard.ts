@@ -125,6 +125,13 @@ export async function packDashboard(ctx: ServiceContext) {
   });
   const activeGoalsCount = goalsCatalog.ready ? goalsCatalog.active.length : 0;
   const comingUp = milestones.ready ? milestones.upcoming.slice(0, 5) : [];
+  const milestonesUpcoming = milestones.ready ? milestones.upcoming.length : 0;
+  let activeTeamActivities = activeGoalsCount;
+  if (funZone.ready) {
+    if (funZone.poll) activeTeamActivities += 1;
+    if (funZone.question) activeTeamActivities += 1;
+    if (funZone.trivia) activeTeamActivities += 1;
+  }
 
   return {
     storageReady: true as const,
@@ -149,7 +156,9 @@ export async function packDashboard(ctx: ServiceContext) {
       teammatesRecognizedThisMonth: authorsThisMonth,
       newForMeThisWeek: pendingForMe,
       pendingMyPosts: awaiting.length,
-      activePackGoals: activeGoalsCount
+      activePackGoals: activeGoalsCount,
+      milestonesUpcoming,
+      activeTeamActivities
     },
     comingUp,
     activityFeed,
