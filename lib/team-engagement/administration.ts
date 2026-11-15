@@ -487,7 +487,7 @@ export async function securityView(ctx: ServiceContext) {
 export async function integrationsView(ctx: ServiceContext) {
   const settings = await ctx.settings();
   const tables = await ctx.db.tableStatus().catch(() => null);
-  const ready = tables ? Object.values(tables).every(Boolean) : false;
+  const ready = tables ? Boolean(tables.team_engagement_bark_outs && tables.team_engagement_settings) : false;
   return {
     items: [
       {

@@ -108,7 +108,7 @@ type HomePayload = {
   participation: { minMessageLength: number };
 };
 
-type PackSection = "pack" | "bark_outs" | "milestones" | "goals" | "fun" | "voice" | "ideas";
+type PackSection = "pack" | "bark_outs" | "milestones" | "goals" | "fun" | "voice" | "pulse" | "ideas";
 
 const NAV: { id: PackSection; label: string }[] = [
   { id: "pack", label: "The Pack" },
@@ -117,6 +117,7 @@ const NAV: { id: PackSection; label: string }[] = [
   { id: "goals", label: "Pack Goals" },
   { id: "fun", label: "Fun Zone" },
   { id: "voice", label: "Employee Voice" },
+  { id: "pulse", label: "Team Pulse" },
   { id: "ideas", label: "Ideas for the Pack" }
 ];
 
@@ -319,10 +320,17 @@ export default function PackExperience() {
   }, [pack?.me.avatarUrl, pack?.me.name, pack?.me.userId]);
 
   const loadPack = useCallback(async () => {
-    const { ok, body } = await fetchAdminJson<PackPayload & { error?: string }>("/api/admin/bark-outs?view=pack");
+    const { ok, body } = await fetchAdminJson<PackPayload & { error?: string; code?: string }>("/api/admin/bark-outs?view=pack");
     if (!ok) {
       setPack(null);
-      setError((body as { error?: string }).error ?? "Team Engagement is not available.");
+      const code = (body as { code?: string }).code;
+      if (code === "setup_required") {
+        setError("Team Engagement storage is not set up yet. Apply migration 103 on Supabase, then refresh.");
+      } else if (code === "storage_error") {
+        setError("Team Engagement could not reach its storage. Check Supabase connectivity and migrations, then refresh.");
+      } else {
+        setError((body as { error?: string }).error ?? "Team Engagement is not available.");
+      }
       return;
     }
     setPack(body);
@@ -430,7 +438,8 @@ export default function PackExperience() {
       void loadVoice();
       void loadYouSaidWeDid();
     }
-  }, [section, loadIdeas, loadFunZone, loadPackGoals, loadVoice, loadYouSaidWeDid]);
+    if (section === "pulse" || section === "pack") void loadTeamPulse();
+  }, [section, loadIdeas, loadFunZone, loadPackGoals, loadVoice, loadYouSaidWeDid, loadTeamPulse]);
 
   useEffect(() => {
     if (modalOpen && !home) void loadHome();
@@ -1270,6 +1279,62 @@ export default function PackExperience() {
             ))}
           </ul>
         </section>
+      ) : null}
+      {section === "pulse" ? (
+        teamPulse?.ready ? (
+          <section className="pack-card">
+            <h2 className="pack-card__title">Team Pulse</h2>
+            <p className="pack-muted">Optional weekly check-in — not a performance score. Leadership sees trends in aggregate, not individual rankings.</p>
+            {teamPulse.submitted ? (
+              <p className="pack-muted">Thanks — you already checked in for the week of {teamPulse.weekStart}.</p>
+            ) : (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const form = event.currentTarget;
+                  const workload = Number((form.elements.namedItem("pulse-workload") as HTMLInputElement).value);
+                  const support = Number((form.elements.namedItem("pulse-support") as HTMLInputElement).value);
+                  const connection = Number((form.elements.namedItem("pulse-connection") as HTMLInputElement).value);
+                  const note = (form.elements.namedItem("pulse-note") as HTMLTextAreaElement).value;
+                  void (async () => {
+                    const { ok, body } = await fetchAdminJson("/api/admin/bark-outs", {
+                      method: "POST",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ action: "submit_team_pulse", workload, support, connection, note })
+                    });
+                    if (!ok) setError((body as { error?: string }).error ?? "Could not save check-in.");
+                    else await loadTeamPulse();
+                  })();
+                }}
+              >
+                <label className="pack-field">
+                  Workload (1–5)
+                  <input name="pulse-workload" type="number" min={1} max={5} required defaultValue={3} />
+                </label>
+                <label className="pack-field">
+                  Support (1–5)
+                  <input name="pulse-support" type="number" min={1} max={5} required defaultValue={3} />
+                </label>
+                <label className="pack-field">
+                  Connection (1–5)
+                  <input name="pulse-connection" type="number" min={1} max={5} required defaultValue={3} />
+                </label>
+                <label className="pack-field">
+                  Optional note
+                  <textarea name="pulse-note" maxLength={400} rows={3} placeholder="Anything management should know?" />
+                </label>
+                <button type="submit" className="pack-btn pack-btn--primary">
+                  Submit check-in
+                </button>
+              </form>
+            )}
+          </section>
+        ) : (
+          <SectionEmpty
+            title="Team Pulse"
+            body={pack.sectionStatus.teamPulse?.message ?? "Apply Pack Phase 4 migrations to enable weekly pulse check-ins."}
+          />
+        )
       ) : null}
       {section === "ideas" ? (
         pack.sectionStatus.ideas?.ready ? (

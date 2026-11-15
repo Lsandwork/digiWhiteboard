@@ -14,6 +14,25 @@ import {
   PackOverviewBody
 } from "@/components/admin/team-engagement/pack/PackLeadershipViews";
 import { TemplateLibraryAdminBody } from "@/components/admin/team-engagement/pack/TemplateLibraryAdminBody";
+import {
+  AccessAdminBody,
+  AiPolicyAdminBody,
+  AnalyticsAdminBody,
+  AnnouncementsAdminBody,
+  DepartmentsAdminBody,
+  DevelopmentAdminBody,
+  FeatureControlsAdminBody,
+  FeedbackAdminBody,
+  IntegrationsAdminBody,
+  PermissionsAdminBody,
+  ProgramsAdminBody,
+  ReportsAdminBody,
+  RetentionAdminBody,
+  SecurityAdminBody,
+  SettingsAdminBody,
+  SystemHealthAdminBody,
+  WorkloadAdminBody
+} from "@/components/admin/team-engagement/LeadershipManagementViews";
 
 type NavItem = { id: string; label: string; icon: string; view: string };
 type NavGroup = { id: string; label: string; items: NavItem[] };
@@ -243,13 +262,23 @@ function viewBody(
   }
   if (view === "bark_outs") return <BarkOutList items={(record.items as Record<string, unknown>[]) ?? []} />;
   if (view === "moderation") return <ModerationBody data={record} onAction={onAction} />;
-  if (view === "analytics") {
-    return record.series ? (
-      <EmptyIllustration name="empty-analytics" title="Engagement analytics" body="Charts use live Bark Out and program data from your selected filters." />
-    ) : (
-      <EmptyIllustration name="empty-analytics" title="No analytics for this filter" body="Try widening the date range or choosing another department." />
-    );
-  }
+  if (view === "analytics") return <AnalyticsAdminBody data={record} />;
+  if (view === "feedback") return <FeedbackAdminBody data={record} />;
+  if (view === "announcements") return <AnnouncementsAdminBody data={record} onAction={onAction} onRefresh={onRefresh} />;
+  if (view === "programs") return <ProgramsAdminBody data={record} />;
+  if (view === "development") return <DevelopmentAdminBody data={record} />;
+  if (view === "workload") return <WorkloadAdminBody data={record} />;
+  if (view === "departments") return <DepartmentsAdminBody data={record} />;
+  if (view === "settings") return <SettingsAdminBody data={record} />;
+  if (view === "reports") return <ReportsAdminBody data={record} />;
+  if (view === "security") return <SecurityAdminBody data={record} />;
+  if (view === "integrations") return <IntegrationsAdminBody data={record} />;
+  if (view === "system_health") return <SystemHealthAdminBody data={record} />;
+  if (view === "access" || view === "management_access" || view === "admin_management") return <AccessAdminBody data={record} />;
+  if (view === "permissions") return <PermissionsAdminBody data={record} />;
+  if (view === "ai_policy") return <AiPolicyAdminBody data={record} />;
+  if (view === "retention") return <RetentionAdminBody data={record} />;
+  if (view === "features") return <FeatureControlsAdminBody data={record} />;
   if (view === "audit") {
     const items = (record.items as Record<string, unknown>[]) ?? [];
     return (
@@ -267,12 +296,7 @@ function viewBody(
       />
     );
   }
-  return (
-    <section className="ro-te-card ro-te-section">
-      <p className="ro-te-muted">This section loads live data from Team Engagement. Use the actions in the admin API for changes not shown here yet.</p>
-      <pre className="ro-te-debug">{JSON.stringify(record, null, 2).slice(0, 4000)}</pre>
-    </section>
-  );
+  return <EmptyIllustration name="empty-staff" title="Nothing to show" body="This section has no data for your current scope." />;
 }
 
 export default function TeamEngagementPanel() {
@@ -309,7 +333,8 @@ export default function TeamEngagementPanel() {
 
   const loadView = useCallback(
     async (item: NavItem | null) => {
-      if (!item || !context?.storageReady) return;
+      if (!item) return;
+      if (!context?.storageReady && item.view !== "template_library_admin") return;
       setViewLoading(true);
       setViewError(null);
       try {
@@ -366,20 +391,15 @@ export default function TeamEngagementPanel() {
     );
   }
 
-  if (!context.storageReady) {
-    return (
-      <div className="ro-te-shell">
-        <EmptyIllustration
-          name="access-denied"
-          title="Database setup required"
-          body={`Run ${context.migration} in the Supabase SQL Editor before using Team Engagement.`}
-        />
-      </div>
-    );
-  }
+  const storageBanner = !context.storageReady ? (
+    <div className="ro-te-banner ro-te-banner--warn" style={{ marginBottom: 12 }}>
+      Core Team Engagement storage is not ready. Run {context.migration} in Supabase. Template Library catalog remains available offline.
+    </div>
+  ) : null;
 
   return (
     <div className="ro-te-shell">
+      {storageBanner}
       <header className="ro-te-header">
         <div>
           <h2 className="ro-te-header__title">Manage Team Engagement</h2>
