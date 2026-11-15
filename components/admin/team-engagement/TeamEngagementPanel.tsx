@@ -367,10 +367,10 @@ function viewBody(
   if (view === "analytics") return <AnalyticsAdminBody data={record} />;
   if (view === "feedback") return <FeedbackAdminBody data={record} onAction={onAction} onRefresh={onRefresh} />;
   if (view === "announcements") return <AnnouncementsAdminBody data={record} onAction={onAction} onRefresh={onRefresh} />;
-  if (view === "programs") return <ProgramsAdminBody data={record} />;
-  if (view === "development") return <DevelopmentAdminBody data={record} />;
+  if (view === "programs") return <ProgramsAdminBody data={record} onAction={onAction} onRefresh={onRefresh} />;
+  if (view === "development") return <DevelopmentAdminBody data={record} onAction={onAction} onRefresh={onRefresh} />;
   if (view === "workload") return <WorkloadAdminBody data={record} />;
-  if (view === "departments") return <DepartmentsAdminBody data={record} />;
+  if (view === "departments") return <DepartmentsAdminBody data={record} onAction={onAction} onRefresh={onRefresh} />;
   if (view === "settings") return <SettingsAdminBody data={record} onAction={onAction} onRefresh={onRefresh} />;
   if (view === "reports") return <ReportsAdminBody data={record} />;
   if (view === "security") return <SecurityAdminBody data={record} />;
@@ -534,8 +534,10 @@ export default function TeamEngagementPanel() {
     </div>
   ) : null;
 
+  const premiumManage = active?.view !== "analytics";
+
   return (
-    <div className="ro-te-shell">
+    <div className="ro-te-shell ro-te-shell--manage-header">
       {storageBanner}
       <header className="ro-te-header">
         <div>
@@ -579,8 +581,8 @@ export default function TeamEngagementPanel() {
             </div>
           ))}
         </nav>
-        <main className="ro-te-main">
-          <h3 className="ro-te-main__title">{active?.label ?? "Overview"}</h3>
+        <main className={`ro-te-main${premiumManage ? " ro-te-main--premium" : ""}`}>
+          {premiumManage ? <h3 className="ro-te-main__title">{active?.label ?? "Overview"}</h3> : null}
           {viewLoading && active && !Object.prototype.hasOwnProperty.call(viewCache, active.view) ? (
             <p className="ro-te-muted">Loading…</p>
           ) : null}

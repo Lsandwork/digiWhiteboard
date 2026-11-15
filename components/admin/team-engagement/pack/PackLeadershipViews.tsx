@@ -1,7 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { fetchAdminJson } from "@/lib/http/fetch-admin-json";
+import {
+  EngagementDataTable,
+  EngagementPremiumSection,
+  EngagementStatusPill,
+  EngagementToolbar
+} from "@/components/admin/team-engagement/EngagementAdminChrome";
 import { FEEDBACK_STATUS_LABELS, type FeedbackStatus } from "@/lib/team-engagement/constants";
 
 async function post(action: string, body: Record<string, unknown>) {
@@ -292,9 +298,141 @@ function trimPollOptions(options: string[]) {
   return options.map((value) => value.trim()).filter(Boolean);
 }
 
+function formatPacificWhen(value: unknown) {
+  if (!value || typeof value !== "string") return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("en-US", {
+    timeZone: "America/Los_Angeles",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function FunZoneActivityTable({
+  questions,
+  polls,
+  trivia,
+  onRefresh
+}: {
+  questions: Array<Record<string, unknown>>;
+  polls: Array<Record<string, unknown>>;
+  trivia: Array<Record<string, unknown>>;
+  onRefresh: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+
+  const rows = useMemo(() => {
+    const merged = [
+      ...questions.map((row) => ({
+        id: String(row.id),
+        kind: "Question" as const,
+        title: String(row.prompt ?? ""),
+        status: String(row.status ?? "draft"),
+        publishAt: row.publishAt ?? row.publish_at,
+        publishAction: "publish_fun_question" as const
+      })),
+      ...polls.map((row) => ({
+        id: String(row.id),
+        kind: "Poll" as const,
+        title: String(row.prompt ?? ""),
+        status: String(row.status ?? "draft"),
+        publishAt: row.publishAt ?? row.publish_at,
+        publishAction: "publish_fun_poll" as const
+      })),
+      ...trivia.map((row) => ({
+        id: String(row.id),
+        kind: "Trivia" as const,
+        title: String(row.title ?? row.prompt ?? ""),
+        status: String(row.status ?? "draft"),
+        publishAt: row.publishAt ?? row.publish_at,
+        publishAction: null
+      }))
+    ];
+    const q = query.trim().toLowerCase();
+    return merged.filter((row) => {
+      if (statusFilter !== "all" && row.status !== statusFilter) return false;
+      if (!q) return true;
+      return row.title.toLowerCase().includes(q) || row.kind.toLowerCase().includes(q);
+    });
+  }, [polls, questions, query, statusFilter, trivia]);
+
+  return (
+    <EngagementPremiumSection
+      title="Drafts & activities"
+      description="Manage what appears in Pack Fun Zone. Publishing activates items for staff; drafts stay admin-only until published."
+    >
+      <EngagementToolbar>
+        <input
+          className="ro-te-input"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search prompt…"
+          aria-label="Search fun zone items"
+        />
+        <select className="ro-te-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filter by status">
+          <option value="all">All statuses</option>
+          <option value="draft">Draft</option>
+          <option value="active">Active</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="closed">Closed</option>
+        </select>
+      </EngagementToolbar>
+      <EngagementDataTable
+        emptyTitle="No Fun Zone items"
+        emptyBody="Publish a question, poll, or event above — it will appear here and in Pack."
+        columns={[
+          { key: "kind", label: "Type" },
+          { key: "title", label: "Title" },
+          { key: "status", label: "Status" },
+          { key: "publishAt", label: "Publish" },
+          { key: "actions", label: "" }
+        ]}
+        rows={rows.map((row) => {
+          const busy = busyKey === `${row.kind}:${row.id}`;
+          return {
+            id: `${row.kind}:${row.id}`,
+            cells: {
+              kind: row.kind,
+              title: <span style={{ whiteSpace: "pre-wrap" }}>{row.title}</span>,
+              status: <EngagementStatusPill status={row.status} />,
+              publishAt: formatPacificWhen(row.publishAt),
+              actions:
+                row.publishAction && row.status === "draft" ? (
+                  <button
+                    type="button"
+                    className="ro-te-btn ro-te-btn--primary"
+                    disabled={busy}
+                    onClick={() => {
+                      setBusyKey(`${row.kind}:${row.id}`);
+                      void post(row.publishAction, { id: row.id })
+                        .then(onRefresh)
+                        .finally(() => setBusyKey(null));
+                    }}
+                  >
+                    Publish
+                  </button>
+                ) : (
+                  <span className="ro-te-muted" style={{ fontSize: 12 }}>
+                    {row.status === "active" ? "Live in Pack" : "—"}
+                  </span>
+                )
+            }
+          };
+        })}
+      />
+    </EngagementPremiumSection>
+  );
+}
+
 export function FunZoneAdminBody({ data, onRefresh }: { data: Record<string, unknown>; onRefresh: () => void }) {
   const questions = (data.questions as Array<Record<string, unknown>>) ?? [];
   const polls = (data.polls as Array<Record<string, unknown>>) ?? [];
+  const trivia = (data.trivia as Array<Record<string, unknown>>) ?? [];
   if (data.ready === false) {
     return (
       <section className="ro-te-card ro-te-section">
@@ -321,10 +459,7 @@ export function FunZoneAdminBody({ data, onRefresh }: { data: Record<string, unk
     <div className="ro-te-stack">
       <QuestionOfTheDayAdmin onRefresh={onRefresh} />
       <FunZonePollPublisher onRefresh={onRefresh} />
-      <section className="ro-te-card ro-te-section">
-        <h3 className="ro-te-section__title">Drafts & activities</h3>
-        <p className="ro-te-muted">{questions.length} questions · {polls.length} polls</p>
-      </section>
+      <FunZoneActivityTable questions={questions} polls={polls} trivia={trivia} onRefresh={onRefresh} />
       <WouldYouRatherAdmin onRefresh={onRefresh} />
       <PackEventAdmin onRefresh={onRefresh} />
     </div>
