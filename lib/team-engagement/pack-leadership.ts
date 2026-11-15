@@ -32,11 +32,13 @@ export async function funZoneManagementView(ctx: ServiceContext) {
     "team_engagement_fun_polls",
     "team_engagement_fun_trivia"
   ];
+  const orderColumn = (table: EngagementTable) =>
+    table === "team_engagement_fun_trivia" ? "created_at" : "updated_at";
   try {
   const [questions, polls, trivia] = await Promise.all(
     tables.map((table) =>
       ctx.db.select<Record<string, unknown>>(table, {
-        order: [{ column: "updated_at", ascending: false }],
+        order: [{ column: orderColumn(table), ascending: false }],
         limit: 30
       })
     )
