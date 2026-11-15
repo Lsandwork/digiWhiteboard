@@ -239,8 +239,11 @@ const sessionSource = readFileSync("app/api/admin/session/route.ts", "utf8");
 assert.match(sessionSource, /SESSION_ENRICH_BUDGET_MS = 800/);
 assert.match(sessionSource, /cookiePayload/);
 assert.match(sessionSource, /Promise\.race/);
+assert.match(sessionSource, /tryGetServiceSupabase/);
 
 const dashboardRoute = readFileSync("app/api/admin/dashboard/route.ts", "utf8");
+assert.match(dashboardRoute, /tryGetServiceSupabase/);
+assert.match(dashboardRoute, /degradedDashboardJson/);
 assert.match(dashboardRoute, /skipSettingsAndAccess/);
 assert.match(dashboardRoute, /skipAccessWork/);
 assert.match(dashboardRoute, /skipHungBoardSnapshots/);

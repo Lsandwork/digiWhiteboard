@@ -45,6 +45,15 @@ function fetchWithTimeout(timeoutMs: number): typeof fetch {
   };
 }
 
+/** Returns null when URL/service key are missing or still placeholders (env login must not brick the UI). */
+export function tryGetServiceSupabase(options: ServiceSupabaseOptions = {}) {
+  try {
+    return getServiceSupabase(options);
+  } catch {
+    return null;
+  }
+}
+
 export function getServiceSupabase(options: ServiceSupabaseOptions = {}) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

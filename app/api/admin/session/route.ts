@@ -4,7 +4,7 @@ import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { getUserAccess, migrateLegacyUserAccess } from "@/lib/admin/user-access";
 import { ensureSuperAdminUsers } from "@/lib/admin/role-permission-matrix";
 import { getAdminUserById } from "@/lib/admin/users";
-import { getServiceSupabase } from "@/lib/supabase/server";
+import { tryGetServiceSupabase } from "@/lib/supabase/server";
 import { withTimeoutOrThrow } from "@/lib/server-ttl-cache";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +38,10 @@ export async function GET(request: Request) {
       : null
   };
 
-  const supabase = getServiceSupabase({ timeoutMs: SESSION_QUERY_TIMEOUT_MS });
+  const supabase = tryGetServiceSupabase({ timeoutMs: SESSION_QUERY_TIMEOUT_MS });
+  if (!supabase) {
+    return NextResponse.json(cookiePayload);
+  }
   after(() => {
     void migrateLegacyUserAccess(supabase).catch(() => undefined);
     void ensureSuperAdminUsers(supabase).catch(() => undefined);
