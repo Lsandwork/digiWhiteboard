@@ -317,7 +317,7 @@ export default function PackExperience() {
       setMineReceived(body.received ?? []);
       setMineSentPublished(body.sent.filter((row) => row.status === "published") as unknown as BarkOutItem[]);
     }
-  }, [pack?.me.avatarUrl, pack?.me.name, pack?.me.userId]);
+  }, []);
 
   const loadPack = useCallback(async () => {
     const { ok, body } = await fetchAdminJson<PackPayload & { error?: string; code?: string }>("/api/admin/bark-outs?view=pack");
@@ -372,8 +372,7 @@ export default function PackExperience() {
   useEffect(() => {
     void loadPack();
     void loadMine();
-    void loadTeamPulse();
-  }, [loadPack, loadMine, loadTeamPulse]);
+  }, [loadPack, loadMine]);
 
   useEffect(() => {
     if (section === "bark_outs") void loadFeed();
@@ -463,7 +462,7 @@ export default function PackExperience() {
     });
     if (!ok) setError((body as { error?: string }).error ?? "Could not confirm.");
     else {
-      await Promise.all([loadPack(), loadMine(), loadFeed()]);
+      await Promise.all([loadPack(), loadMine(), section === "bark_outs" ? loadFeed() : Promise.resolve()]);
     }
   }
 
@@ -475,7 +474,7 @@ export default function PackExperience() {
     });
     if (!ok) setError((body as { error?: string }).error ?? "Could not withdraw.");
     else {
-      await Promise.all([loadPack(), loadMine(), loadFeed()]);
+      await Promise.all([loadPack(), loadMine(), section === "bark_outs" ? loadFeed() : Promise.resolve()]);
     }
   }
 

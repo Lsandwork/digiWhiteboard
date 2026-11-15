@@ -5,6 +5,15 @@ import { FEEDBACK_STATUS_LABELS } from "@/lib/team-engagement/constants";
 
 type ActionHandler = (action: string, payload: Record<string, unknown>) => Promise<void>;
 
+function EmptyAnalytics({ detail }: { detail: string }) {
+  return (
+    <section className="ro-te-card ro-te-section">
+      <h3 className="ro-te-section__title">Engagement analytics</h3>
+      <p className="ro-te-muted">{detail}</p>
+    </section>
+  );
+}
+
 function ListSection({
   title,
   empty,
@@ -28,7 +37,11 @@ export function AnalyticsAdminBody({ data }: { data: Record<string, unknown> }) 
   const participation = data.participation as { authors?: number; recipients?: number; team?: number } | undefined;
   const range = data.range as { from?: string; to?: string } | undefined;
   if (!totals) {
-    return <p className="ro-te-muted">Choose a date range to load engagement analytics.</p>;
+    return (
+      <EmptyAnalytics
+        detail={String(data.error ?? "Analytics could not load. Apply Team Engagement migrations and refresh, or try another section.")}
+      />
+    );
   }
   return (
     <div className="ro-te-stack">
@@ -61,23 +74,92 @@ export function AnalyticsAdminBody({ data }: { data: Record<string, unknown> }) 
   );
 }
 
-export function FeedbackAdminBody({ data }: { data: Record<string, unknown> }) {
+export function FeedbackAdminBody({
+  data,
+  onAction,
+  onRefresh
+}: {
+  data: Record<string, unknown>;
+  onAction?: ActionHandler;
+  onRefresh?: () => void;
+}) {
   const items = (data.items as Array<Record<string, unknown>>) ?? [];
   return (
     <ListSection title="Team feedback & suggestions" empty={items.length ? undefined : "No feedback in your scope yet."}>
       <ul className="ro-te-list">
         {items.map((row) => (
-          <li key={String(row.id)} className="ro-te-list__item">
-            <strong>{String(row.subject ?? "Suggestion")}</strong>
-            <span className="ro-te-muted">
-              {" "}
-              · {FEEDBACK_STATUS_LABELS[row.status as keyof typeof FEEDBACK_STATUS_LABELS] ?? row.status} · {String(row.submitterName ?? "")}
-            </span>
-            <p>{String(row.message ?? row.body ?? "")}</p>
-          </li>
+          <FeedbackRow key={String(row.id)} row={row} onAction={onAction} onRefresh={onRefresh} />
         ))}
       </ul>
     </ListSection>
+  );
+}
+
+function FeedbackRow({
+  row,
+  onAction,
+  onRefresh
+}: {
+  row: Record<string, unknown>;
+  onAction?: ActionHandler;
+  onRefresh?: () => void;
+}) {
+  const [response, setResponse] = useState("");
+  const [busy, setBusy] = useState(false);
+  const id = String(row.id);
+  return (
+    <li className="ro-te-list__item">
+      <strong>{String(row.subject ?? "Suggestion")}</strong>
+      <span className="ro-te-muted">
+        {" "}
+        · {FEEDBACK_STATUS_LABELS[row.status as keyof typeof FEEDBACK_STATUS_LABELS] ?? row.status} · {String(row.submitterName ?? "")}
+      </span>
+      <p>{String(row.message ?? row.body ?? "")}</p>
+      {onAction ? (
+        <div className="ro-te-stack" style={{ marginTop: 8 }}>
+          <textarea
+            value={response}
+            rows={2}
+            maxLength={3000}
+            placeholder="Reply to the teammate…"
+            onChange={(event) => setResponse(event.target.value)}
+          />
+          <div className="ro-te-actions">
+            <button
+              type="button"
+              className="ro-te-btn ro-te-btn--primary"
+              disabled={busy || response.trim().length < 3}
+              onClick={() => {
+                setBusy(true);
+                void onAction("respond_feedback", { id, body: response })
+                  .then(() => {
+                    setResponse("");
+                    onRefresh?.();
+                  })
+                  .finally(() => setBusy(false));
+              }}
+            >
+              Send response
+            </button>
+            <button
+              type="button"
+              className="ro-te-btn ro-te-btn--ghost"
+              disabled={busy}
+              onClick={() => {
+                const resolution = window.prompt("Outcome message for the teammate:", "Thanks — we are reviewing this.");
+                if (!resolution || resolution.length < 5) return;
+                setBusy(true);
+                void onAction("update_feedback", { id, status: "resolved", resolution })
+                  .then(onRefresh)
+                  .finally(() => setBusy(false));
+              }}
+            >
+              Mark resolved
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </li>
   );
 }
 
@@ -230,10 +312,27 @@ export function DepartmentsAdminBody({ data }: { data: Record<string, unknown> }
   );
 }
 
-export function SettingsAdminBody({ data }: { data: Record<string, unknown> }) {
+export function SettingsAdminBody({
+  data,
+  onAction,
+  onRefresh
+}: {
+  data: Record<string, unknown>;
+  onAction?: ActionHandler;
+  onRefresh?: () => void;
+}) {
   const categories = (data.categories as Array<{ key: string; label: string; active: boolean }>) ?? [];
-  const participation = data.participation as Record<string, unknown> | undefined;
+  const participation = (data.participation as Record<string, number> | undefined) ?? {
+    dailyLimit: 5,
+    perRecipientWeeklyLimit: 3,
+    minMessageLength: 20
+  };
+  const revisions = (data.revisions as Record<string, number> | undefined) ?? {};
   const features = data.features as Record<string, boolean> | undefined;
+  const [dailyLimit, setDailyLimit] = useState(String(participation.dailyLimit ?? 5));
+  const [weeklyLimit, setWeeklyLimit] = useState(String(participation.perRecipientWeeklyLimit ?? 3));
+  const [minLength, setMinLength] = useState(String(participation.minMessageLength ?? 20));
+  const [busy, setBusy] = useState(false);
   return (
     <div className="ro-te-stack">
       <ListSection title="Bark Out categories">
@@ -246,19 +345,47 @@ export function SettingsAdminBody({ data }: { data: Record<string, unknown> }) {
           ))}
         </ul>
       </ListSection>
-      {participation ? (
-        <section className="ro-te-card ro-te-section">
-          <h3 className="ro-te-section__title">Participation limits</h3>
-          <ul className="ro-te-list">
-            <li>Daily limit: {String(participation.dailyLimit)}</li>
-            <li>Per-recipient weekly: {String(participation.perRecipientWeeklyLimit)}</li>
-            <li>Minimum message length: {String(participation.minMessageLength)}</li>
-          </ul>
-        </section>
-      ) : null}
+      <section className="ro-te-card ro-te-section">
+        <h3 className="ro-te-section__title">Participation limits</h3>
+        <label className="ro-te-field">
+          Daily Bark Outs per teammate
+          <input type="number" min={1} max={50} value={dailyLimit} onChange={(e) => setDailyLimit(e.target.value)} />
+        </label>
+        <label className="ro-te-field">
+          Per-recipient weekly limit
+          <input type="number" min={1} max={50} value={weeklyLimit} onChange={(e) => setWeeklyLimit(e.target.value)} />
+        </label>
+        <label className="ro-te-field">
+          Minimum message length
+          <input type="number" min={5} max={500} value={minLength} onChange={(e) => setMinLength(e.target.value)} />
+        </label>
+        {onAction ? (
+          <button
+            type="button"
+            className="ro-te-btn ro-te-btn--primary"
+            disabled={busy}
+            onClick={() => {
+              setBusy(true);
+              void onAction("save_participation", {
+                value: {
+                  dailyLimit: Number(dailyLimit),
+                  perRecipientWeeklyLimit: Number(weeklyLimit),
+                  minMessageLength: Number(minLength)
+                },
+                revision: revisions.participation ?? 0
+              })
+                .then(onRefresh)
+                .finally(() => setBusy(false));
+            }}
+          >
+            Save limits
+          </button>
+        ) : null}
+      </section>
       {features ? (
         <section className="ro-te-card ro-te-section">
-          <h3 className="ro-te-section__title">Feature toggles</h3>
+          <h3 className="ro-te-section__title">Feature toggles (read-only here)</h3>
+          <p className="ro-te-muted">Super Admins can change Pack feature controls under Security → Feature Controls.</p>
           <ul className="ro-te-list">
             {Object.entries(features).map(([key, enabled]) => (
               <li key={key}>
@@ -403,12 +530,65 @@ export function AccessAdminBody({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-export function PermissionsAdminBody({ data }: { data: Record<string, unknown> }) {
+export function PermissionsAdminBody({
+  data,
+  onAction,
+  onRefresh
+}: {
+  data: Record<string, unknown>;
+  onAction?: ActionHandler;
+  onRefresh?: () => void;
+}) {
   const notes = (data.notes as string[]) ?? [];
+  const permissions = (data.permissions as Array<{ permission: string; cells: Array<{ role: string; enabled: boolean; locked: boolean }> }>) ?? [];
+  const roleLabels = Object.fromEntries(
+    ((data.roles as Array<{ role: string; label: string }>) ?? []).map((row) => [row.role, row.label])
+  );
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   return (
     <div className="ro-te-stack">
       <ListSection title="Role permissions">
-        <p className="ro-te-muted">Use RuffOps User Management for detailed matrix edits. This view summarizes Team Engagement permissions by role.</p>
+        <p className="ro-te-muted">Toggle Team Engagement permissions by role. Locked cells cannot be changed here.</p>
+        {permissions.map((row) => (
+          <details key={row.permission} style={{ marginBottom: 12 }}>
+            <summary>
+              <strong>{row.permission.replace(/\./g, " · ")}</strong>
+            </summary>
+            <ul className="ro-te-list">
+              {row.cells.map((cell) => {
+                const key = `${row.permission}:${cell.role}`;
+                return (
+                  <li key={key}>
+                    <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={cell.enabled}
+                        disabled={!onAction || cell.locked || busyKey === key}
+                        onChange={(event) => {
+                          if (!onAction) return;
+                          const enabled = event.target.checked;
+                          const reason = window.prompt("Reason for this permission change (required):");
+                          if (!reason || reason.trim().length < 3) return;
+                          setBusyKey(key);
+                          void onAction("set_role_permission", {
+                            role: cell.role,
+                            permission: row.permission,
+                            enabled,
+                            reason
+                          })
+                            .then(onRefresh)
+                            .finally(() => setBusyKey(null));
+                        }}
+                      />
+                      {roleLabels[cell.role] ?? cell.role}
+                      {cell.locked ? <span className="ro-te-muted"> (locked)</span> : null}
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </details>
+        ))}
         <ul className="ro-te-list">
           {notes.map((line) => (
             <li key={line}>{line}</li>
@@ -419,19 +599,59 @@ export function PermissionsAdminBody({ data }: { data: Record<string, unknown> }
   );
 }
 
-export function AiPolicyAdminBody({ data }: { data: Record<string, unknown> }) {
+export function AiPolicyAdminBody({
+  data,
+  onAction,
+  onRefresh
+}: {
+  data: Record<string, unknown>;
+  onAction?: ActionHandler;
+  onRefresh?: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const lastTest = data.lastTest as { at?: string; result?: string } | null | undefined;
+  const statement = String(data.statement ?? "");
   return (
     <section className="ro-te-card ro-te-section">
       <h3 className="ro-te-section__title">AI moderation policy</h3>
-      <p className="ro-te-muted">
-        Gemini is {data.configured ? "configured" : "not configured"}. Bark Outs that automated rules cannot clear still route to human moderators.
-      </p>
+      <p className="ro-te-muted">{statement || "Bark Outs that automated rules cannot clear still route to human moderators."}</p>
+      <p className="ro-te-muted">Status: {String(data.status ?? (data.configured ? "configured" : "not_configured"))}</p>
+      {lastTest?.at ? (
+        <p className="ro-te-muted">
+          Last test: {new Date(lastTest.at).toLocaleString()} · {lastTest.result ?? "unknown"}
+        </p>
+      ) : null}
+      {onAction ? (
+        <button
+          type="button"
+          className="ro-te-btn ro-te-btn--primary"
+          disabled={busy || !data.configured}
+          style={{ marginTop: 8 }}
+          onClick={() => {
+            setBusy(true);
+            void onAction("test_ai_connection", {}).then(onRefresh).finally(() => setBusy(false));
+          }}
+        >
+          Test Gemini connection
+        </button>
+      ) : null}
     </section>
   );
 }
 
-export function RetentionAdminBody({ data }: { data: Record<string, unknown> }) {
+export function RetentionAdminBody({
+  data,
+  onAction,
+  onRefresh
+}: {
+  data: Record<string, unknown>;
+  onAction?: ActionHandler;
+  onRefresh?: () => void;
+}) {
   const preview = data.preview as Record<string, number> | undefined;
+  const [reason, setReason] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
   return (
     <div className="ro-te-stack">
       <p className="ro-te-callout">{String(data.schedule ?? "")}</p>
@@ -445,18 +665,74 @@ export function RetentionAdminBody({ data }: { data: Record<string, unknown> }) 
           ))}
         </div>
       ) : null}
+      {onAction ? (
+        <section className="ro-te-card ro-te-section">
+          <h3 className="ro-te-section__title">Run retention purge</h3>
+          <p className="ro-te-muted">Super Admins only. Deletes aged rejected, withdrawn, removed Bark Outs, closed feedback, and old audit entries per policy.</p>
+          <label className="ro-te-field">
+            Reason
+            <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Annual cleanup" />
+          </label>
+          <label className="ro-te-field">
+            Type PURGE to confirm
+            <input value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="off" />
+          </label>
+          <button
+            type="button"
+            className="ro-te-btn ro-te-btn--primary"
+            disabled={busy || confirm !== "PURGE" || reason.trim().length < 3}
+            onClick={() => {
+              setBusy(true);
+              void onAction("run_retention_purge", { confirmation: "PURGE", reason })
+                .then(onRefresh)
+                .finally(() => setBusy(false));
+            }}
+          >
+            Run purge now
+          </button>
+        </section>
+      ) : null}
     </div>
   );
 }
 
-export function FeatureControlsAdminBody({ data }: { data: Record<string, unknown> }) {
+export function FeatureControlsAdminBody({
+  data,
+  onAction,
+  onRefresh
+}: {
+  data: Record<string, unknown>;
+  onAction?: ActionHandler;
+  onRefresh?: () => void;
+}) {
   const features = (data.features as Array<{ key: string; label: string; enabled: boolean }>) ?? [];
+  const revision = Number(data.revision ?? 0);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   return (
     <ListSection title="Pack feature controls">
       <ul className="ro-te-list">
         {features.map((row) => (
           <li key={row.key}>
-            <strong>{row.label}</strong> — {row.enabled ? "Enabled" : "Disabled"}
+            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={row.enabled}
+                disabled={!onAction || busyKey === row.key}
+                onChange={(event) => {
+                  if (!onAction) return;
+                  const next = Object.fromEntries(features.map((feature) => [feature.key, feature.key === row.key ? event.target.checked : feature.enabled]));
+                  setBusyKey(row.key);
+                  void onAction("save_features", {
+                    value: next,
+                    revision,
+                    reason: `Toggle ${row.label}`
+                  })
+                    .then(onRefresh)
+                    .finally(() => setBusyKey(null));
+                }}
+              />
+              <strong>{row.label}</strong>
+            </label>
           </li>
         ))}
       </ul>

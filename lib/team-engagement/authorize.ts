@@ -233,10 +233,10 @@ async function loadManagedDepartments(db: EngagementDb, userId: string): Promise
     });
     return { departments: rows.map((row) => row.department_key), storageReady: true };
   } catch (error) {
-    if (error instanceof EngagementError && (error.code === "setup_required" || error.code === "storage_error")) {
+    if (error instanceof EngagementError) {
       return { departments: [], storageReady: false };
     }
-    throw error;
+    return { departments: [], storageReady: false };
   }
 }
 
@@ -272,7 +272,7 @@ export async function loadEngagementContext(
       managedDepartments: managed.departments,
       impersonated: Boolean(session.impersonatorEmail)
     });
-    return { ok: true, context: { session, supabase, db, actor, storageReady: storageReady || managed.storageReady } };
+    return { ok: true, context: { session, supabase, db, actor, storageReady } };
   } catch (error) {
     return { ok: false, response: engagementErrorResponse(error) };
   }
