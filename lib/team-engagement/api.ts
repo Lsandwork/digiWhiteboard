@@ -45,6 +45,7 @@ import {
   withdrawBarkOut
 } from "@/lib/team-engagement/bark-outs";
 import { canViewEmployee, requireFeature, scopeLabel, type ServiceContext } from "@/lib/team-engagement/context";
+import { analyticsIntelligence } from "@/lib/team-engagement/analytics-intelligence";
 import {
   analytics,
   auditHistory,
@@ -263,6 +264,7 @@ export async function runLeadershipView(ctx: ServiceContext, view: LeadershipVie
     case "programs":
       return listPrograms(ctx);
     case "analytics":
+      if (params.panel === "intelligence") return analyticsIntelligence(ctx, params);
       return analytics(ctx, params);
     case "reports":
       return reportsCatalog(ctx);

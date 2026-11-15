@@ -50,6 +50,7 @@ import type {
   NominationRow,
   ProgramRow
 } from "@/lib/team-engagement/types";
+import { renderTabularExport } from "@/lib/team-engagement/export-formats";
 import { pacificDateKey, pacificTodayKey } from "@/lib/user-interactions/pacific";
 
 const BARK_OUT_STAT_COLUMNS = [
@@ -1003,6 +1004,41 @@ export const EXPORT_TYPES = {
     label: "Audit history",
     description: "Who changed what, and when.",
     requires: ["engagement.export", "engagement.view_audit_logs"] as EngagementPermission[]
+  },
+  organization_engagement: {
+    label: "Organization engagement summary",
+    description: "Participation, response totals, and category counts for the selected dates.",
+    requires: ["engagement.export", "engagement.view_analytics"] as EngagementPermission[]
+  },
+  department_engagement: {
+    label: "Department engagement report",
+    description: "Participation and recognition by department.",
+    requires: ["engagement.export", "engagement.view_analytics"] as EngagementPermission[]
+  },
+  employee_engagement: {
+    label: "Individual employee engagement report",
+    description: "One teammate's original answers and Bark Outs. Pass userId.",
+    requires: ["engagement.export", "engagement.view_analytics"] as EngagementPermission[]
+  },
+  staff_answers: {
+    label: "Staff question and answer report",
+    description: "Original identified answers for the selected filters.",
+    requires: ["engagement.export", "engagement.view_analytics"] as EngagementPermission[]
+  },
+  bark_out_recognition: {
+    label: "Bark Out recognition report",
+    description: "Posted Bark Outs with the sender and recipient kept distinct.",
+    requires: ["engagement.export", "engagement.view_analytics"] as EngagementPermission[]
+  },
+  participation_report: {
+    label: "Participation report",
+    description: "Who participated, with department rates. Not a performance evaluation.",
+    requires: ["engagement.export", "engagement.view_analytics"] as EngagementPermission[]
+  },
+  monthly_management: {
+    label: "Monthly management report",
+    description: "Totals, insights, answers, and recognition for the selected dates.",
+    requires: ["engagement.export", "engagement.view_analytics"] as EngagementPermission[]
   }
 } as const;
 export type ExportType = keyof typeof EXPORT_TYPES;
@@ -1044,7 +1080,10 @@ function pacificStamp(iso: string | null) {
   return new Date(iso).toLocaleString("en-US", { timeZone: "America/Los_Angeles", dateStyle: "short", timeStyle: "short" });
 }
 
-export async function buildExport(ctx: ServiceContext, input: { type?: unknown; from?: unknown; to?: unknown; department?: unknown }) {
+export async function buildExport(
+  ctx: ServiceContext,
+  input: { type?: unknown; from?: unknown; to?: unknown; department?: unknown; format?: unknown; userId?: unknown; sections?: unknown }
+) {
   requireStorage(ctx);
   if (!isExportType(input.type)) throw validationError("Choose a report to export.");
   const type = input.type;
@@ -1178,6 +1217,19 @@ export async function buildExport(ctx: ServiceContext, input: { type?: unknown; 
       pacificStamp(row.completed_at),
       row.visibility === "shared_with_employee" ? "Yes" : "No"
     ]);
+  } else if (
+    type === "organization_engagement" ||
+    type === "department_engagement" ||
+    type === "employee_engagement" ||
+    type === "staff_answers" ||
+    type === "bark_out_recognition" ||
+    type === "participation_report" ||
+    type === "monthly_management"
+  ) {
+    const { engagementExportTable } = await import("@/lib/team-engagement/analytics-intelligence");
+    const table = await engagementExportTable(ctx, { ...input, type });
+    header = table.header;
+    rows = table.rows;
   } else if (type === "audit") {
     const data = await all<AuditEventRow>(ctx, "team_engagement_audit_events", {
       filters: [
@@ -1202,7 +1254,15 @@ export async function buildExport(ctx: ServiceContext, input: { type?: unknown; 
     ]);
   }
 
-  const filename = `ruffops-${type.replace(/_/g, "-")}-${range.from}-to-${range.to}.csv`;
+  const csv = toCsv(header, rows);
+  const rendered = renderTabularExport({
+    format: input.format,
+    baseName: `ruffops-${type.replace(/_/g, "-")}-${range.from}-to-${range.to}`,
+    title: EXPORT_TYPES[type].label,
+    header,
+    rows,
+    csv
+  });
   await ctx.db.commit([
     auditOp(ctx, {
       category: "export",
@@ -1211,10 +1271,10 @@ export async function buildExport(ctx: ServiceContext, input: { type?: unknown; 
       targetId: type,
       targetLabel: EXPORT_TYPES[type].label,
       scope: department ? departmentLabel(department) : scopeLabel(ctx.actor.scope),
-      next: { rows: rows.length, from: range.from, to: range.to }
+      next: { rows: rows.length, from: range.from, to: range.to, format: input.format ?? "csv" }
     })
   ]);
-  return { filename, csv: toCsv(header, rows), rowCount: rows.length };
+  return { filename: rendered.filename, csv, body: rendered.body, contentType: rendered.contentType, rowCount: rows.length };
 }
 
 // ---------------------------------------------------------------------------------------------
