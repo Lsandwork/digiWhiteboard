@@ -13,7 +13,7 @@ import {
   setAdminSessionCookie
 } from "@/lib/admin/session";
 import { touchAdminUserLogin } from "@/lib/admin/users";
-import { tryGetServiceSupabase } from "@/lib/supabase/server";
+import { getSupabaseServerConfigSummary, tryGetServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
@@ -47,8 +47,13 @@ export async function POST(request: Request) {
     const auth = await verifyAdminCredentials(username, password);
     if (!auth.ok) {
       if (auth.unavailable) {
+        const config = getSupabaseServerConfigSummary();
         return NextResponse.json(
-          { error: "Sign-in is temporarily unavailable. Please try again in a moment." },
+          {
+            error: "Sign-in is temporarily unavailable. Please try again in a moment.",
+            reason: config.hasProjectUrl && config.hasServiceRoleKey ? "admin_store_unavailable" : "supabase_not_configured",
+            config
+          },
           { status: 503 }
         );
       }

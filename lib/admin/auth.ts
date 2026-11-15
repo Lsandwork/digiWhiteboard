@@ -95,11 +95,15 @@ function resultFromDbUser(dbUser: AdminUserRecord, source: AdminAuthResult["sour
 }
 
 async function envPasswordMatches(password: string) {
-  const hash = process.env.ADMIN_PASSWORD_HASH?.trim();
-  if (hash) return bcrypt.compare(password, hash);
-  const legacyPassword = process.env.ADMIN_PASSWORD?.trim();
-  if (!legacyPassword) return false;
-  return safeEqual(password, legacyPassword);
+  try {
+    const hash = process.env.ADMIN_PASSWORD_HASH?.trim();
+    if (hash) return await bcrypt.compare(password, hash);
+    const legacyPassword = process.env.ADMIN_PASSWORD?.trim();
+    if (!legacyPassword) return false;
+    return safeEqual(password, legacyPassword);
+  } catch {
+    return false;
+  }
 }
 
 function pickLoginUser(users: AdminUserRecord[], normalized: string) {
@@ -113,12 +117,25 @@ function pickLoginUser(users: AdminUserRecord[], normalized: string) {
   );
 }
 
-async function lookupLoginUsers(emails: string[], timeoutMs = AUTH_QUERY_TIMEOUT_MS) {
+type LoginLookupResult =
+  | { ok: true; users: AdminUserRecord[] }
+  | { ok: false; reason: "unconfigured" | "timeout" | "store_error"; detail?: string };
+
+async function lookupLoginUsers(emails: string[], timeoutMs = AUTH_QUERY_TIMEOUT_MS): Promise<LoginLookupResult> {
   const supabase = authSupabase(timeoutMs);
   if (!supabase) {
-    throw new Error("Supabase client unavailable");
+    return { ok: false, reason: "unconfigured" };
   }
-  return withTimeout(findAdminUsersForLogin(supabase, emails), timeoutMs, "admin user lookup");
+  try {
+    const users = await withTimeout(findAdminUsersForLogin(supabase, emails), timeoutMs, "admin user lookup");
+    return { ok: true, users };
+  } catch (error) {
+    if (isAuthTimeout(error)) {
+      return { ok: false, reason: "timeout" };
+    }
+    const detail = error instanceof Error ? error.message : undefined;
+    return { ok: false, reason: "store_error", detail };
+  }
 }
 
 async function superAdminEnvFallback(username: string, password: string): Promise<AdminAuthResult | null> {
@@ -158,11 +175,9 @@ export async function verifyAdminCredentials(username: string, password: string)
   // Do not wait on settings/lookups before accepting a valid env password.
   if (envValid) {
     let superAdmin: AdminUserRecord | null = null;
-    try {
-      const users = await lookupLoginUsers([SUPER_ADMIN_EMAIL], ENV_ATTACH_TIMEOUT_MS);
-      superAdmin = pickLoginUser(users, SUPER_ADMIN_EMAIL);
-    } catch {
-      superAdmin = null;
+    const attach = await lookupLoginUsers([SUPER_ADMIN_EMAIL], ENV_ATTACH_TIMEOUT_MS);
+    if (attach.ok) {
+      superAdmin = pickLoginUser(attach.users, SUPER_ADMIN_EMAIL);
     }
     if (superAdmin) return resultFromDbUser(superAdmin, "env");
     return {
@@ -173,22 +188,19 @@ export async function verifyAdminCredentials(username: string, password: string)
     };
   }
 
-  try {
-    const users = await lookupLoginUsers(loginLookupEmails(normalized));
-    const dbUser = pickLoginUser(users, normalized);
-    if (dbUser && isDemoIdentity({ email: dbUser.email }) && !isDemoModeEnabled()) {
-      return { ok: false, email: normalized, source: "database" };
-    }
-    if (dbUser && (await verifyAdminUserPassword(dbUser, password))) {
-      return resultFromDbUser(dbUser, "database");
-    }
-  } catch (error) {
+  const lookup = await lookupLoginUsers(loginLookupEmails(normalized));
+  if (!lookup.ok) {
     const envFallback = await superAdminEnvFallback(normalized, password);
     if (envFallback) return envFallback;
-    if (isAuthTimeout(error)) {
-      return { ok: false, unavailable: true, email: normalized, source: "database" };
-    }
     return { ok: false, unavailable: true, email: normalized, source: "database" };
+  }
+
+  const dbUser = pickLoginUser(lookup.users, normalized);
+  if (dbUser && isDemoIdentity({ email: dbUser.email }) && !isDemoModeEnabled()) {
+    return { ok: false, email: normalized, source: "database" };
+  }
+  if (dbUser && (await verifyAdminUserPassword(dbUser, password))) {
+    return resultFromDbUser(dbUser, "database");
   }
 
   return { ok: false, email: normalized, source: "database" };
