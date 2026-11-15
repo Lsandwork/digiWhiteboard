@@ -1,18 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import AnalyticsIntelligenceDashboard from "@/components/admin/team-engagement/AnalyticsIntelligenceDashboard";
 import { FEEDBACK_STATUS_LABELS } from "@/lib/team-engagement/constants";
 
 type ActionHandler = (action: string, payload: Record<string, unknown>) => Promise<void>;
-
-function EmptyAnalytics({ detail }: { detail: string }) {
-  return (
-    <section className="ro-te-card ro-te-section">
-      <h3 className="ro-te-section__title">Engagement analytics</h3>
-      <p className="ro-te-muted">{detail}</p>
-    </section>
-  );
-}
 
 function ListSection({
   title,
@@ -33,45 +25,8 @@ function ListSection({
 }
 
 export function AnalyticsAdminBody({ data }: { data: Record<string, unknown> }) {
-  const totals = data.totals as Record<string, number> | undefined;
-  const participation = data.participation as { authors?: number; recipients?: number; team?: number } | undefined;
-  const range = data.range as { from?: string; to?: string } | undefined;
-  if (!totals) {
-    return (
-      <EmptyAnalytics
-        detail={String(data.error ?? "Analytics could not load. Apply Team Engagement migrations and refresh, or try another section.")}
-      />
-    );
-  }
-  return (
-    <div className="ro-te-stack">
-      <p className="ro-te-muted">
-        {range?.from && range?.to ? `${range.from} → ${range.to}` : "Selected period"} · Participation is not a performance ranking.
-      </p>
-      <div className="ro-te-stat-grid">
-        <div className="ro-te-card ro-te-stat">
-          <div className="ro-te-muted">Published Bark Outs</div>
-          <div className="ro-te-stat__value">{totals.published ?? 0}</div>
-        </div>
-        <div className="ro-te-card ro-te-stat">
-          <div className="ro-te-muted">Cross-department</div>
-          <div className="ro-te-stat__value">{totals.crossDepartment ?? 0}</div>
-        </div>
-        <div className="ro-te-card ro-te-stat">
-          <div className="ro-te-muted">Authors</div>
-          <div className="ro-te-stat__value">{participation?.authors ?? 0}</div>
-        </div>
-        <div className="ro-te-card ro-te-stat">
-          <div className="ro-te-muted">Recipients</div>
-          <div className="ro-te-stat__value">{participation?.recipients ?? 0}</div>
-        </div>
-        <div className="ro-te-card ro-te-stat">
-          <div className="ro-te-muted">Feedback items</div>
-          <div className="ro-te-stat__value">{totals.feedbackSubmitted ?? 0}</div>
-        </div>
-      </div>
-    </div>
-  );
+  const notice = typeof data.error === "string" ? data.error : null;
+  return <AnalyticsIntelligenceDashboard notice={notice} />;
 }
 
 export function FeedbackAdminBody({

@@ -126,9 +126,10 @@ export async function handleExport(request: Request, deps: EngagementHandlerDeps
 
   try {
     const result = await buildExport(deps.serviceContext(context), { ...paramsFromUrl(url), type });
-    return new Response(result.csv, {
+    const body = typeof result.body === "string" ? result.body : Uint8Array.from(result.body);
+    return new Response(body, {
       headers: {
-        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Type": result.contentType,
         "Content-Disposition": `attachment; filename="${result.filename}"`,
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff"
