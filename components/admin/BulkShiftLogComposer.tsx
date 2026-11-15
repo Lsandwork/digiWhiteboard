@@ -10,6 +10,7 @@ import {
   emptyBulkShiftLogRow,
   isBulkShiftLogRowEmpty,
   normalizeBulkShiftLogRows,
+  type BulkShiftLogPublishOptions,
   type BulkShiftLogRow,
   type NormalizedBulkShiftLogEntry
 } from "@/lib/staff/bulk-shift-log";
@@ -22,6 +23,7 @@ export function BulkShiftLogComposer({
   defaultLogType,
   defaultDepartment,
   submitLabel,
+  multiLogPublish,
   onSubmit
 }: {
   title: string;
@@ -31,18 +33,29 @@ export function BulkShiftLogComposer({
   defaultLogType: ShiftLogType;
   defaultDepartment: string;
   submitLabel: string;
-  onSubmit: (entries: NormalizedBulkShiftLogEntry[], defaults: {
-    log_type: ShiftLogType;
-    priority: StaffOpsPriority;
-    assigned_to: string;
-    department_area: string;
-  }) => Promise<void>;
+  multiLogPublish?: {
+    canOwnerFollowUp: boolean;
+    canActiveIssue: boolean;
+  };
+  onSubmit: (
+    entries: NormalizedBulkShiftLogEntry[],
+    defaults: {
+      log_type: ShiftLogType;
+      priority: StaffOpsPriority;
+      assigned_to: string;
+      department_area: string;
+    },
+    publish?: BulkShiftLogPublishOptions
+  ) => Promise<void>;
 }) {
   const [logType, setLogType] = useState<ShiftLogType>(defaultLogType);
   const [priority, setPriority] = useState<StaffOpsPriority>("Normal");
   const [assignedTo, setAssignedTo] = useState("");
   const [department, setDepartment] = useState(defaultDepartment);
   const [rows, setRows] = useState<BulkShiftLogRow[]>([emptyBulkShiftLogRow()]);
+  const [addToActiveIssues, setAddToActiveIssues] = useState(false);
+  const [addToOwnerFollowUp, setAddToOwnerFollowUp] = useState(false);
+  const showMultiLogPublish = Boolean(multiLogPublish);
 
   const assignmentNames = useMemo(
     () => [...new Set([...ASSIGNMENT_TEAMS, ...assignOptions])],
@@ -53,13 +66,27 @@ export function BulkShiftLogComposer({
   async function submitAll() {
     const entries = normalizeBulkShiftLogRows(rows);
     if (!entries.length) return;
-    await onSubmit(entries, {
-      log_type: logType,
-      priority,
-      assigned_to: assignedTo,
-      department_area: department
-    });
+    const publish: BulkShiftLogPublishOptions | undefined = showMultiLogPublish
+      ? {
+          create_active_issue: addToActiveIssues && Boolean(multiLogPublish?.canActiveIssue),
+          create_owner_follow_up: addToOwnerFollowUp && Boolean(multiLogPublish?.canOwnerFollowUp)
+        }
+      : undefined;
+    await onSubmit(
+      entries,
+      {
+        log_type: logType,
+        priority,
+        assigned_to: assignedTo,
+        department_area: department
+      },
+      publish
+    );
     setRows([emptyBulkShiftLogRow()]);
+    if (showMultiLogPublish) {
+      setAddToActiveIssues(false);
+      setAddToOwnerFollowUp(false);
+    }
   }
 
   return (
@@ -137,15 +164,55 @@ export function BulkShiftLogComposer({
             { key: "details", label: "Details", kind: "textarea", placeholder: "What the incoming staff needs to know", className: "bulk-entry-col--details" }
           ]}
           footer={
-            <button
-              type="button"
-              className="crossover-btn crossover-btn--primary"
-              disabled={busy || readyCount === 0}
-              onClick={() => void submitAll()}
-            >
-              <ClipboardList className="h-4 w-4" aria-hidden />
-              {busy ? "Saving…" : `${submitLabel}${readyCount ? ` (${readyCount})` : ""}`}
-            </button>
+            <div className="bulk-entry-composer__footer shift-log-publish-footer">
+              {showMultiLogPublish ? (
+                <div className="shift-log-publish-footer__checks" role="group" aria-label="Additional publishing destinations">
+                  <label
+                    className={`shift-log-publish-check ${!multiLogPublish?.canActiveIssue ? "shift-log-publish-check--disabled" : ""}`}
+                    title={
+                      multiLogPublish?.canActiveIssue
+                        ? undefined
+                        : "You do not have permission to publish to Active Issues."
+                    }
+                  >
+                    <input
+                      type="checkbox"
+                      className="shift-log-publish-check__input"
+                      checked={addToActiveIssues}
+                      disabled={busy || !multiLogPublish?.canActiveIssue}
+                      onChange={(event) => setAddToActiveIssues(event.target.checked)}
+                    />
+                    <span>Add to Active Issues</span>
+                  </label>
+                  <label
+                    className={`shift-log-publish-check ${!multiLogPublish?.canOwnerFollowUp ? "shift-log-publish-check--disabled" : ""}`}
+                    title={
+                      multiLogPublish?.canOwnerFollowUp
+                        ? undefined
+                        : "You do not have permission to publish to Owner Follow Up."
+                    }
+                  >
+                    <input
+                      type="checkbox"
+                      className="shift-log-publish-check__input"
+                      checked={addToOwnerFollowUp}
+                      disabled={busy || !multiLogPublish?.canOwnerFollowUp}
+                      onChange={(event) => setAddToOwnerFollowUp(event.target.checked)}
+                    />
+                    <span>Add to Owner Follow Up</span>
+                  </label>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                className="crossover-btn crossover-btn--primary shift-log-publish-footer__submit"
+                disabled={busy || readyCount === 0}
+                onClick={() => void submitAll()}
+              >
+                <ClipboardList className="h-4 w-4" aria-hidden />
+                {busy ? "Saving…" : `${submitLabel}${readyCount ? ` (${readyCount})` : ""}`}
+              </button>
+            </div>
           }
         />
       </div>

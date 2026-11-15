@@ -75,6 +75,13 @@ for (const role of ["owner_admin", "super_admin", "admin"] as const) {
   expectAllowed(role, "update_crossover", { assigned_to: "Sam" });
 }
 
+expectAllowed("front_desk_coordinator", "create_crossover_bulk", {
+  entries: [{ subject: "Handoff", details: "Note", create_owner_follow_up: true }]
+});
+expectDenied("groomer", "create_crossover_bulk", {
+  entries: [{ subject: "Handoff", details: "Note", create_active_issue: true }]
+});
+
 assert.equal(parseStaffOpsRevision({ staff_ops_revision: 12 }), 12);
 assert.equal(parseStaffOpsRevision({ staff_ops_revision: "7" }), 7);
 assert.equal(parseStaffOpsRevision({}), undefined);

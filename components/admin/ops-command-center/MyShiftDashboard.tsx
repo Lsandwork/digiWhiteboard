@@ -210,7 +210,8 @@ export function MyShiftDashboard({
   onNavigate,
   onRefresh,
   onWorkItemAction,
-  onSubmitShiftEntries
+  onSubmitShiftEntries,
+  multiLogPublish
 }: {
   data: OpsCommandCenterSnapshot;
   loading: boolean;
@@ -221,8 +222,13 @@ export function MyShiftDashboard({
   onWorkItemAction: (itemId: string, action: WorkItemAction, title?: string | null) => void;
   onSubmitShiftEntries: (
     entries: Parameters<typeof toCrossoverBulkPayload>[0],
-    defaults: Parameters<typeof toCrossoverBulkPayload>[1]
+    defaults: Parameters<typeof toCrossoverBulkPayload>[1],
+    publish?: Parameters<typeof toCrossoverBulkPayload>[2]
   ) => Promise<void>;
+  multiLogPublish?: {
+    canOwnerFollowUp: boolean;
+    canActiveIssue: boolean;
+  };
 }) {
   const [now, setNow] = useState(() => new Date(data.generatedAt || Date.now()));
 
@@ -666,6 +672,7 @@ export function MyShiftDashboard({
           defaultLogType={defaultLogTypeForDepartment(homeDepartment)}
           defaultDepartment={homeDepartment}
           submitLabel="Post to Team Log"
+          multiLogPublish={multiLogPublish}
           onSubmit={onSubmitShiftEntries}
         />
         {data.departmentHandoff?.shiftNotes?.length ? (
