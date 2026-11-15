@@ -80,7 +80,7 @@ export function OpsCommandCenterPanel({
     const cached = readPanelCache<OpsCommandCenterSnapshot>(cacheKey, MY_SHIFT_PANEL_CACHE_MS);
     return !(cached?.greetingName || cached?.shiftSummary);
   });
-  const [pollMs, setPollMs] = useState(60_000);
+  const [pollMs, setPollMs] = useState(mode === "my_shift" ? 30_000 : 60_000);
   const dataRef = useRef<OpsCommandCenterSnapshot | null>(data);
   const [query, setQuery] = useState("");
   const [dogHits, setDogHits] = useState<Array<OpsDog | BoardSearchHit>>([]);

@@ -45,6 +45,11 @@ export type TeamMemberCard = {
   role: string;
   department: string;
   status: "active" | "inactive";
+  /** Pacific-day first successful login (Team on Shift). */
+  firstLoginAt?: string | null;
+  lastLoginAt?: string | null;
+  loggedInToday?: boolean;
+  avatarUrl?: string | null;
 };
 
 export type CommandDashboard = {
@@ -54,7 +59,7 @@ export type CommandDashboard = {
   timeline: TimelineItem[];
   issues: IssueSummary;
   team: TeamMemberCard[];
-  teamSource: "directory";
+  teamSource: "directory" | "login";
   locationTracking: "unavailable";
 };
 
@@ -214,6 +219,7 @@ export function buildCommandDashboard(input: {
   sources: SourceStatus[];
   actions: CommandAction[];
   now: number;
+  team?: TeamMemberCard[];
 }): CommandDashboard {
   const { floor } = input;
   const taxiOnSite = floor.onSite.filter(serviceMentionsTaxi).length;
@@ -273,8 +279,8 @@ export function buildCommandDashboard(input: {
     ],
     timeline: buildOperationsTimeline(floor),
     issues: buildIssueSummary(input.issues, input.now),
-    team: buildTeamRoster(input.directory),
-    teamSource: "directory",
+    team: input.team ?? buildTeamRoster(input.directory),
+    teamSource: input.team ? "login" : "directory",
     locationTracking: "unavailable"
   };
 }

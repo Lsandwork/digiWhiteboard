@@ -57,7 +57,9 @@ import {
   type MyShiftFacilityFeed
 } from "@/lib/ops-command-center/my-shift-facility-feed";
 import { loadLiveFloor, type LiveFloor } from "@/lib/ops-command-center/live-floor";
-import { buildTeamRoster, type TeamMemberCard } from "@/lib/ops-command-center/command-dashboard";
+import { type TeamMemberCard } from "@/lib/ops-command-center/command-dashboard";
+import { loadTeamOnShiftCards } from "@/lib/ops-command-center/team-on-shift";
+import { pacificTodayKey } from "@/lib/user-interactions/pacific";
 import type { CrossoverMessage, StaffDirectoryMember } from "@/lib/staff/admin-ops";
 
 export type NeedsAttentionItem = {
@@ -157,8 +159,13 @@ export type OpsCommandCenterSnapshot = {
     classesToday: number;
     groomingAppts: number;
   };
-  /** Active staff-directory members shown on My Shift Team on Shift. */
+  /** Staff who successfully logged in today (Pacific business date). */
   teamOnShift: TeamMemberCard[];
+  teamOnShiftBusinessDate?: string;
+  viewerShiftLogin?: {
+    businessDate: string;
+    firstLoginAt: string | null;
+  };
 };
 
 /** Account-type labels must never appear in "Good evening, …" — use the person's name. */
@@ -398,6 +405,8 @@ export function emptyOpsCommandCenterSnapshot(input: {
     departmentHandoff: { department: null, previousName: null, shiftNotes: [], assignOptions: [] },
     facilityPulse: { dogsToday: 0, boardingStays: 0, taxiRuns: 0, classesToday: 0, groomingAppts: 0 },
     teamOnShift: [],
+    teamOnShiftBusinessDate: pacificTodayKey(),
+    viewerShiftLogin: { businessDate: pacificTodayKey(), firstLoginAt: null },
     stale: false,
     pending: true
   };
@@ -792,6 +801,18 @@ export async function buildOpsCommandCenterSnapshot(input: {
     }
   }
 
+  const teamShift = await withTimeoutFallback(
+    loadTeamOnShiftCards(supabase, staffFeed.staffDirectory || [], {
+      viewerAdminUserId: input.adminUserId
+    }),
+    OPS_SNAPSHOT_TIMEOUT_MS,
+    {
+      businessDate: pacificTodayKey(),
+      team: [] as TeamMemberCard[],
+      viewer: { businessDate: pacificTodayKey(), firstLoginAt: null }
+    }
+  );
+
   return {
     greetingName: greetingNameFromEmail(input.email, input.displayName),
     roleKey: input.roleKey,
@@ -864,7 +885,9 @@ export async function buildOpsCommandCenterSnapshot(input: {
       dogsOnFloor,
       groomerDashboard ? additionalServicesFeed.services.length : 0
     ),
-    teamOnShift: buildTeamRoster(staffFeed.staffDirectory || [])
+    teamOnShift: teamShift.team,
+    teamOnShiftBusinessDate: teamShift.businessDate,
+    viewerShiftLogin: teamShift.viewer
   };
 }
 
