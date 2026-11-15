@@ -1,8 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import AnalyticsIntelligenceDashboard from "@/components/admin/team-engagement/AnalyticsIntelligenceDashboard";
-import { FEEDBACK_STATUS_LABELS } from "@/lib/team-engagement/constants";
+import {
+  EngagementDataTable,
+  EngagementPremiumSection,
+  EngagementStatusPill,
+  EngagementToolbar
+} from "@/components/admin/team-engagement/EngagementAdminChrome";
+import {
+  DEVELOPMENT_RECORD_TYPE_LABELS,
+  DEVELOPMENT_RECORD_TYPES,
+  DEVELOPMENT_STATUS_LABELS,
+  DEVELOPMENT_STATUSES,
+  FEEDBACK_STATUS_LABELS,
+  PROGRAM_CADENCES,
+  PROGRAM_STATUSES,
+  PROGRAM_TYPE_LABELS,
+  PROGRAM_TYPES
+} from "@/lib/team-engagement/constants";
 
 type ActionHandler = (action: string, payload: Record<string, unknown>) => Promise<void>;
 
@@ -16,11 +32,10 @@ function ListSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="ro-te-card ro-te-section">
-      <h3 className="ro-te-section__title">{title}</h3>
+    <EngagementPremiumSection title={title}>
       {empty ? <p className="ro-te-muted">{empty}</p> : null}
-      {children}
-    </section>
+      {!empty ? children : null}
+    </EngagementPremiumSection>
   );
 }
 
@@ -39,14 +54,54 @@ export function FeedbackAdminBody({
   onRefresh?: () => void;
 }) {
   const items = (data.items as Array<Record<string, unknown>>) ?? [];
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return items.filter((row) => {
+      const status = String(row.status ?? "submitted");
+      if (statusFilter !== "all" && status !== statusFilter) return false;
+      if (!q) return true;
+      const hay = `${row.subject ?? ""} ${row.message ?? row.body ?? ""} ${row.submitterName ?? ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [items, query, statusFilter]);
+
   return (
-    <ListSection title="Team feedback & suggestions" empty={items.length ? undefined : "No feedback in your scope yet."}>
-      <ul className="ro-te-list">
-        {items.map((row) => (
-          <FeedbackRow key={String(row.id)} row={row} onAction={onAction} onRefresh={onRefresh} />
-        ))}
-      </ul>
-    </ListSection>
+    <EngagementPremiumSection title="Team feedback & suggestions" description="Respond to suggestions and mark items resolved — updates sync to the employee feedback view.">
+      <EngagementToolbar>
+        <input
+          className="ro-te-input"
+          placeholder="Search subject, message, or teammate…"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          aria-label="Search feedback"
+        />
+        <select className="ro-te-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filter by status">
+          <option value="all">All statuses</option>
+          {Object.entries(FEEDBACK_STATUS_LABELS).map(([key, label]) => (
+            <option key={key} value={key}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <span className="ro-te-muted" style={{ fontSize: 12 }}>
+          {filtered.length} shown
+        </span>
+      </EngagementToolbar>
+      {filtered.length ? (
+        <ul className="ro-te-list">
+          {filtered.map((row) => (
+            <FeedbackRow key={String(row.id)} row={row} onAction={onAction} onRefresh={onRefresh} />
+          ))}
+        </ul>
+      ) : (
+        <div className="ro-ai-empty">
+          <h3>{items.length ? "No matches" : "No feedback in your scope yet"}</h3>
+          <p>{items.length ? "Try another search or status filter." : "When teammates submit suggestions they appear here."}</p>
+        </div>
+      )}
+    </EngagementPremiumSection>
   );
 }
 
@@ -60,16 +115,19 @@ function FeedbackRow({
   onRefresh?: () => void;
 }) {
   const [response, setResponse] = useState("");
+  const [resolution, setResolution] = useState("Thanks — we implemented this.");
+  const [resolveOpen, setResolveOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const id = String(row.id);
+  const status = FEEDBACK_STATUS_LABELS[row.status as keyof typeof FEEDBACK_STATUS_LABELS] ?? String(row.status ?? "open");
   return (
     <li className="ro-te-list__item">
-      <strong>{String(row.subject ?? "Suggestion")}</strong>
-      <span className="ro-te-muted">
-        {" "}
-        · {FEEDBACK_STATUS_LABELS[row.status as keyof typeof FEEDBACK_STATUS_LABELS] ?? row.status} · {String(row.submitterName ?? "")}
-      </span>
-      <p>{String(row.message ?? row.body ?? "")}</p>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <strong>{String(row.subject ?? "Suggestion")}</strong>
+        <EngagementStatusPill status={status} />
+        <span className="ro-te-muted">· {String(row.submitterName ?? "")}</span>
+      </div>
+      <p style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>{String(row.message ?? row.body ?? "")}</p>
       {onAction ? (
         <div className="ro-te-stack" style={{ marginTop: 8 }}>
           <textarea
@@ -100,18 +158,35 @@ function FeedbackRow({
               type="button"
               className="ro-te-btn ro-te-btn--ghost"
               disabled={busy}
-              onClick={() => {
-                const resolution = window.prompt("Outcome message for the teammate:", "Thanks — we are reviewing this.");
-                if (!resolution || resolution.length < 5) return;
-                setBusy(true);
-                void onAction("update_feedback", { id, status: "resolved", resolution })
-                  .then(onRefresh)
-                  .finally(() => setBusy(false));
-              }}
+              onClick={() => setResolveOpen((open) => !open)}
             >
-              Mark resolved
+              {resolveOpen ? "Cancel resolve" : "Mark resolved"}
             </button>
           </div>
+          {resolveOpen ? (
+            <div className="ro-te-stack">
+              <label className="ro-te-field">
+                Resolution message (shown to the teammate)
+                <textarea value={resolution} rows={2} maxLength={2000} onChange={(event) => setResolution(event.target.value)} />
+              </label>
+              <button
+                type="button"
+                className="ro-te-btn ro-te-btn--primary"
+                disabled={busy || resolution.trim().length < 5}
+                onClick={() => {
+                  setBusy(true);
+                  void onAction("update_feedback", { id, status: "resolved", resolution: resolution.trim() })
+                    .then(() => {
+                      setResolveOpen(false);
+                      onRefresh?.();
+                    })
+                    .finally(() => setBusy(false));
+                }}
+              >
+                Confirm resolved
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </li>
@@ -130,86 +205,535 @@ export function AnnouncementsAdminBody({
   const items = (data.items as Array<Record<string, unknown>>) ?? [];
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [query, setQuery] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [postBusy, setPostBusy] = useState(false);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((row) => {
+      const hay = `${row.title ?? ""} ${row.body ?? ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [items, query]);
+
   return (
     <div className="ro-te-stack">
-      <section className="ro-te-card ro-te-section">
-        <h3 className="ro-te-section__title">Post announcement</h3>
+      <EngagementPremiumSection
+        title="Post announcement"
+        description="Published announcements appear in Pack home and engagement surfaces for the selected audience."
+      >
         <label className="ro-te-field">
           Title
-          <input value={title} onChange={(e) => setTitle(e.target.value)} />
+          <input value={title} disabled={postBusy} onChange={(e) => setTitle(e.target.value)} />
         </label>
         <label className="ro-te-field">
           Message
-          <textarea value={body} rows={4} onChange={(e) => setBody(e.target.value)} />
+          <textarea value={body} rows={4} disabled={postBusy} onChange={(e) => setBody(e.target.value)} />
         </label>
         <button
           type="button"
           className="ro-te-btn ro-te-btn--primary"
-          onClick={() => void onAction("create_announcement", { title, body }).then(onRefresh)}
+          disabled={postBusy || title.trim().length < 3 || body.trim().length < 5}
+          onClick={() => {
+            setPostBusy(true);
+            void onAction("create_announcement", { title: title.trim(), body: body.trim() })
+              .then(() => {
+                setTitle("");
+                setBody("");
+                onRefresh();
+              })
+              .finally(() => setPostBusy(false));
+          }}
         >
-          Publish
+          {postBusy ? "Publishing…" : "Publish"}
         </button>
-      </section>
-      <ListSection title="Recent announcements" empty={items.length ? undefined : "No announcements yet."}>
-        <ul className="ro-te-list">
-          {items.map((row) => (
-            <li key={String(row.id)} className="ro-te-list__item">
-              <strong>{String(row.title)}</strong>
-              <p>{String(row.body)}</p>
-            </li>
-          ))}
-        </ul>
-      </ListSection>
+      </EngagementPremiumSection>
+      <EngagementPremiumSection title="Announcements library">
+        <EngagementToolbar>
+          <input
+            className="ro-te-input"
+            placeholder="Search title or message…"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            aria-label="Search announcements"
+          />
+          <span className="ro-te-muted" style={{ fontSize: 12 }}>
+            {filtered.length} shown
+          </span>
+        </EngagementToolbar>
+        <EngagementDataTable
+          emptyTitle="No announcements yet"
+          emptyBody="Publish an announcement above — it will appear here and in Team Engagement for staff."
+          columns={[
+            { key: "title", label: "Title" },
+            { key: "status", label: "Status" },
+            { key: "published", label: "Published" },
+            { key: "author", label: "Author" },
+            { key: "actions", label: "" }
+          ]}
+          rows={filtered.map((row) => {
+            const id = String(row.id);
+            const status = String(row.status ?? "published");
+            return {
+              id,
+              cells: {
+                title: (
+                  <div>
+                    <strong>{String(row.title)}</strong>
+                    <div className="ro-ai-answer" style={{ marginTop: 4 }}>
+                      {String(row.body ?? "")}
+                    </div>
+                  </div>
+                ),
+                status: <EngagementStatusPill status={status} />,
+                published: formatPacificDateTime(row.publishedAt ?? row.published_at ?? row.created_at),
+                author: String(row.authorName ?? row.created_by_name ?? "—"),
+                actions: (
+                  <button
+                    type="button"
+                    className="ro-te-btn ro-te-btn--ghost"
+                    disabled={busyId === id || status === "archived"}
+                    onClick={() => {
+                      if (!window.confirm("Archive this announcement? It will stop showing to staff.")) return;
+                      setBusyId(id);
+                      void onAction("archive_announcement", { id })
+                        .then(onRefresh)
+                        .finally(() => setBusyId(null));
+                    }}
+                  >
+                    Archive
+                  </button>
+                )
+              }
+            };
+          })}
+        />
+      </EngagementPremiumSection>
     </div>
   );
 }
 
-export function ProgramsAdminBody({ data }: { data: Record<string, unknown> }) {
+function formatPacificDateTime(value: unknown) {
+  if (!value || typeof value !== "string") return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("en-US", {
+    timeZone: "America/Los_Angeles",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+export function ProgramsAdminBody({
+  data,
+  onAction,
+  onRefresh
+}: {
+  data: Record<string, unknown>;
+  onAction?: ActionHandler;
+  onRefresh?: () => void;
+}) {
   const programs = (data.programs as Array<Record<string, unknown>>) ?? (data.items as Array<Record<string, unknown>>) ?? [];
   const nominations = (data.nominations as Array<Record<string, unknown>>) ?? [];
+  const [name, setName] = useState("");
+  const [programType, setProgramType] = useState<string>(PROGRAM_TYPES[0]);
+  const [cadence, setCadence] = useState<string>(PROGRAM_CADENCES[0]);
+  const [description, setDescription] = useState("");
+  const [createBusy, setCreateBusy] = useState(false);
+  const [progQuery, setProgQuery] = useState("");
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editStatus, setEditStatus] = useState<string>(PROGRAM_STATUSES[0]);
+  const [editBusy, setEditBusy] = useState(false);
+  const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({});
+  const [nomBusy, setNomBusy] = useState<string | null>(null);
+
+  const filteredPrograms = useMemo(() => {
+    const q = progQuery.trim().toLowerCase();
+    if (!q) return programs;
+    return programs.filter((row) => `${row.name ?? ""} ${row.description ?? ""}`.toLowerCase().includes(q));
+  }, [programs, progQuery]);
+
+  const openNominations = nominations.filter((row) => row.status === "submitted" || row.status === "under_review");
+
   return (
     <div className="ro-te-stack">
-      <ListSection title="Recognition programs" empty={programs.length ? undefined : "No programs configured."}>
-        <ul className="ro-te-list">
-          {programs.map((row) => (
-            <li key={String(row.id)} className="ro-te-list__item">
-              <strong>{String(row.title ?? row.name)}</strong>
-              <span className="ro-te-muted"> · {String(row.status ?? "")}</span>
-            </li>
-          ))}
-        </ul>
-      </ListSection>
-      <ListSection title="Open nominations" empty={nominations.length ? undefined : "No open nominations."}>
-        <ul className="ro-te-list">
-          {nominations.map((row) => (
-            <li key={String(row.id)} className="ro-te-list__item">
-              <strong>{String(row.nomineeName ?? row.nominee_name)}</strong>
-              <span className="ro-te-muted"> · {String(row.programTitle ?? "")}</span>
-            </li>
-          ))}
-        </ul>
-      </ListSection>
+      {onAction ? (
+        <EngagementPremiumSection title="Create recognition program" description="Programs power nominations and recognition cycles in Team Engagement.">
+          <div className="ro-te-form">
+            <label className="ro-te-field">
+              Program name
+              <input value={name} onChange={(e) => setName(e.target.value)} disabled={createBusy} placeholder="Outstanding teamwork" />
+            </label>
+            <label className="ro-te-field">
+              Type
+              <select className="ro-te-select" value={programType} disabled={createBusy} onChange={(e) => setProgramType(e.target.value)}>
+                {PROGRAM_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {PROGRAM_TYPE_LABELS[type]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="ro-te-field">
+              Cadence
+              <select className="ro-te-select" value={cadence} disabled={createBusy} onChange={(e) => setCadence(e.target.value)}>
+                {PROGRAM_CADENCES.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="ro-te-field">
+              Description (optional)
+              <textarea value={description} rows={2} disabled={createBusy} onChange={(e) => setDescription(e.target.value)} />
+            </label>
+            <button
+              type="button"
+              className="ro-te-btn ro-te-btn--primary"
+              disabled={createBusy || name.trim().length < 3}
+              onClick={() => {
+                setCreateBusy(true);
+                void onAction("save_program", {
+                  name: name.trim(),
+                  programType,
+                  cadence,
+                  description: description.trim() || undefined,
+                  status: "active",
+                  nominationsOpen: true
+                })
+                  .then(() => {
+                    setName("");
+                    setDescription("");
+                    onRefresh?.();
+                  })
+                  .finally(() => setCreateBusy(false));
+              }}
+            >
+              {createBusy ? "Saving…" : "Create program"}
+            </button>
+          </div>
+        </EngagementPremiumSection>
+      ) : null}
+      <EngagementPremiumSection title="Recognition programs">
+        <EngagementToolbar>
+          <input
+            className="ro-te-input"
+            placeholder="Search programs…"
+            value={progQuery}
+            onChange={(event) => setProgQuery(event.target.value)}
+            aria-label="Search programs"
+          />
+        </EngagementToolbar>
+        <EngagementDataTable
+          emptyTitle="No programs configured"
+          emptyBody="Create a program above to open nominations for your team."
+          columns={[
+            { key: "name", label: "Program" },
+            { key: "type", label: "Type" },
+            { key: "status", label: "Status" },
+            { key: "cadence", label: "Cadence" },
+            { key: "actions", label: "" }
+          ]}
+          rows={filteredPrograms.map((row) => {
+            const id = String(row.id);
+            const editing = editId === id;
+            return {
+              id,
+              cells: {
+                name: editing ? (
+                  <input className="ro-te-input" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                ) : (
+                  <div>
+                    <strong>{String(row.name)}</strong>
+                    {row.description ? <div className="ro-ai-answer" style={{ marginTop: 4 }}>{String(row.description)}</div> : null}
+                  </div>
+                ),
+                type: String(row.typeLabel ?? PROGRAM_TYPE_LABELS[row.program_type as keyof typeof PROGRAM_TYPE_LABELS] ?? row.program_type),
+                status: editing ? (
+                  <select className="ro-te-select" value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
+                    {PROGRAM_STATUSES.map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <EngagementStatusPill status={String(row.status ?? "active")} />
+                ),
+                cadence: String(row.cadence ?? "—"),
+                actions:
+                  onAction && editing ? (
+                    <div className="ro-te-actions" style={{ margin: 0 }}>
+                      <button
+                        type="button"
+                        className="ro-te-btn ro-te-btn--primary"
+                        disabled={editBusy || editName.trim().length < 3}
+                        onClick={() => {
+                          setEditBusy(true);
+                          void onAction("save_program", {
+                            id,
+                            name: editName.trim(),
+                            programType: row.program_type,
+                            cadence: row.cadence,
+                            description: row.description,
+                            status: editStatus,
+                            nominationsOpen: row.nominations_open !== false
+                          })
+                            .then(() => {
+                              setEditId(null);
+                              onRefresh?.();
+                            })
+                            .finally(() => setEditBusy(false));
+                        }}
+                      >
+                        Save
+                      </button>
+                      <button type="button" className="ro-te-btn ro-te-btn--ghost" disabled={editBusy} onClick={() => setEditId(null)}>
+                        Cancel
+                      </button>
+                    </div>
+                  ) : onAction ? (
+                    <button
+                      type="button"
+                      className="ro-te-btn ro-te-btn--ghost"
+                      onClick={() => {
+                        setEditId(id);
+                        setEditName(String(row.name));
+                        setEditStatus(String(row.status ?? "active"));
+                      }}
+                    >
+                      Edit
+                    </button>
+                  ) : (
+                    "—"
+                  )
+              }
+            };
+          })}
+        />
+      </EngagementPremiumSection>
+      <EngagementPremiumSection title="Nominations queue" description="Decisions are recorded for audit — include a note when selecting or declining.">
+        <EngagementDataTable
+          emptyTitle="No nominations in queue"
+          emptyBody="When teammates nominate colleagues, pending items show here."
+          columns={[
+            { key: "nominee", label: "Nominee" },
+            { key: "period", label: "Period" },
+            { key: "status", label: "Status" },
+            { key: "reason", label: "Reason" },
+            { key: "actions", label: "" }
+          ]}
+          rows={openNominations.map((row) => {
+            const id = String(row.id);
+            const note = decisionNotes[id] ?? "";
+            const canDecide = row.canDecide === true && onAction;
+            return {
+              id,
+              cells: {
+                nominee: String(row.nominee_name ?? row.nomineeName),
+                period: String(row.period_label ?? row.periodLabel ?? "—"),
+                status: <EngagementStatusPill status={String(row.status)} />,
+                reason: <span style={{ whiteSpace: "pre-wrap" }}>{String(row.reason ?? row.nomination_reason ?? "—")}</span>,
+                actions: canDecide ? (
+                  <div className="ro-te-stack" style={{ gap: 6, minWidth: 220 }}>
+                    <textarea
+                      rows={2}
+                      placeholder="Decision note (required for select/decline)"
+                      value={note}
+                      onChange={(event) => setDecisionNotes((prev) => ({ ...prev, [id]: event.target.value }))}
+                    />
+                    <div className="ro-te-actions" style={{ margin: 0 }}>
+                      <button
+                        type="button"
+                        className="ro-te-btn ro-te-btn--primary"
+                        disabled={nomBusy === id || note.trim().length < 10}
+                        onClick={() => {
+                          setNomBusy(id);
+                          void onAction!("decide_nomination", { id, decision: "selected", note: note.trim() })
+                            .then(onRefresh)
+                            .finally(() => setNomBusy(null));
+                        }}
+                      >
+                        Select
+                      </button>
+                      <button
+                        type="button"
+                        className="ro-te-btn ro-te-btn--ghost"
+                        disabled={nomBusy === id || note.trim().length < 10}
+                        onClick={() => {
+                          setNomBusy(id);
+                          void onAction!("decide_nomination", { id, decision: "not_selected", note: note.trim() })
+                            .then(onRefresh)
+                            .finally(() => setNomBusy(null));
+                        }}
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <span className="ro-te-muted" style={{ fontSize: 12 }}>
+                    {row.canDecide === false ? "Awaiting another leader" : "—"}
+                  </span>
+                )
+              }
+            };
+          })}
+        />
+      </EngagementPremiumSection>
     </div>
   );
 }
 
-export function DevelopmentAdminBody({ data }: { data: Record<string, unknown> }) {
+export function DevelopmentAdminBody({
+  data,
+  onAction,
+  onRefresh
+}: {
+  data: Record<string, unknown>;
+  onAction?: ActionHandler;
+  onRefresh?: () => void;
+}) {
   const items = (data.items as Array<Record<string, unknown>>) ?? [];
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editStatus, setEditStatus] = useState<string>(DEVELOPMENT_STATUSES[1]);
+  const [editDetails, setEditDetails] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return items.filter((row) => {
+      const status = String(row.status ?? "in_progress");
+      if (statusFilter !== "all" && status !== statusFilter) return false;
+      if (!q) return true;
+      const hay = `${row.employee_name ?? ""} ${row.title ?? ""} ${row.details ?? ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [items, query, statusFilter]);
+
   return (
-    <ListSection title="Employee development" empty={items.length ? undefined : "No development records in this view."}>
-      <ul className="ro-te-list">
-        {items.map((row) => (
-          <li key={String(row.id)} className="ro-te-list__item">
-            <strong>{String(row.employeeName ?? row.employee_name)}</strong>
-            <span className="ro-te-muted">
-              {" "}
-              · {String(row.recordType ?? row.record_type)} · {String(row.status)}
-            </span>
-            <p>{String(row.title ?? row.summary ?? "")}</p>
-          </li>
-        ))}
-      </ul>
-    </ListSection>
+    <EngagementPremiumSection title="Employee development" description="Growth records sync to leadership views and employee development surfaces when shared.">
+      <EngagementToolbar>
+        <input
+          className="ro-te-input"
+          placeholder="Search teammate or title…"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          aria-label="Search development records"
+        />
+        <select className="ro-te-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filter by status">
+          <option value="all">All statuses</option>
+          {DEVELOPMENT_STATUSES.map((status) => (
+            <option key={status} value={status}>
+              {DEVELOPMENT_STATUS_LABELS[status]}
+            </option>
+          ))}
+        </select>
+      </EngagementToolbar>
+      <EngagementDataTable
+        emptyTitle="No development records"
+        emptyBody="Records you create for teammates in your scope appear here."
+        columns={[
+          { key: "employee", label: "Teammate" },
+          { key: "type", label: "Type" },
+          { key: "title", label: "Title" },
+          { key: "status", label: "Status" },
+          { key: "updated", label: "Updated" },
+          { key: "actions", label: "" }
+        ]}
+        rows={filtered.map((row) => {
+          const id = String(row.id);
+          const editing = editId === id;
+          const recordType = String(row.record_type ?? row.recordType ?? "growth_note");
+          return {
+            id,
+            cells: {
+              employee: String(row.employee_name ?? row.employeeName),
+              type: DEVELOPMENT_RECORD_TYPE_LABELS[recordType as keyof typeof DEVELOPMENT_RECORD_TYPE_LABELS] ?? recordType,
+              title: editing ? (
+                <div className="ro-te-stack" style={{ gap: 6 }}>
+                  <input className="ro-te-input" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+                  <textarea rows={2} value={editDetails} placeholder="Details" onChange={(e) => setEditDetails(e.target.value)} />
+                </div>
+              ) : (
+                <div>
+                  <strong>{String(row.title)}</strong>
+                  {row.details ? <div className="ro-ai-answer" style={{ marginTop: 4 }}>{String(row.details)}</div> : null}
+                </div>
+              ),
+              status: editing ? (
+                <select className="ro-te-select" value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
+                  {DEVELOPMENT_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {DEVELOPMENT_STATUS_LABELS[status]}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <EngagementStatusPill status={String(row.status)} />
+              ),
+              updated: formatPacificDateTime(row.updated_at ?? row.updatedAt),
+              actions:
+                onAction && editing ? (
+                  <div className="ro-te-actions" style={{ margin: 0 }}>
+                    <button
+                      type="button"
+                      className="ro-te-btn ro-te-btn--primary"
+                      disabled={busy || editTitle.trim().length < 2}
+                      onClick={() => {
+                        setBusy(true);
+                        void onAction("save_development_record", {
+                          id,
+                          recordType,
+                          status: editStatus,
+                          title: editTitle.trim(),
+                          details: editDetails.trim() || undefined,
+                          visibility: row.visibility ?? "leadership"
+                        })
+                          .then(() => {
+                            setEditId(null);
+                            onRefresh?.();
+                          })
+                          .finally(() => setBusy(false));
+                      }}
+                    >
+                      Save
+                    </button>
+                    <button type="button" className="ro-te-btn ro-te-btn--ghost" disabled={busy} onClick={() => setEditId(null)}>
+                      Cancel
+                    </button>
+                  </div>
+                ) : onAction ? (
+                  <button
+                    type="button"
+                    className="ro-te-btn ro-te-btn--ghost"
+                    onClick={() => {
+                      setEditId(id);
+                      setEditTitle(String(row.title ?? ""));
+                      setEditStatus(String(row.status ?? "in_progress"));
+                      setEditDetails(String(row.details ?? ""));
+                    }}
+                  >
+                    Edit
+                  </button>
+                ) : (
+                  "—"
+                )
+            }
+          };
+        })}
+      />
+    </EngagementPremiumSection>
   );
 }
 
@@ -248,22 +772,117 @@ export function WorkloadAdminBody({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-export function DepartmentsAdminBody({ data }: { data: Record<string, unknown> }) {
+export function DepartmentsAdminBody({
+  data,
+  onAction,
+  onRefresh
+}: {
+  data: Record<string, unknown>;
+  onAction?: ActionHandler;
+  onRefresh?: () => void;
+}) {
   const items = (data.items as Array<Record<string, unknown>>) ?? [];
+  const canManage = data.canManage === true;
+  const [editKey, setEditKey] = useState<string | null>(null);
+  const [description, setDescription] = useState("");
+  const [recognitionEnabled, setRecognitionEnabled] = useState(true);
+  const [busy, setBusy] = useState(false);
+
   return (
-    <ListSection title="Departments" empty={items.length ? undefined : "No departments in scope."}>
-      <ul className="ro-te-list">
-        {items.map((row) => (
-          <li key={String(row.key)} className="ro-te-list__item">
-            <strong>{String(row.label)}</strong>
-            <span className="ro-te-muted"> · {String(row.headcount ?? row.memberCount ?? "—")} members</span>
-            {Array.isArray(row.managers) && row.managers.length ? (
-              <p className="ro-te-muted">Managers: {(row.managers as string[]).join(", ")}</p>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-    </ListSection>
+    <EngagementPremiumSection
+      title="Departments"
+      description="Department profiles control recognition settings and descriptions shown in engagement tools."
+    >
+      <EngagementDataTable
+        emptyTitle="No departments in scope"
+        emptyBody="Your role limits which department profiles you can view."
+        columns={[
+          { key: "label", label: "Department" },
+          { key: "headcount", label: "Team size" },
+          { key: "profile", label: "Profile" },
+          { key: "managers", label: "Managers" },
+          { key: "actions", label: "" }
+        ]}
+        rows={items.map((row) => {
+          const key = String(row.key);
+          const editing = editKey === key;
+          const managers = (row.managers as Array<{ name?: string }> | undefined) ?? [];
+          return {
+            id: key,
+            cells: {
+              label: (
+                <div>
+                  <strong>{String(row.label)}</strong>
+                  {row.operational === false ? <span className="ro-te-muted"> · non-operational</span> : null}
+                </div>
+              ),
+              headcount: String(row.headcount ?? "—"),
+              profile: editing ? (
+                <div className="ro-te-stack" style={{ gap: 6, minWidth: 220 }}>
+                  <textarea
+                    rows={2}
+                    value={description}
+                    placeholder="Department description for leaders…"
+                    onChange={(event) => setDescription(event.target.value)}
+                  />
+                  <label className="ro-te-check">
+                    <input type="checkbox" checked={recognitionEnabled} onChange={(event) => setRecognitionEnabled(event.target.checked)} />
+                    Recognition enabled
+                  </label>
+                </div>
+              ) : (
+                <div>
+                  <EngagementStatusPill status={row.recognitionEnabled === false ? "paused" : "active"} />
+                  {row.description ? <div className="ro-ai-answer" style={{ marginTop: 4 }}>{String(row.description)}</div> : <span className="ro-te-muted"> No description</span>}
+                </div>
+              ),
+              managers:
+                managers.length > 0
+                  ? managers.map((manager) => manager.name ?? "Manager").join(", ")
+                  : "—",
+              actions:
+                canManage && onAction && editing ? (
+                  <div className="ro-te-actions" style={{ margin: 0 }}>
+                    <button
+                      type="button"
+                      className="ro-te-btn ro-te-btn--primary"
+                      disabled={busy}
+                      onClick={() => {
+                        setBusy(true);
+                        void onAction("save_department", { key, description: description.trim() || undefined, recognitionEnabled })
+                          .then(() => {
+                            setEditKey(null);
+                            onRefresh?.();
+                          })
+                          .finally(() => setBusy(false));
+                      }}
+                    >
+                      Save
+                    </button>
+                    <button type="button" className="ro-te-btn ro-te-btn--ghost" disabled={busy} onClick={() => setEditKey(null)}>
+                      Cancel
+                    </button>
+                  </div>
+                ) : canManage && onAction ? (
+                  <button
+                    type="button"
+                    className="ro-te-btn ro-te-btn--ghost"
+                    onClick={() => {
+                      setEditKey(key);
+                      setDescription(String(row.description ?? ""));
+                      setRecognitionEnabled(row.recognitionEnabled !== false);
+                    }}
+                  >
+                    Edit profile
+                  </button>
+                ) : (
+                  "—"
+                )
+            }
+          };
+        })}
+      />
+    </EngagementPremiumSection>
   );
 }
 
@@ -500,10 +1119,62 @@ export function PermissionsAdminBody({
     ((data.roles as Array<{ role: string; label: string }>) ?? []).map((row) => [row.role, row.label])
   );
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const [pendingEnabled, setPendingEnabled] = useState(false);
+  const [reason, setReason] = useState("");
+
   return (
     <div className="ro-te-stack">
-      <ListSection title="Role permissions">
-        <p className="ro-te-muted">Toggle Team Engagement permissions by role. Locked cells cannot be changed here.</p>
+      <EngagementPremiumSection title="Role permissions" description="Toggle Team Engagement permissions by role. Locked cells cannot be changed here.">
+        {pendingKey ? (
+          <div className="ro-te-banner ro-te-banner--warn" style={{ marginBottom: 12 }}>
+            <p style={{ margin: "0 0 8px" }}>
+              Confirm permission change for <strong>{pendingKey.split(":")[1]}</strong> — {pendingEnabled ? "enable" : "disable"}{" "}
+              <strong>{pendingKey.split(":")[0].replace(/\./g, " · ")}</strong>
+            </p>
+            <label className="ro-te-field">
+              Reason (required)
+              <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Quarterly access review" />
+            </label>
+            <div className="ro-te-actions">
+              <button
+                type="button"
+                className="ro-te-btn ro-te-btn--primary"
+                disabled={!onAction || busyKey === pendingKey || reason.trim().length < 3}
+                onClick={() => {
+                  if (!onAction || !pendingKey) return;
+                  const [permission, role] = pendingKey.split(":");
+                  setBusyKey(pendingKey);
+                  void onAction("set_role_permission", {
+                    role,
+                    permission,
+                    enabled: pendingEnabled,
+                    reason: reason.trim()
+                  })
+                    .then(() => {
+                      setPendingKey(null);
+                      setReason("");
+                      onRefresh?.();
+                    })
+                    .finally(() => setBusyKey(null));
+                }}
+              >
+                Confirm
+              </button>
+              <button
+                type="button"
+                className="ro-te-btn ro-te-btn--ghost"
+                disabled={busyKey === pendingKey}
+                onClick={() => {
+                  setPendingKey(null);
+                  setReason("");
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
         {permissions.map((row) => (
           <details key={row.permission} style={{ marginBottom: 12 }}>
             <summary>
@@ -518,21 +1189,12 @@ export function PermissionsAdminBody({
                       <input
                         type="checkbox"
                         checked={cell.enabled}
-                        disabled={!onAction || cell.locked || busyKey === key}
+                        disabled={!onAction || cell.locked || busyKey === key || Boolean(pendingKey)}
                         onChange={(event) => {
                           if (!onAction) return;
-                          const enabled = event.target.checked;
-                          const reason = window.prompt("Reason for this permission change (required):");
-                          if (!reason || reason.trim().length < 3) return;
-                          setBusyKey(key);
-                          void onAction("set_role_permission", {
-                            role: cell.role,
-                            permission: row.permission,
-                            enabled,
-                            reason
-                          })
-                            .then(onRefresh)
-                            .finally(() => setBusyKey(null));
+                          setPendingKey(key);
+                          setPendingEnabled(event.target.checked);
+                          setReason("");
                         }}
                       />
                       {roleLabels[cell.role] ?? cell.role}
@@ -549,7 +1211,7 @@ export function PermissionsAdminBody({
             <li key={line}>{line}</li>
           ))}
         </ul>
-      </ListSection>
+      </EngagementPremiumSection>
     </div>
   );
 }

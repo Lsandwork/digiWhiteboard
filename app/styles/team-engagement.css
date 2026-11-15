@@ -188,3 +188,114 @@
   .ro-ai-controls { justify-content: flex-start; }
   .ro-ai-donut { flex-direction: column; align-items: stretch; }
 }
+
+/* Manage Team Engagement — align non-analytics tabs with Analytics & Reporting polish */
+.ro-te-main.ro-te-main--premium {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.ro-te-main.ro-te-main--premium .ro-te-main__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ro-navy);
+  letter-spacing: -0.01em;
+}
+
+.ro-te-main.ro-te-main--premium .ro-te-card:not(.ro-ai-card) {
+  background: #fff;
+  border: 1px solid #d5e6ee;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(23, 50, 71, 0.04);
+}
+
+.ro-te-main.ro-te-main--premium .ro-te-stat-grid {
+  gap: 12px;
+}
+
+.ro-te-main.ro-te-main--premium .ro-te-stat {
+  border: 1px solid #d5e6ee;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(23, 50, 71, 0.04);
+  padding: 14px 16px;
+}
+
+.ro-te-main.ro-te-main--premium .ro-te-stat__value {
+  font-size: 1.55rem;
+  font-weight: 750;
+}
+
+.ro-te-main.ro-te-main--premium .ro-te-section__title {
+  color: var(--ro-navy);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ro-te-main.ro-te-main--premium .ro-te-table {
+  font-size: 13px;
+}
+
+.ro-te-main.ro-te-main--premium .ro-te-table th {
+  color: #5c7280;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ro-manage-intro {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.ro-manage-intro__title {
+  margin: 0 0 6px;
+  font-size: 1.35rem;
+  color: var(--ro-navy);
+  letter-spacing: -0.02em;
+}
+
+.ro-manage-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.ro-manage-toolbar .ro-te-input,
+.ro-manage-toolbar .ro-te-select {
+  min-width: 160px;
+}
+
+.ro-manage-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: capitalize;
+}
+
+.ro-manage-pill--good { background: #eaf6f0; color: #1f6f4a; }
+.ro-manage-pill--muted { background: #eef4f8; color: #4d6472; }
+.ro-manage-pill--neutral { background: #f2f4f7; color: #5c6670; }
+.ro-manage-pill--accent { background: #e8f6fc; color: var(--ro-blue-dark); }
+
+.ro-te-main.ro-te-main--premium .ro-te-list__item {
+  border-bottom-color: #e5eef3;
+  padding: 12px 2px;
+}
+
+.ro-te-shell.ro-te-shell--manage-header .ro-te-header {
+  margin-bottom: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #d5e6ee;
+}
