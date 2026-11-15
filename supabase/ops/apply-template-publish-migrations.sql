@@ -1,0 +1,13 @@
+-- Fun Zone template publish fix (run once in Supabase → SQL Editor)
+--
+-- Why: migration 111 added template tables, but team_engagement_commit only allows
+-- team_engagement_template_publications after migration 112. Without 112 you see:
+-- "Team Engagement commit is out of date for team_engagement_template_publications..."
+--
+-- Run this file in two steps if needed:
+--   1) Paste and run: supabase/migrations/112_team_engagement_commit_templates.sql
+--   2) Paste and run: supabase/migrations/113_team_engagement_template_grants.sql
+--
+-- Or from repo: npx tsx scripts/print-team-engagement-template-sql.ts | pbcopy
+--
+-- After running, use Settings → API → Reload in Supabase.
