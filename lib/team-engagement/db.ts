@@ -1,5 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { EngagementError, isMissingRelationError, mapDbError } from "@/lib/team-engagement/errors";
+import {
+  conflictError,
+  EngagementError,
+  isCommitAllowlistError,
+  isMissingRelationError,
+  mapDbError
+} from "@/lib/team-engagement/errors";
 import {
   ENGAGEMENT_TABLES,
   type DbFilter,
@@ -55,6 +61,75 @@ function toRpcOp(op: DbOp) {
     case "delete":
       return { op: "delete", table: op.table, match: op.match, expect_rows: op.expectRows ?? null };
   }
+}
+
+function assertExpectedRows(count: number, expectRows: number | undefined, table: EngagementTable) {
+  if (expectRows == null) return;
+  if (count !== expectRows) {
+    throw conflictError(`Operation on ${table} changed ${count} rows; expected ${expectRows}.`);
+  }
+}
+
+function applyMatch<T extends { eq: (col: string, val: unknown) => T }>(builder: T, match: Record<string, unknown>) {
+  let next = builder;
+  for (const [column, value] of Object.entries(match)) {
+    next = next.eq(column, value);
+  }
+  return next;
+}
+
+/**
+ * When migration 112 (or similar) is not applied, `team_engagement_commit` rejects new tables.
+ * Service role can still write via PostgREST — same security model as the commit function.
+ */
+export async function executeCommitOpsDirect(
+  supabase: SupabaseClient,
+  ops: DbOp[]
+): Promise<Record<string, unknown>[][]> {
+  const results: Record<string, unknown>[][] = [];
+  for (const op of ops) {
+    if (op.table === "team_engagement_audit_events" && op.op !== "insert") {
+      throw new EngagementError(403, "forbidden", "Team Engagement audit events are append-only.");
+    }
+    switch (op.op) {
+      case "insert": {
+        const { data, error } = await supabase.from(op.table).insert(op.values).select();
+        if (error) throw mapDbError(error);
+        results.push((data ?? []) as Record<string, unknown>[]);
+        break;
+      }
+      case "upsert": {
+        const { data, error } = await supabase
+          .from(op.table)
+          .upsert(op.values, { onConflict: op.conflict.join(",") })
+          .select();
+        if (error) throw mapDbError(error);
+        results.push((data ?? []) as Record<string, unknown>[]);
+        break;
+      }
+      case "update": {
+        const builder = applyMatch(supabase.from(op.table).update(op.set), op.match);
+        const { data, error } = await builder.select();
+        if (error) throw mapDbError(error);
+        const rows = (data ?? []) as Record<string, unknown>[];
+        assertExpectedRows(rows.length, op.expectRows, op.table);
+        results.push(rows);
+        break;
+      }
+      case "delete": {
+        const builder = applyMatch(supabase.from(op.table).delete(), op.match);
+        const { data, error } = await builder.select();
+        if (error) throw mapDbError(error);
+        const rows = (data ?? []) as Record<string, unknown>[];
+        assertExpectedRows(rows.length, op.expectRows, op.table);
+        results.push(rows);
+        break;
+      }
+      default:
+        throw new EngagementError(500, "storage_error", "Unknown Team Engagement commit operation.");
+    }
+  }
+  return results;
 }
 
 export function createSupabaseEngagementDb(supabase: SupabaseClient): EngagementDb {
@@ -123,7 +198,12 @@ export function createSupabaseEngagementDb(supabase: SupabaseClient): Engagement
     async commit(ops: DbOp[]) {
       if (ops.length === 0) return [];
       const { data, error } = await supabase.rpc("team_engagement_commit", { p_ops: ops.map(toRpcOp) });
-      if (error) throw mapDbError(error);
+      if (error) {
+        if (isCommitAllowlistError(error)) {
+          return executeCommitOpsDirect(supabase, ops);
+        }
+        throw mapDbError(error);
+      }
       if (!Array.isArray(data)) {
         throw new EngagementError(500, "storage_error", "Team Engagement storage returned an unexpected response.");
       }
