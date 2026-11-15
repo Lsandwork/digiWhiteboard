@@ -36,6 +36,8 @@ export const ENGAGEMENT_TABLES = [
   "team_engagement_milestone_messages",
   "team_engagement_fun_questions",
   "team_engagement_fun_question_responses",
+  "team_engagement_fun_question_options",
+  "team_engagement_fun_question_choice_votes",
   "team_engagement_fun_polls",
   "team_engagement_fun_poll_options",
   "team_engagement_fun_poll_votes",

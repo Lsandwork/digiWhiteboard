@@ -1,4 +1,10 @@
-import { TEAM_ENGAGEMENT_MIGRATION } from "@/lib/team-engagement/constants";
+import {
+  FUN_QUESTION_CHOICES_COMMIT,
+  FUN_QUESTION_CHOICES_MIGRATION,
+  PACK_PRIORITY2_COMMIT,
+  TEAM_ENGAGEMENT_MIGRATION,
+  TEMPLATE_LIBRARY_COMMIT
+} from "@/lib/team-engagement/constants";
 
 export class EngagementError extends Error {
   readonly status: number;
@@ -38,8 +44,16 @@ export function setupRequiredError() {
 
 type DbErrorLike = { code?: string | null; message?: string | null; details?: string | null };
 
+/** `team_engagement_commit` rejected a table name — needs 106/112, not core migration 103. */
+export function isCommitAllowlistError(error: DbErrorLike | null | undefined) {
+  if (!error) return false;
+  const message = String(error.message ?? "");
+  return message.includes("team_engagement_commit") && message.toLowerCase().includes("not allowed");
+}
+
 export function isMissingRelationError(error: DbErrorLike | null | undefined) {
   if (!error) return false;
+  if (isCommitAllowlistError(error)) return false;
   const code = String(error.code ?? "");
   const message = String(error.message ?? "").toLowerCase();
   return (
@@ -49,13 +63,28 @@ export function isMissingRelationError(error: DbErrorLike | null | undefined) {
     code === "PGRST204" ||
     message.includes("schema cache") ||
     message.includes("could not find the function") ||
-    message.includes("team_engagement_commit") ||
+    (message.includes("team_engagement_commit") && message.includes("does not exist")) ||
     (message.includes("relation") && message.includes("does not exist"))
   );
 }
 
+function commitAllowlistSetupMessage(error: DbErrorLike) {
+  const message = String(error.message ?? "");
+  const table = message.match(/table\s+(\S+)\s+is not allowed/i)?.[1] ?? "";
+  const hint = table.startsWith("team_engagement_fun_question_option") ||
+    table === "team_engagement_fun_question_choice_votes"
+    ? `Run ${FUN_QUESTION_CHOICES_MIGRATION} and ${FUN_QUESTION_CHOICES_COMMIT} in the Supabase SQL Editor, then reload the API schema (Settings → API → Reload).`
+    : table.startsWith("team_engagement_template")
+      ? `Run ${TEMPLATE_LIBRARY_COMMIT} in the Supabase SQL Editor, then reload the API schema (Settings → API → Reload).`
+      : `Run ${PACK_PRIORITY2_COMMIT} in the Supabase SQL Editor (after migration 105), then reload the API schema (Settings → API → Reload).`;
+  return `Team Engagement commit is out of date${table ? ` for ${table}` : ""}. ${hint}`;
+}
+
 /** Maps a Postgres / PostgREST error to a safe message. Constraint names and SQL never reach the client. */
 export function mapDbError(error: DbErrorLike): EngagementError {
+  if (isCommitAllowlistError(error)) {
+    return new EngagementError(503, "setup_required", commitAllowlistSetupMessage(error));
+  }
   if (isMissingRelationError(error)) return setupRequiredError();
   const code = String(error.code ?? "");
   const message = String(error.message ?? "");

@@ -286,26 +286,15 @@ function VoiceOutcomeForm({ onRefresh }: { onRefresh: () => void }) {
   );
 }
 
+const DEFAULT_POLL_OPTIONS = ["", ""];
+
+function trimPollOptions(options: string[]) {
+  return options.map((value) => value.trim()).filter(Boolean);
+}
+
 export function FunZoneAdminBody({ data, onRefresh }: { data: Record<string, unknown>; onRefresh: () => void }) {
   const questions = (data.questions as Array<Record<string, unknown>>) ?? [];
   const polls = (data.polls as Array<Record<string, unknown>>) ?? [];
-  const [pollPrompt, setPollPrompt] = useState("");
-  const [busy, setBusy] = useState(false);
-  async function createPoll() {
-    setBusy(true);
-    try {
-      const { body } = await post("save_fun_poll", {
-        prompt: pollPrompt,
-        options: ["Option A", "Option B"]
-      });
-      const id = (body as { id?: string }).id;
-      if (id) await post("publish_fun_poll", { id });
-      setPollPrompt("");
-      onRefresh();
-    } finally {
-      setBusy(false);
-    }
-  }
   if (data.ready === false) {
     return (
       <section className="ro-te-card ro-te-section">
@@ -330,13 +319,8 @@ export function FunZoneAdminBody({ data, onRefresh }: { data: Record<string, unk
   }
   return (
     <div className="ro-te-stack">
-      <section className="ro-te-card ro-te-section">
-        <h3 className="ro-te-section__title">Publish a poll</h3>
-        <input value={pollPrompt} placeholder="Poll question" onChange={(e) => setPollPrompt(e.target.value)} />
-        <button type="button" className="ro-te-btn ro-te-btn--primary" style={{ marginTop: 8 }} disabled={busy} onClick={() => void createPoll()}>
-          Publish poll
-        </button>
-      </section>
+      <QuestionOfTheDayAdmin onRefresh={onRefresh} />
+      <FunZonePollPublisher onRefresh={onRefresh} />
       <section className="ro-te-card ro-te-section">
         <h3 className="ro-te-section__title">Drafts & activities</h3>
         <p className="ro-te-muted">{questions.length} questions · {polls.length} polls</p>
@@ -344,6 +328,201 @@ export function FunZoneAdminBody({ data, onRefresh }: { data: Record<string, unk
       <WouldYouRatherAdmin onRefresh={onRefresh} />
       <PackEventAdmin onRefresh={onRefresh} />
     </div>
+  );
+}
+
+function QuestionOfTheDayAdmin({ onRefresh }: { onRefresh: () => void }) {
+  const [prompt, setPrompt] = useState("");
+  const [options, setOptions] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const labels = trimPollOptions(options);
+  const hasChoiceAnswers = labels.length > 0;
+  const choiceMode = options.length > 0 || hasChoiceAnswers;
+  const canPublish =
+    prompt.trim().length >= 5 && (!choiceMode || labels.length >= 2);
+
+  function updateOption(index: number, value: string) {
+    setOptions((current) => current.map((entry, i) => (i === index ? value : entry)));
+  }
+
+  function removeOption(index: number) {
+    setOptions((current) => current.filter((_, i) => i !== index));
+  }
+
+  return (
+    <section className="ro-te-card ro-te-section">
+      <h3 className="ro-te-section__title">Question of the day</h3>
+      <p className="ro-te-muted" style={{ marginBottom: 8, fontSize: 13 }}>
+        {choiceMode
+          ? "With answer choices, Pack shows multiple choice on the Question of the day card."
+          : "Team members answer in Pack with short written responses, or add answer choices below for multiple choice."}
+      </p>
+      <label className="ro-te-field">
+        Question
+        <textarea
+          value={prompt}
+          rows={2}
+          placeholder="What made you smile at work today?"
+          onChange={(e) => setPrompt(e.target.value)}
+        />
+      </label>
+      {choiceMode ? (
+        <div className="ro-te-stack" style={{ marginTop: 8, gap: 8 }}>
+          {options.map((value, index) => (
+            <div key={index} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <label className="ro-te-field" style={{ flex: 1, margin: 0 }}>
+                Answer {index + 1}
+                <input
+                  value={value}
+                  placeholder={`Answer ${index + 1}`}
+                  onChange={(e) => updateOption(index, e.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                className="ro-te-btn ro-te-btn--ghost"
+                style={{ marginTop: 20 }}
+                aria-label={`Remove answer ${index + 1}`}
+                disabled={busy}
+                onClick={() => removeOption(index)}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {options.length < 8 ? (
+        <button
+          type="button"
+          className="ro-te-btn ro-te-btn--ghost"
+          style={{ marginTop: 8 }}
+          disabled={busy}
+          onClick={() => setOptions((current) => (current.length ? [...current, ""] : ["", ""]))}
+        >
+          {choiceMode ? "Add answer" : "Add poll answers"}
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className="ro-te-btn ro-te-btn--primary"
+        style={{ marginTop: 8 }}
+        disabled={busy || !canPublish}
+        onClick={() => {
+          setBusy(true);
+          const trimmedPrompt = prompt.trim();
+          const publish = post("save_fun_question", {
+            prompt: trimmedPrompt,
+            cadence: "daily",
+            ...(hasChoiceAnswers ? { options: labels } : {})
+          }).then(async ({ body }) => {
+            const id = (body as { id?: string }).id;
+            if (id) await post("publish_fun_question", { id });
+          });
+          void publish
+            .then(() => {
+              setPrompt("");
+              setOptions([]);
+              onRefresh();
+            })
+            .finally(() => setBusy(false));
+        }}
+      >
+        Publish question
+      </button>
+    </section>
+  );
+}
+
+function FunZonePollPublisher({ onRefresh }: { onRefresh: () => void }) {
+  const [pollPrompt, setPollPrompt] = useState("");
+  const [options, setOptions] = useState(() => [...DEFAULT_POLL_OPTIONS]);
+  const [busy, setBusy] = useState(false);
+  const labels = trimPollOptions(options);
+  const canPublish = pollPrompt.trim().length >= 5 && labels.length >= 2;
+
+  function updateOption(index: number, value: string) {
+    setOptions((current) => current.map((entry, i) => (i === index ? value : entry)));
+  }
+
+  function removeOption(index: number) {
+    setOptions((current) => (current.length <= 2 ? current : current.filter((_, i) => i !== index)));
+  }
+
+  async function createPoll() {
+    setBusy(true);
+    try {
+      const { body } = await post("save_fun_poll", {
+        prompt: pollPrompt.trim(),
+        options: labels
+      });
+      const id = (body as { id?: string }).id;
+      if (id) await post("publish_fun_poll", { id });
+      setPollPrompt("");
+      setOptions([...DEFAULT_POLL_OPTIONS]);
+      onRefresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="ro-te-card ro-te-section">
+      <h3 className="ro-te-section__title">Pack poll</h3>
+      <p className="ro-te-muted" style={{ marginBottom: 8, fontSize: 13 }}>
+        Add the question and at least two answer choices. Shown as the Pack poll (multiple choice).
+      </p>
+      <label className="ro-te-field">
+        Poll question
+        <input value={pollPrompt} placeholder="Poll question" onChange={(e) => setPollPrompt(e.target.value)} />
+      </label>
+      <div className="ro-te-stack" style={{ marginTop: 8, gap: 8 }}>
+        {options.map((value, index) => (
+          <div key={index} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <label className="ro-te-field" style={{ flex: 1, margin: 0 }}>
+              Answer {index + 1}
+              <input
+                value={value}
+                placeholder={`Answer ${index + 1}`}
+                onChange={(e) => updateOption(index, e.target.value)}
+              />
+            </label>
+            {options.length > 2 ? (
+              <button
+                type="button"
+                className="ro-te-btn ro-te-btn--ghost"
+                style={{ marginTop: 20 }}
+                aria-label={`Remove answer ${index + 1}`}
+                disabled={busy}
+                onClick={() => removeOption(index)}
+              >
+                Remove
+              </button>
+            ) : null}
+          </div>
+        ))}
+      </div>
+      {options.length < 8 ? (
+        <button
+          type="button"
+          className="ro-te-btn ro-te-btn--ghost"
+          style={{ marginTop: 8 }}
+          disabled={busy}
+          onClick={() => setOptions((current) => [...current, ""])}
+        >
+          Add answer
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className="ro-te-btn ro-te-btn--primary"
+        style={{ marginTop: 8 }}
+        disabled={busy || !canPublish}
+        onClick={() => void createPoll()}
+      >
+        Publish poll
+      </button>
+    </section>
   );
 }
 

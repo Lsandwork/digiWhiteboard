@@ -11,6 +11,7 @@ import {
   type StaffOpsPriority
 } from "@/lib/staff/admin-ops";
 import { buildStaffMissionContext, type StaffMissionContext } from "@/lib/ops-command-center/staff-mission";
+import { loadTeamOnShiftCards } from "@/lib/ops-command-center/team-on-shift";
 import {
   buildCommandDashboard,
   mergeActivityFeed,
@@ -365,6 +366,8 @@ export async function loadCommandCenterView(options?: {
   const pickupsDue =
     floor.overduePickups.length + floor.pickupsRemaining.length;
   const arrivalsExpected = floor.lateArrivals.length + floor.arrivalsExpected.length;
+  const teamShift = await loadTeamOnShiftCards(supabase, staffOps.value?.staff_directory ?? []);
+
   const staffMission = buildStaffMissionContext({
     roleKey: options?.roleKey || "staff",
     roleLabel: options?.roleLabel || "Staff",
@@ -386,7 +389,8 @@ export async function loadCommandCenterView(options?: {
     directory: staffOps.value?.staff_directory ?? [],
     sources,
     actions: queue.actions,
-    now
+    now,
+    team: teamShift.team
   });
   const ownerActivity = mergeActivityFeed(queue.ownerActivity, staffOps.value?.activity_logs ?? []);
 

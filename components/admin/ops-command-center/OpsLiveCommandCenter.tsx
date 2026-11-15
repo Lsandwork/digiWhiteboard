@@ -378,9 +378,9 @@ export function OpsLiveCommandCenter({ onNavigate }: { onNavigate: (tab: string)
                 ))}
               </div>
             ) : (
-              <p className="ops-live__muted">No active directory members available.</p>
+              <p className="ops-live__muted">No one has logged in to RuffOps yet today.</p>
             )}
-            <p className="ops-live__note">Active Staff Directory — not live clock-in or GPS.</p>
+            <p className="ops-live__note">Team on Shift lists successful staff logins for today (Pacific). Not GPS clock-in.</p>
           </section>
         </div>
       </div>

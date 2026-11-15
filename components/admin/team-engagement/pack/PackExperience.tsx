@@ -72,7 +72,15 @@ type PackPayload = {
   milestonesPreview: { ready: boolean; upcoming: MilestoneItem[]; recent: MilestoneItem[] };
   funZonePreview: {
     ready: boolean;
-    question: { id: string; prompt: string; responded: boolean; responseCount: number } | null;
+    question: {
+      id: string;
+      prompt: string;
+      responded: boolean;
+      responseCount: number;
+      responseKind?: "text" | "choice";
+      options?: { id: string; label: string; votes: number; selected: boolean }[];
+      totalVotes?: number;
+    } | null;
     poll: { id: string; prompt: string; options: { id: string; label: string; votes: number; selected: boolean }[]; voted: boolean } | null;
     trivia: { id: string; title: string; prompt: string; answered: boolean } | null;
   };
@@ -456,6 +464,15 @@ export default function PackExperience() {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ action: "vote_fun_poll", pollId, optionIds: [optionId] })
+    });
+    if (ok) setFunZone(body);
+  }
+
+  async function chooseQuestionOption(questionId: string, optionId: string) {
+    const { ok, body } = await fetchAdminJson<PackPayload["funZonePreview"]>("/api/admin/bark-outs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "answer_fun_question", questionId, optionId })
     });
     if (ok) setFunZone(body);
   }
@@ -1158,10 +1175,37 @@ export default function PackExperience() {
                 <>
                   <p>{(funZone ?? pack.funZonePreview)!.question!.prompt}</p>
                   <p className="pack-muted" style={{ fontSize: 13 }}>
-                    {(funZone ?? pack.funZonePreview)!.question!.responseCount} responses
+                    {(funZone ?? pack.funZonePreview)!.question!.responseKind === "choice"
+                      ? `${(funZone ?? pack.funZonePreview)!.question!.responseCount} votes`
+                      : `${(funZone ?? pack.funZonePreview)!.question!.responseCount} responses`}
                     {(funZone ?? pack.funZonePreview)!.question!.responded ? " · You responded" : ""}
                   </p>
-                  {!(funZone ?? pack.funZonePreview)!.question!.responded ? (
+                  {(funZone ?? pack.funZonePreview)!.question!.responseKind === "choice" &&
+                  (funZone ?? pack.funZonePreview)!.question!.options?.length ? (
+                    <ul style={{ margin: "12px 0 0", padding: 0, listStyle: "none" }}>
+                      {(funZone ?? pack.funZonePreview)!.question!.options!.map((option) => (
+                        <li key={option.id} style={{ marginBottom: 6, fontSize: 14 }}>
+                          <button
+                            type="button"
+                            className={`pack-btn pack-btn--ghost ${option.selected ? "pack-react--mine" : ""}`}
+                            style={{ padding: "6px 10px", justifyContent: "flex-start" }}
+                            disabled={Boolean(
+                              (funZone ?? pack.funZonePreview)!.question!.responded && !option.selected
+                            )}
+                            onClick={() =>
+                              void chooseQuestionOption(
+                                (funZone ?? pack.funZonePreview)!.question!.id,
+                                option.id
+                              )
+                            }
+                          >
+                            {option.label}
+                            {option.votes > 0 ? <span className="pack-muted"> · {option.votes} votes</span> : null}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : !(funZone ?? pack.funZonePreview)!.question!.responded ? (
                     <form
                       className="pack-comments__composer"
                       onSubmit={(event) => {

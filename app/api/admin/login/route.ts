@@ -13,6 +13,7 @@ import {
   setAdminSessionCookie
 } from "@/lib/admin/session";
 import { touchAdminUserLogin } from "@/lib/admin/users";
+import { recordTeamOnShiftLogin } from "@/lib/ops-command-center/team-on-shift";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -65,7 +66,11 @@ export async function POST(request: Request) {
     const adminUserId = auth.adminUserId;
     if (adminUserId) {
       after(() => {
-        void touchAdminUserLogin(getServiceSupabase({ timeoutMs: 4_000 }), adminUserId, auth.email).catch(() => undefined);
+        const supabase = getServiceSupabase({ timeoutMs: 4_000 });
+        void touchAdminUserLogin(supabase, adminUserId, auth.email).catch(() => undefined);
+        if (!auth.isDemo) {
+          void recordTeamOnShiftLogin(supabase, adminUserId).catch(() => undefined);
+        }
       });
     }
 

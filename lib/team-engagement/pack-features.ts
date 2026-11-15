@@ -7,7 +7,12 @@ import {
   SPOTLIGHT_CATEGORY_LABELS,
   type SpotlightCategory
 } from "@/lib/team-engagement/constants";
-import { PACK_PRIORITY2_COMMIT, PACK_PRIORITY2_MIGRATION } from "@/lib/team-engagement/constants";
+import {
+  FUN_QUESTION_CHOICES_COMMIT,
+  FUN_QUESTION_CHOICES_MIGRATION,
+  PACK_PRIORITY2_COMMIT,
+  PACK_PRIORITY2_MIGRATION
+} from "@/lib/team-engagement/constants";
 import {
   multilineText,
   nowIso,
@@ -422,7 +427,23 @@ type FunQuestionRow = {
   publish_at: string | null;
   close_at: string | null;
   allow_multiple_responses: boolean;
+  response_kind?: string;
 };
+
+async function assertFunQuestionChoicesStorage(ctx: ServiceContext) {
+  const status = await ctx.db.tableStatus().catch(() => null);
+  if (!status?.team_engagement_fun_question_options || !status?.team_engagement_fun_question_choice_votes) {
+    throw new EngagementError(
+      503,
+      "setup_required",
+      `Multiple-choice questions need ${FUN_QUESTION_CHOICES_MIGRATION} and ${FUN_QUESTION_CHOICES_COMMIT} applied in Supabase, then an API schema reload.`
+    );
+  }
+}
+
+function questionResponseKind(row: FunQuestionRow): "text" | "choice" {
+  return row.response_kind === "choice" ? "choice" : "text";
+}
 
 type FunPollRow = {
   id: string;
@@ -470,27 +491,76 @@ export async function funZoneView(ctx: ServiceContext) {
   let questionPayload: null | {
     id: string;
     prompt: string;
+    responseKind: "text" | "choice";
     responded: boolean;
     responseCount: number;
     responsesVisible: boolean;
+    options?: { id: string; label: string; votes: number; selected: boolean }[];
+    totalVotes?: number;
   } = null;
   if (question) {
-    const { rows: responses, total } = await ctx.db.select<{ responder_user_id: string; body: string }>(
-      "team_engagement_fun_question_responses",
-      {
-        filters: [{ column: "question_id", op: "eq", value: question.id }],
-        limit: 500,
-        count: true
+    const responseKind = questionResponseKind(question);
+    if (responseKind === "choice") {
+      const status = await ctx.db.tableStatus().catch(() => null);
+      const choiceReady =
+        status?.team_engagement_fun_question_options === true &&
+        status?.team_engagement_fun_question_choice_votes === true;
+      if (choiceReady) {
+        const { rows: options } = await ctx.db.select<{ id: string; label: string; sort_order: number }>(
+          "team_engagement_fun_question_options",
+          {
+            filters: [{ column: "question_id", op: "eq", value: question.id }],
+            order: [{ column: "sort_order", ascending: true }],
+            limit: 20
+          }
+        );
+        const { rows: votes } = await ctx.db.select<{ option_id: string; responder_user_id: string }>(
+          "team_engagement_fun_question_choice_votes",
+          {
+            filters: [{ column: "question_id", op: "eq", value: question.id }],
+            limit: 2000
+          }
+        );
+        const myVote = votes.find((row) => row.responder_user_id === ctx.actor.userId);
+        const counts = new Map<string, number>();
+        for (const vote of votes) counts.set(vote.option_id, (counts.get(vote.option_id) ?? 0) + 1);
+        const totalVotes = votes.length;
+        questionPayload = {
+          id: question.id,
+          prompt: question.prompt,
+          responseKind: "choice",
+          responded: Boolean(myVote),
+          responseCount: totalVotes,
+          responsesVisible: true,
+          totalVotes,
+          options: options.map((option) => ({
+            id: option.id,
+            label: option.label,
+            votes: counts.get(option.id) ?? 0,
+            selected: myVote?.option_id === option.id
+          }))
+        };
       }
-    );
-    const mine = responses.find((row) => row.responder_user_id === ctx.actor.userId);
-    questionPayload = {
-      id: question.id,
-      prompt: question.prompt,
-      responded: Boolean(mine),
-      responseCount: total ?? responses.length,
-      responsesVisible: Boolean(mine) || !question.allow_multiple_responses
-    };
+    }
+    if (!questionPayload) {
+      const { rows: responses, total } = await ctx.db.select<{ responder_user_id: string; body: string }>(
+        "team_engagement_fun_question_responses",
+        {
+          filters: [{ column: "question_id", op: "eq", value: question.id }],
+          limit: 500,
+          count: true
+        }
+      );
+      const mine = responses.find((row) => row.responder_user_id === ctx.actor.userId);
+      questionPayload = {
+        id: question.id,
+        prompt: question.prompt,
+        responseKind: "text",
+        responded: Boolean(mine),
+        responseCount: total ?? responses.length,
+        responsesVisible: Boolean(mine) || !question.allow_multiple_responses
+      };
+    }
   }
 
   const poll = polls.find((row) => activityActive(row, now)) ?? null;
@@ -571,19 +641,61 @@ export async function funZoneView(ctx: ServiceContext) {
   }
 }
 
-export async function answerFunQuestion(ctx: ServiceContext, input: { questionId?: unknown; body?: unknown }) {
+export async function answerFunQuestion(
+  ctx: ServiceContext,
+  input: { questionId?: unknown; body?: unknown; optionId?: unknown }
+) {
   requireStorage(ctx);
   await assertPackTable(ctx, "team_engagement_fun_questions");
   const questionId = requireUuid(input.questionId, "questionId");
-  const body = multilineText(input.body, 600);
-  if (!body.trim()) throw validationError("Share your answer.");
-  assertCommunityText(body, "fun");
   const { rows } = await ctx.db.select<FunQuestionRow>("team_engagement_fun_questions", {
     filters: [{ column: "id", op: "eq", value: questionId }],
     limit: 1
   });
   const question = rows[0];
   if (!question || !activityActive(question, nowIso(ctx))) throw validationError("That question is not open right now.");
+
+  if (questionResponseKind(question) === "choice") {
+    await assertFunQuestionChoicesStorage(ctx);
+    const optionId = requireUuid(input.optionId, "optionId");
+    const { rows: options } = await ctx.db.select<{ id: string }>("team_engagement_fun_question_options", {
+      filters: [
+        { column: "question_id", op: "eq", value: questionId },
+        { column: "id", op: "eq", value: optionId }
+      ],
+      limit: 1
+    });
+    if (!options[0]) throw validationError("That answer is not part of this question.");
+    const { rows: existing } = await ctx.db.select("team_engagement_fun_question_choice_votes", {
+      filters: [
+        { column: "question_id", op: "eq", value: questionId },
+        { column: "responder_user_id", op: "eq", value: ctx.actor.userId }
+      ],
+      limit: 1
+    });
+    if (existing.length) {
+      throw new EngagementError(409, "duplicate", "You already answered this question.");
+    }
+    await ctx.db.commit([
+      {
+        op: "insert",
+        table: "team_engagement_fun_question_choice_votes",
+        values: {
+          id: randomUUID(),
+          question_id: questionId,
+          option_id: optionId,
+          responder_user_id: ctx.actor.userId,
+          responder_name: ctx.actor.name,
+          created_at: nowIso(ctx)
+        }
+      }
+    ]);
+    return funZoneView(ctx);
+  }
+
+  const body = multilineText(input.body, 600);
+  if (!body.trim()) throw validationError("Share your answer.");
+  assertCommunityText(body, "fun");
   const { rows: existing } = await ctx.db.select("team_engagement_fun_question_responses", {
     filters: [
       { column: "question_id", op: "eq", value: questionId },
@@ -928,7 +1040,7 @@ export async function syncPackMilestones(ctx: ServiceContext, staff: StaffHrRow[
 
 export async function saveFunQuestion(
   ctx: ServiceContext,
-  input: { id?: unknown; prompt?: unknown; cadence?: unknown; publishAt?: unknown; closeAt?: unknown }
+  input: { id?: unknown; prompt?: unknown; cadence?: unknown; publishAt?: unknown; closeAt?: unknown; options?: unknown }
 ) {
   requireStorage(ctx);
   if (!ctx.actor.tier) throw forbiddenError();
@@ -937,9 +1049,18 @@ export async function saveFunQuestion(
   if (prompt.length < 5) throw validationError("Add a question prompt.");
   assertCommunityText(prompt, "fun");
   const cadence = input.cadence === "weekly" ? "weekly" : "daily";
+  const labels = Array.isArray(input.options)
+    ? input.options.map((value) => multilineText(value, 121).trim()).filter(Boolean)
+    : [];
+  if (labels.length === 1) throw validationError("Add at least two answer choices, or leave answers empty for written responses.");
+  const responseKind = labels.length >= 2 ? "choice" : "text";
+  if (responseKind === "choice") {
+    await assertFunQuestionChoicesStorage(ctx);
+    for (const label of labels) assertCommunityText(label, "fun");
+  }
   const now = nowIso(ctx);
   const id = typeof input.id === "string" ? input.id : randomUUID();
-  await ctx.db.commit([
+  const ops: DbOp[] = [
     {
       op: "upsert",
       table: "team_engagement_fun_questions",
@@ -948,6 +1069,7 @@ export async function saveFunQuestion(
         id,
         prompt: prompt.trim(),
         cadence,
+        response_kind: responseKind,
         status: "draft",
         publish_at: typeof input.publishAt === "string" ? input.publishAt : null,
         close_at: typeof input.closeAt === "string" ? input.closeAt : null,
@@ -958,21 +1080,48 @@ export async function saveFunQuestion(
         updated_at: now
       }
     }
-  ]);
+  ];
+  if (responseKind === "choice") {
+    if (typeof input.id === "string") {
+      ops.push(
+        { op: "delete", table: "team_engagement_fun_question_choice_votes", match: { question_id: id } },
+        { op: "delete", table: "team_engagement_fun_question_options", match: { question_id: id } }
+      );
+    }
+    labels.forEach((label, index) => {
+      ops.push({
+        op: "insert",
+        table: "team_engagement_fun_question_options",
+        values: { id: randomUUID(), question_id: id, label, sort_order: index }
+      });
+    });
+  } else if (typeof input.id === "string") {
+    ops.push(
+      { op: "delete", table: "team_engagement_fun_question_choice_votes", match: { question_id: id } },
+      { op: "delete", table: "team_engagement_fun_question_options", match: { question_id: id } }
+    );
+  }
+  await ctx.db.commit(ops);
   return { id };
 }
 
-export async function publishFunQuestion(ctx: ServiceContext, input: { id?: unknown }) {
+export async function publishFunQuestion(
+  ctx: ServiceContext,
+  input: { id?: unknown; publishAt?: unknown; closeAt?: unknown }
+) {
   requireStorage(ctx);
   if (!ctx.actor.tier) throw forbiddenError();
   const id = requireUuid(input.id, "id");
   const now = nowIso(ctx);
+  const publishAt =
+    typeof input.publishAt === "string" && input.publishAt.trim() ? input.publishAt.trim() : now;
+  const closeAt = typeof input.closeAt === "string" && input.closeAt.trim() ? input.closeAt.trim() : null;
   await ctx.db.commit([
     {
       op: "update",
       table: "team_engagement_fun_questions",
       match: { id },
-      set: { status: "active", publish_at: now, updated_at: now },
+      set: { status: "active", publish_at: publishAt, close_at: closeAt, updated_at: now },
       expectRows: 1
     }
   ]);
@@ -1035,17 +1184,23 @@ export async function saveFunPoll(
   return { id: pollId };
 }
 
-export async function publishFunPoll(ctx: ServiceContext, input: { id?: unknown }) {
+export async function publishFunPoll(
+  ctx: ServiceContext,
+  input: { id?: unknown; publishAt?: unknown; closeAt?: unknown }
+) {
   requireStorage(ctx);
   if (!ctx.actor.tier) throw forbiddenError();
   const id = requireUuid(input.id, "id");
   const now = nowIso(ctx);
+  const publishAt =
+    typeof input.publishAt === "string" && input.publishAt.trim() ? input.publishAt.trim() : now;
+  const closeAt = typeof input.closeAt === "string" && input.closeAt.trim() ? input.closeAt.trim() : null;
   await ctx.db.commit([
     {
       op: "update",
       table: "team_engagement_fun_polls",
       match: { id },
-      set: { status: "active", publish_at: now, updated_at: now },
+      set: { status: "active", publish_at: publishAt, close_at: closeAt, updated_at: now },
       expectRows: 1
     }
   ]);
