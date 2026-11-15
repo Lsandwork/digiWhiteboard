@@ -117,6 +117,21 @@ function patchClosesStatus(status: string | null): boolean {
   return isStaffOpsStatusClosed(status);
 }
 
+function assertBulkCrossoverPublishFlags(
+  access: UserAccess,
+  role: string | null | undefined,
+  entries: Record<string, unknown>[]
+) {
+  const wantsFollowUp = entries.some((entry) => Boolean(entry.create_owner_follow_up));
+  const wantsIssue = entries.some((entry) => Boolean(entry.create_active_issue));
+  if (wantsFollowUp && !allowed(access, role, "create_owner_follow_up")) {
+    throw new StaffOpsAuthorizationError("You do not have permission to publish to Owner Follow Up.");
+  }
+  if (wantsIssue && !allowed(access, role, "create_active_issue")) {
+    throw new StaffOpsAuthorizationError("You do not have permission to publish to Active Issues.");
+  }
+}
+
 export function assertStaffOpsPostAuthorized(
   access: UserAccess,
   role: string | null | undefined,
@@ -127,9 +142,20 @@ export function assertStaffOpsPostAuthorized(
 
   switch (action) {
     case "create_crossover":
-    case "create_crossover_bulk":
       if (!caps.canCreateNote) throw new StaffOpsAuthorizationError();
+      if (Boolean(body.create_owner_follow_up) && !caps.canCreateFollowUp) {
+        throw new StaffOpsAuthorizationError("You do not have permission to publish to Owner Follow Up.");
+      }
+      if (Boolean(body.create_active_issue) && !caps.canCreateIssue) {
+        throw new StaffOpsAuthorizationError("You do not have permission to publish to Active Issues.");
+      }
       return;
+    case "create_crossover_bulk": {
+      if (!caps.canCreateNote) throw new StaffOpsAuthorizationError();
+      const entries = Array.isArray(body.entries) ? (body.entries as Record<string, unknown>[]) : [];
+      assertBulkCrossoverPublishFlags(access, role, entries);
+      return;
+    }
     case "reply_crossover":
       if (!caps.canReplyNote) throw new StaffOpsAuthorizationError();
       return;

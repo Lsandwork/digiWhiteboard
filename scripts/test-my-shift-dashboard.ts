@@ -36,5 +36,6 @@ assert.match(layout, /my-shift\.css/);
 assert.equal(myShiftPortraitForName("Sarah M."), MY_SHIFT_ASSETS.portraits.sarah);
 assert.equal(myShiftPortraitForName("Unknown Handler"), null);
 assert.match(dash, /create_crossover_bulk|Shift Entry Log/);
+assert.match(dash, /multiLogPublish/);
 
 console.log("my-shift-dashboard: ok");

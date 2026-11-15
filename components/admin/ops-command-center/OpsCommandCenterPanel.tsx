@@ -15,7 +15,9 @@ import {
   workItemActionLabel,
   type WorkItemAction
 } from "@/lib/ops-command-center/work-item-actions";
-import { toCrossoverBulkPayload } from "@/lib/staff/bulk-shift-log";
+import { shiftLogPublishSuccessMessage, toCrossoverBulkPayload, type BulkShiftLogPublishOptions } from "@/lib/staff/bulk-shift-log";
+import { accessFromLegacyRole } from "@/lib/admin/permissions";
+import { buildUserInteractionsCapabilities } from "@/lib/user-interactions/staff-ops-auth";
 import { readPanelCache, writePanelCache } from "@/lib/admin/panel-session-cache";
 import { MyShiftDashboard } from "@/components/admin/ops-command-center/MyShiftDashboard";
 
@@ -190,7 +192,8 @@ export function OpsCommandCenterPanel({
 
   async function submitShiftEntries(
     entries: Parameters<typeof toCrossoverBulkPayload>[0],
-    defaults: Parameters<typeof toCrossoverBulkPayload>[1]
+    defaults: Parameters<typeof toCrossoverBulkPayload>[1],
+    publish?: BulkShiftLogPublishOptions
   ) {
     if (!data) return;
     const department = defaults.department_area || data.homeDepartment || "Front Desk";
@@ -201,27 +204,37 @@ export function OpsCommandCenterPanel({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           action: "create_crossover_bulk",
-          entries: toCrossoverBulkPayload(entries, {
-            ...defaults,
-            department_area: department,
-            from_department: department
-          })
+          entries: toCrossoverBulkPayload(
+            entries,
+            {
+              ...defaults,
+              department_area: department,
+              from_department: department
+            },
+            publish
+          )
         })
       });
-      const body = await readResponseJson<{ error?: string; result?: { saved?: number; failed?: number } }>(response).catch(
-        () => ({} as { error?: string; result?: { saved?: number; failed?: number } })
-      );
+      const body = await readResponseJson<{ error?: string; result?: { saved?: number; failed?: number; errors?: string[] } }>(
+        response
+      ).catch(() => ({} as { error?: string; result?: { saved?: number; failed?: number; errors?: string[] } }));
       if (!response.ok) throw new Error(humanizeUnknownError(body.error, "Unable to save shift log entries."));
       const saved = Number(body.result?.saved ?? entries.length);
       const failed = Number(body.result?.failed ?? 0);
-      showToast(
-        failed
-          ? `Saved ${saved} ${saved === 1 ? "entry" : "entries"} to Team Log. ${failed} could not be saved.`
-          : saved === 1
-            ? "Shift entry saved to Team Log. Same-department peers will see it on My Shift."
-            : `${saved} shift entries saved to Team Log.`,
-        failed && !saved ? "error" : "success"
-      );
+      const followUp = Boolean(publish?.create_owner_follow_up);
+      const issue = Boolean(publish?.create_active_issue);
+      const message =
+        followUp || issue
+          ? shiftLogPublishSuccessMessage({ saved, failed, publish })
+          : failed
+            ? `Saved ${saved} ${saved === 1 ? "entry" : "entries"} to Team Log. ${failed} could not be saved.`
+            : saved === 1
+              ? "Shift entry saved to Team Log. Same-department peers will see it on My Shift."
+              : `${saved} shift entries saved to Team Log.`;
+      if (failed && body.result?.errors?.length) {
+        throw new Error(body.result.errors[0] ?? message);
+      }
+      showToast(message, failed && !saved ? "error" : "success");
       await load();
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Unable to save shift log entries.", "error");
@@ -234,6 +247,10 @@ export function OpsCommandCenterPanel({
   if (!data) return null;
 
   if (mode === "my_shift") {
+    const staffCaps = buildUserInteractionsCapabilities(
+      accessFromLegacyRole(null, null, data.roleKey),
+      data.roleKey
+    );
     return (
       <MyShiftDashboard
         data={data}
@@ -244,6 +261,10 @@ export function OpsCommandCenterPanel({
         busyItemId={busyItemId}
         onWorkItemAction={(itemId, workAction, itemTitle) => void runWorkItemAction(itemId, workAction, itemTitle)}
         onSubmitShiftEntries={submitShiftEntries}
+        multiLogPublish={{
+          canOwnerFollowUp: staffCaps.canCreateFollowUp,
+          canActiveIssue: staffCaps.canCreateIssue
+        }}
       />
     );
   }

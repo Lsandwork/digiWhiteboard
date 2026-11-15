@@ -8,6 +8,7 @@ import {
   emptyBulkShiftLogRow,
   normalizeBulkShiftLogRow,
   normalizeBulkShiftLogRows,
+  shiftLogPublishSuccessMessage,
   toCrossoverBulkPayload
 } from "../lib/staff/bulk-shift-log";
 
@@ -54,5 +55,26 @@ const payload = toCrossoverBulkPayload(
 assert.equal(payload[0].subject, "Yard note");
 assert.equal(payload[0].related_dog_name, "Milo");
 assert.equal(payload[0].log_type, "Daycare Note");
+
+const routed = toCrossoverBulkPayload(
+  [{ subject: "Issue", details: "Needs owner call", related_dog_name: "Milo" }],
+  { log_type: "General Shift Note", priority: "High", assigned_to: "", department_area: "Front Desk" },
+  { create_owner_follow_up: true, create_active_issue: true }
+);
+assert.equal(routed[0].create_owner_follow_up, true);
+assert.equal(routed[0].create_active_issue, true);
+
+assert.match(
+  shiftLogPublishSuccessMessage({ saved: 1, failed: 0, publish: { create_active_issue: true } }),
+  /Team Log and Active Issues/
+);
+assert.match(
+  shiftLogPublishSuccessMessage({
+    saved: 2,
+    failed: 0,
+    publish: { create_owner_follow_up: true, create_active_issue: true }
+  }),
+  /Team Log, Owner Follow Up, and Active Issues/
+);
 
 console.log("test-bulk-shift-entries: ok");

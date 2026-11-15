@@ -48,6 +48,11 @@ export function normalizeBulkShiftLogRows(rows: BulkShiftLogRow[]) {
     .filter((entry): entry is NormalizedBulkShiftLogEntry => Boolean(entry));
 }
 
+export type BulkShiftLogPublishOptions = {
+  create_owner_follow_up?: boolean;
+  create_active_issue?: boolean;
+};
+
 export function toCrossoverBulkPayload(
   entries: NormalizedBulkShiftLogEntry[],
   defaults: {
@@ -57,9 +62,12 @@ export function toCrossoverBulkPayload(
     department_area: string;
     from_department?: string;
     status?: string;
-  }
+  },
+  publish?: BulkShiftLogPublishOptions
 ) {
   const department = defaults.department_area || defaults.from_department || null;
+  const followUp = Boolean(publish?.create_owner_follow_up);
+  const activeIssue = Boolean(publish?.create_active_issue);
   return entries.map((entry) => ({
     log_type: defaults.log_type,
     subject: entry.subject,
@@ -71,6 +79,36 @@ export function toCrossoverBulkPayload(
     assigned_team: defaults.assigned_to || null,
     related_dog_name: entry.related_dog_name,
     department_area: department,
-    from_department: defaults.from_department || department
+    from_department: defaults.from_department || department,
+    ...(followUp ? { create_owner_follow_up: true } : {}),
+    ...(activeIssue ? { create_active_issue: true } : {})
   }));
+}
+
+export function shiftLogPublishSuccessMessage(input: {
+  saved: number;
+  failed: number;
+  publish?: BulkShiftLogPublishOptions;
+}): string {
+  const { saved, failed, publish } = input;
+  const followUp = Boolean(publish?.create_owner_follow_up);
+  const issue = Boolean(publish?.create_active_issue);
+  const destinations = ["Team Log", ...(followUp ? ["Owner Follow Up"] : []), ...(issue ? ["Active Issues"] : [])];
+  const destLabel =
+    destinations.length === 1
+      ? "Team Log"
+      : destinations.length === 2
+        ? `${destinations[0]} and ${destinations[1]}`
+        : `${destinations.slice(0, -1).join(", ")}, and ${destinations[destinations.length - 1]}`;
+
+  if (failed > 0 && saved > 0) {
+    return `Saved ${saved} ${saved === 1 ? "entry" : "entries"} to ${destLabel}. ${failed} could not be saved.`;
+  }
+  if (failed > 0 && !saved) {
+    return `Unable to post to ${destLabel}.`;
+  }
+  if (saved === 1) {
+    return `Successfully posted to ${destLabel}.`;
+  }
+  return `Successfully posted ${saved} entries to ${destLabel}.`;
 }
