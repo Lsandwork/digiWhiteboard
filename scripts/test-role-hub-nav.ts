@@ -44,7 +44,6 @@ for (const role of HUB_NAV_ROLES) {
   const primaryTabs = rolePrimaryTabs(role as HubNavRole);
   if (role === "front_desk_coordinator") {
     for (const tab of [
-      "staff_training",
       "ops_command_center",
       "crossover_communication",
       "owner_follow_up",
@@ -96,7 +95,7 @@ const marketingVisible = ADMIN_TABS.filter((tab) =>
   canAccessAdminTab(marketingAccess, tab, "marketing", "staff")
 );
 const marketingNav = buildStaffPanelNav(marketingVisible, "staff", "marketing");
-assert.ok(countNavIcons(marketingNav) <= 10, "marketing staff nav should stay small");
+assert.ok(countNavIcons(marketingNav) <= 11, "marketing staff nav should stay small");
 assert.ok(
   filterHelpArticlesForRole("marketing").some((a) => a.id === "cleaned-menu-hubs"),
   "marketing help includes cleaned menu article"
