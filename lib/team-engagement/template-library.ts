@@ -1,11 +1,11 @@
 import { randomUUID } from "crypto";
 import { ENGAGEMENT_TEMPLATE_CATALOG } from "@/lib/team-engagement/template-catalog.generated";
 import { assertCommunityText } from "@/lib/team-engagement/community-content";
-import { forbiddenError, validationError } from "@/lib/team-engagement/errors";
+import { EngagementError, forbiddenError, validationError } from "@/lib/team-engagement/errors";
 import { createAnnouncement } from "@/lib/team-engagement/records";
 import { saveFunPoll, saveFunQuestion } from "@/lib/team-engagement/pack-features";
 import { savePackGoal } from "@/lib/team-engagement/pack-goals";
-import { multilineText, nowIso, requireStorage, text, type ServiceContext } from "@/lib/team-engagement/context";
+import { assertEngagementWriteReady, multilineText, nowIso, requireStorage, text, type ServiceContext } from "@/lib/team-engagement/context";
 import {
   applyTemplateFields,
   assertTemplateResolvable,
@@ -19,7 +19,7 @@ import {
   type EngagementTemplateTab,
   type EngagementTemplateSeed
 } from "@/lib/team-engagement/template-types";
-import { TEMPLATE_LIBRARY_MIGRATION } from "@/lib/team-engagement/constants";
+import { TEMPLATE_LIBRARY_COMMIT, TEMPLATE_LIBRARY_MIGRATION } from "@/lib/team-engagement/constants";
 
 type TemplateDbRow = {
   id: string;
@@ -119,6 +119,22 @@ function mapDbRow(row: TemplateDbRow, favorited: boolean): EngagementTemplateRow
 async function templatesReady(ctx: ServiceContext): Promise<boolean> {
   const status = await ctx.db.tableStatus().catch(() => null);
   return status?.team_engagement_templates === true;
+}
+
+const TEMPLATE_PUBLISH_TABLES = [
+  "team_engagement_templates",
+  "team_engagement_template_publications"
+] as const;
+
+async function templatePublishStorageReady(ctx: ServiceContext) {
+  const status = await ctx.db.tableStatus().catch(() => null);
+  if (!status) return { ready: false as const, missing: [...TEMPLATE_PUBLISH_TABLES] };
+  const missing = TEMPLATE_PUBLISH_TABLES.filter((table) => !status[table]);
+  return { ready: missing.length === 0, missing };
+}
+
+function templateLibrarySetupMessage() {
+  return `Run ${TEMPLATE_LIBRARY_MIGRATION} and ${TEMPLATE_LIBRARY_COMMIT} in the Supabase SQL Editor, then reload the API schema (Settings → API → Reload).`;
 }
 
 async function loadFavoriteIds(ctx: ServiceContext): Promise<Set<string>> {
@@ -423,13 +439,19 @@ export async function archiveEngagementTemplate(ctx: ServiceContext, input: { te
 }
 
 export async function publishEngagementTemplate(ctx: ServiceContext, input: Record<string, unknown>) {
-  requireStorage(ctx);
   if (!ctx.actor.tier) throw forbiddenError();
   const template = input.templateId ? await getTemplateById(ctx, String(input.templateId)) : null;
   if (!template) throw validationError("Choose a template to publish.");
+  await assertEngagementWriteReady(ctx, template.kind, template.tab);
 
   const fields = parseFields(input.fields);
   const asDraft = input.publishMode === "draft" || input.asDraft === true;
+  if (!asDraft) {
+    const library = await templatePublishStorageReady(ctx);
+    if (!library.ready) {
+      throw new EngagementError(503, "setup_required", templateLibrarySetupMessage());
+    }
+  }
   const title = applyTemplateFields(text(input.title ?? template.titleTemplate, 200), fields);
   const message = applyTemplateFields(multilineText(input.message ?? template.messageTemplate, 8000), fields);
   const instructions = template.instructionsTemplate
