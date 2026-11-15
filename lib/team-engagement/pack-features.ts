@@ -962,17 +962,23 @@ export async function saveFunQuestion(
   return { id };
 }
 
-export async function publishFunQuestion(ctx: ServiceContext, input: { id?: unknown }) {
+export async function publishFunQuestion(
+  ctx: ServiceContext,
+  input: { id?: unknown; publishAt?: unknown; closeAt?: unknown }
+) {
   requireStorage(ctx);
   if (!ctx.actor.tier) throw forbiddenError();
   const id = requireUuid(input.id, "id");
   const now = nowIso(ctx);
+  const publishAt =
+    typeof input.publishAt === "string" && input.publishAt.trim() ? input.publishAt.trim() : now;
+  const closeAt = typeof input.closeAt === "string" && input.closeAt.trim() ? input.closeAt.trim() : null;
   await ctx.db.commit([
     {
       op: "update",
       table: "team_engagement_fun_questions",
       match: { id },
-      set: { status: "active", publish_at: now, updated_at: now },
+      set: { status: "active", publish_at: publishAt, close_at: closeAt, updated_at: now },
       expectRows: 1
     }
   ]);
@@ -1035,17 +1041,23 @@ export async function saveFunPoll(
   return { id: pollId };
 }
 
-export async function publishFunPoll(ctx: ServiceContext, input: { id?: unknown }) {
+export async function publishFunPoll(
+  ctx: ServiceContext,
+  input: { id?: unknown; publishAt?: unknown; closeAt?: unknown }
+) {
   requireStorage(ctx);
   if (!ctx.actor.tier) throw forbiddenError();
   const id = requireUuid(input.id, "id");
   const now = nowIso(ctx);
+  const publishAt =
+    typeof input.publishAt === "string" && input.publishAt.trim() ? input.publishAt.trim() : now;
+  const closeAt = typeof input.closeAt === "string" && input.closeAt.trim() ? input.closeAt.trim() : null;
   await ctx.db.commit([
     {
       op: "update",
       table: "team_engagement_fun_polls",
       match: { id },
-      set: { status: "active", publish_at: now, updated_at: now },
+      set: { status: "active", publish_at: publishAt, close_at: closeAt, updated_at: now },
       expectRows: 1
     }
   ]);

@@ -3,8 +3,8 @@ import { ENGAGEMENT_TEMPLATE_CATALOG } from "@/lib/team-engagement/template-cata
 import { assertCommunityText } from "@/lib/team-engagement/community-content";
 import { EngagementError, forbiddenError, validationError } from "@/lib/team-engagement/errors";
 import { createAnnouncement } from "@/lib/team-engagement/records";
-import { saveFunPoll, saveFunQuestion } from "@/lib/team-engagement/pack-features";
-import { savePackGoal } from "@/lib/team-engagement/pack-goals";
+import { publishFunPoll, publishFunQuestion, saveFunPoll, saveFunQuestion } from "@/lib/team-engagement/pack-features";
+import { publishPackGoal, savePackGoal } from "@/lib/team-engagement/pack-goals";
 import { assertEngagementWriteReady, multilineText, nowIso, requireStorage, text, type ServiceContext } from "@/lib/team-engagement/context";
 import {
   applyTemplateFields,
@@ -482,22 +482,38 @@ export async function publishEngagementTemplate(ctx: ServiceContext, input: Reco
         break;
       case "poll": {
         const options = Array.isArray(template.payload?.options) ? template.payload?.options : [];
-        target = await saveFunPoll(ctx, { prompt: message, options });
+        const saved = await saveFunPoll(ctx, { prompt: message, options });
+        target = await publishFunPoll(ctx, {
+          id: saved.id,
+          publishAt: scheduledFor,
+          closeAt: expiresAt
+        });
         break;
       }
       case "question_week":
-      case "fun_activity":
-        target = await saveFunQuestion(ctx, { prompt: message });
+      case "fun_activity": {
+        const saved = await saveFunQuestion(ctx, {
+          prompt: message,
+          cadence: template.kind === "question_week" ? "weekly" : "daily"
+        });
+        target = await publishFunQuestion(ctx, {
+          id: saved.id,
+          publishAt: scheduledFor,
+          closeAt: expiresAt
+        });
         break;
-      case "goal":
-        target = await savePackGoal(ctx, {
+      }
+      case "goal": {
+        const saved = await savePackGoal(ctx, {
           title,
           description: message,
           goalType: template.payload?.goalType ?? "teamwork",
           targetValue: template.payload?.targetValue,
           successCriteria: template.payload?.measurementMethod
         });
+        target = await publishPackGoal(ctx, { id: saved.id });
         break;
+      }
       case "bark_out":
         target = {
           prefilled: true,
