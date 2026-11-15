@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
+import { revokeAdminSessionsForUser } from "@/lib/admin/session-revocation";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { validatePasswordStrength } from "@/lib/admin/password";
 import { canChangeAdminUserPassword } from "@/lib/admin/permissions";
@@ -60,6 +61,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return NextResponse.json({ error: "Passwords cannot be changed while logged in as another employee." }, { status: 403 });
   }
   await changeAdminUserPassword(supabase, id, password, isSelf ? false : (body.force_password_change ?? false));
+
+  // Admin resets must kill the target's existing sessions; self-change issues a fresh cookie elsewhere.
+  if (!isSelf) {
+    revokeAdminSessionsForUser(id);
+  }
 
   await writeAdminAuditLog({
     actorAdminId: session?.adminUserId,

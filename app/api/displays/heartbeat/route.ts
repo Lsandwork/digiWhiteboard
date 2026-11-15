@@ -8,11 +8,11 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Partial<HeartbeatRequest>;
-    const deviceId = body.deviceId?.trim();
+    const deviceId = body.deviceId?.trim().slice(0, 128);
     const displayType = parseDisplayType(body.displayType);
-    const route = body.route?.trim();
+    const route = body.route?.trim().slice(0, 256);
 
-    if (!deviceId || !displayType || !route) {
+    if (!deviceId || !displayType || !route || !/^[a-zA-Z0-9._:-]+$/.test(deviceId)) {
       return NextResponse.json({ ok: false, error: "Invalid heartbeat payload." }, { status: 400 });
     }
 
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       status: body.status,
       wakeLockStatus: body.wakeLockStatus,
       lastDataAt: body.lastDataAt,
-      name: body.name
+      name: body.name != null ? String(body.name).slice(0, 128) : undefined
     });
 
     return NextResponse.json(response, {

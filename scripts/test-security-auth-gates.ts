@@ -140,6 +140,22 @@ async function main() {
   assert.equal(canEditGlobalAdminSettings(groomer, "groomer"), false);
   assert.equal(canEditGlobalAdminSettings(null, undefined), false);
 
+  // --- Disabled / password-reset accounts lose API session on this instance.
+  const {
+    revokeAdminSessionsForUser,
+    resetAdminSessionRevocationForTests,
+    isAdminSessionRevoked
+  } = await import("../lib/admin/session-revocation");
+  resetAdminSessionRevocationForTests();
+  const otherToken = createAdminSessionToken({ email: "other@fitdog.com", role: "manager_admin", adminUserId: "u-9" });
+  assert.equal(isAdminSessionRevoked("u-1"), false);
+  assert.ok(getAdminSessionFromRequest(request("/api/admin/users", realToken)), "session valid before revoke");
+  revokeAdminSessionsForUser("u-1");
+  assert.equal(isAdminSessionRevoked("u-1"), true);
+  assert.equal(getAdminSessionFromRequest(request("/api/admin/users", realToken)), null, "revoked user blocked");
+  assert.ok(getAdminSessionFromRequest(request("/api/admin/users", otherToken)), "other users unaffected");
+  resetAdminSessionRevocationForTests();
+
   console.log("security auth gate tests passed");
 }
 

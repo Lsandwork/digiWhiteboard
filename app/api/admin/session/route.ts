@@ -1,6 +1,7 @@
 import { after, NextResponse } from "next/server";
 import { accessFromLegacyRole } from "@/lib/admin/permissions";
-import { getAdminSessionFromRequest } from "@/lib/admin/session";
+import { clearAdminSessionCookies, getAdminSessionFromRequest } from "@/lib/admin/session";
+import { revokeAdminSessionsForUser } from "@/lib/admin/session-revocation";
 import { getUserAccess, migrateLegacyUserAccess } from "@/lib/admin/user-access";
 import { ensureSuperAdminUsers } from "@/lib/admin/role-permission-matrix";
 import { getAdminUserById } from "@/lib/admin/users";
@@ -60,6 +61,7 @@ export async function GET(request: Request) {
       "session access"
     ).catch(() => fallbackAccess)
   ]).then(([dbUser, access]) => ({
+    dbUser,
     role: session.role ?? dbUser?.role ?? null,
     mustChangePassword: Boolean(session.mustChangePassword || dbUser?.force_password_change),
     access: access ?? fallbackAccess
@@ -76,8 +78,19 @@ export async function GET(request: Request) {
     return NextResponse.json(cookiePayload);
   }
 
+  if (enriched.dbUser && enriched.dbUser.status !== "active") {
+    revokeAdminSessionsForUser(session.adminUserId);
+    const response = NextResponse.json({ authenticated: false, reason: "account_disabled" }, { status: 401 });
+    clearAdminSessionCookies(response, new URL(request.url).host);
+    return response;
+  }
+
+  // Avoid leaking the full dbUser into the client response.
+  const { dbUser: _dbUser, ...safe } = enriched;
+  void _dbUser;
+
   return NextResponse.json({
     ...cookiePayload,
-    ...enriched
+    ...safe
   });
 }
