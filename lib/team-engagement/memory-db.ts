@@ -27,6 +27,7 @@ const UNIQUE_KEYS: Partial<Record<EngagementTable, { columns: string[]; where?: 
     { columns: ["program_id", "nominee_user_id", "period_label"], where: (row) => row.status !== "withdrawn" }
   ],
   team_engagement_fun_question_responses: [{ columns: ["question_id", "responder_user_id"] }],
+  team_engagement_fun_question_choice_votes: [{ columns: ["question_id", "responder_user_id"] }],
   team_engagement_fun_poll_votes: [{ columns: ["poll_id", "voter_user_id"] }],
   team_engagement_fun_trivia_answers: [{ columns: ["trivia_id", "responder_user_id"] }],
   team_engagement_milestones: [
@@ -49,6 +50,9 @@ const CASCADES: { parent: EngagementTable; child: EngagementTable; column: strin
   { parent: "team_engagement_bark_outs", child: "team_engagement_bark_out_comments", column: "bark_out_id" },
   { parent: "team_engagement_milestones", child: "team_engagement_milestone_messages", column: "milestone_id" },
   { parent: "team_engagement_fun_questions", child: "team_engagement_fun_question_responses", column: "question_id" },
+  { parent: "team_engagement_fun_questions", child: "team_engagement_fun_question_options", column: "question_id" },
+  { parent: "team_engagement_fun_questions", child: "team_engagement_fun_question_choice_votes", column: "question_id" },
+  { parent: "team_engagement_fun_question_options", child: "team_engagement_fun_question_choice_votes", column: "option_id" },
   { parent: "team_engagement_fun_polls", child: "team_engagement_fun_poll_options", column: "poll_id" },
   { parent: "team_engagement_fun_polls", child: "team_engagement_fun_poll_votes", column: "poll_id" },
   { parent: "team_engagement_fun_trivia", child: "team_engagement_fun_trivia_answers", column: "trivia_id" },

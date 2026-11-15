@@ -1,4 +1,6 @@
 import {
+  FUN_QUESTION_CHOICES_COMMIT,
+  FUN_QUESTION_CHOICES_MIGRATION,
   PACK_PRIORITY2_COMMIT,
   TEAM_ENGAGEMENT_MIGRATION,
   TEMPLATE_LIBRARY_COMMIT
@@ -69,9 +71,12 @@ export function isMissingRelationError(error: DbErrorLike | null | undefined) {
 function commitAllowlistSetupMessage(error: DbErrorLike) {
   const message = String(error.message ?? "");
   const table = message.match(/table\s+(\S+)\s+is not allowed/i)?.[1] ?? "";
-  const hint = table.startsWith("team_engagement_template")
-    ? `Run ${TEMPLATE_LIBRARY_COMMIT} in the Supabase SQL Editor, then reload the API schema (Settings → API → Reload).`
-    : `Run ${PACK_PRIORITY2_COMMIT} in the Supabase SQL Editor (after migration 105), then reload the API schema (Settings → API → Reload).`;
+  const hint = table.startsWith("team_engagement_fun_question_option") ||
+    table === "team_engagement_fun_question_choice_votes"
+    ? `Run ${FUN_QUESTION_CHOICES_MIGRATION} and ${FUN_QUESTION_CHOICES_COMMIT} in the Supabase SQL Editor, then reload the API schema (Settings → API → Reload).`
+    : table.startsWith("team_engagement_template")
+      ? `Run ${TEMPLATE_LIBRARY_COMMIT} in the Supabase SQL Editor, then reload the API schema (Settings → API → Reload).`
+      : `Run ${PACK_PRIORITY2_COMMIT} in the Supabase SQL Editor (after migration 105), then reload the API schema (Settings → API → Reload).`;
   return `Team Engagement commit is out of date${table ? ` for ${table}` : ""}. ${hint}`;
 }
 

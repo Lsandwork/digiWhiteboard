@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test:team-engagement": "tsx scripts/test-team-engagement-moderation.ts && tsx scripts/test-team-engagement-access.ts && tsx scripts/test-team-engagement-bark-outs.ts && tsx scripts/test-team-engagement-template-catalog.ts && tsx scripts/test-team-engagement-fun-zone-admin.ts && tsx scripts/test-team-engagement-commit-errors.ts && tsx scripts/test-team-engagement-commit-fallback.ts && tsx scripts/test-template-fun-zone-publish-live.ts",
+    "test:team-engagement": "tsx scripts/test-team-engagement-moderation.ts && tsx scripts/test-team-engagement-access.ts && tsx scripts/test-team-engagement-bark-outs.ts && tsx scripts/test-team-engagement-template-catalog.ts && tsx scripts/test-team-engagement-fun-zone-admin.ts && tsx scripts/test-fun-question-choices.ts && tsx scripts/test-team-engagement-commit-errors.ts && tsx scripts/test-team-engagement-commit-fallback.ts && tsx scripts/test-template-fun-zone-publish-live.ts",
     "test:cleanup": "tsx scripts/test-transition-cleanup.ts",
     "test:checkout-display": "tsx scripts/test-checkout-display.ts",
     "test:checkout-prompt": "tsx scripts/test-checkout-prompt.ts",
