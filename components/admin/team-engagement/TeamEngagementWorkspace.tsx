@@ -34,7 +34,12 @@ export default function TeamEngagementWorkspace({ leadership }: { leadership: bo
           Manage Team Engagement
         </button>
       </div>
-      {mode === "pack" ? <TeamEngagementParticipationPanel /> : <TeamEngagementPanel />}
+      <div hidden={mode !== "pack"} aria-hidden={mode !== "pack"}>
+        <TeamEngagementParticipationPanel />
+      </div>
+      <div hidden={mode !== "manage"} aria-hidden={mode !== "manage"}>
+        <TeamEngagementPanel />
+      </div>
     </div>
   );
 }

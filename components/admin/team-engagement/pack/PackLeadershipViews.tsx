@@ -12,6 +12,48 @@ async function post(action: string, body: Record<string, unknown>) {
   });
 }
 
+function SurveyDistributionBars({ distribution }: { distribution: unknown }) {
+  const rows: Array<{ label: string; count: number }> = [];
+  if (Array.isArray(distribution)) {
+    for (const entry of distribution) {
+      if (entry && typeof entry === "object") {
+        const record = entry as Record<string, unknown>;
+        rows.push({
+          label: String(record.label ?? record.option ?? record.key ?? "Option"),
+          count: Number(record.count ?? record.value ?? 0)
+        });
+      }
+    }
+  } else if (distribution && typeof distribution === "object") {
+    for (const [label, value] of Object.entries(distribution as Record<string, unknown>)) {
+      rows.push({ label, count: Number(value ?? 0) });
+    }
+  }
+  if (!rows.length) return <p className="ro-te-muted">No distribution data.</p>;
+  const max = Math.max(1, ...rows.map((row) => row.count));
+  return (
+    <ul className="ro-te-list" style={{ marginTop: 8 }}>
+      {rows.map((row) => (
+        <li key={row.label} style={{ display: "grid", gridTemplateColumns: "1fr 3fr auto", gap: 8, alignItems: "center" }}>
+          <span>{row.label}</span>
+          <span
+            style={{
+              display: "block",
+              height: 8,
+              borderRadius: 4,
+              background: "var(--ro-te-accent, #3b82f6)",
+              width: `${Math.round((row.count / max) * 100)}%`,
+              minWidth: row.count ? 4 : 0
+            }}
+            aria-hidden
+          />
+          <span className="ro-te-muted">{row.count}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function PackOverviewBody({ data, onRefresh }: { data: Record<string, unknown>; onRefresh: () => void }) {
   const goals = data.goals as { active?: number; completed?: number } | undefined;
   const milestones = data.milestones as { upcoming?: number } | undefined;
@@ -180,11 +222,7 @@ export function EmployeeVoiceAdminBody({ data, onRefresh }: { data: Record<strin
                     · {String(q.responseCount)} responses
                     {q.suppressed ? " · hidden (below minimum)" : ""}
                   </span>
-                  {q.distribution ? (
-                    <pre className="ro-te-muted" style={{ fontSize: 12, whiteSpace: "pre-wrap" }}>
-                      {JSON.stringify(q.distribution, null, 2)}
-                    </pre>
-                  ) : null}
+                  {q.distribution ? <SurveyDistributionBars distribution={q.distribution} /> : null}
                   {Array.isArray(q.samples) && q.samples.length ? (
                     <ul className="ro-te-list">
                       {(q.samples as string[]).slice(0, 5).map((sample, index) => (
@@ -393,7 +431,15 @@ export function PackIdeasAdminBody({ data, onRefresh }: { data: Record<string, u
               <button type="button" className="ro-te-btn ro-te-btn--ghost" onClick={() => void post("update_feedback", { id: row.id, status: "under_review" }).then(onRefresh)}>
                 Under review
               </button>
-              <button type="button" className="ro-te-btn ro-te-btn--primary" onClick={() => void post("update_feedback", { id: row.id, status: "implemented", resolution: "We are putting this into practice." }).then(onRefresh)}>
+              <button
+                type="button"
+                className="ro-te-btn ro-te-btn--primary"
+                onClick={() => {
+                  const resolution = window.prompt("What did the team do with this idea?", "We are putting this into practice.");
+                  if (!resolution || resolution.length < 5) return;
+                  void post("update_feedback", { id: row.id, status: "implemented", resolution }).then(onRefresh);
+                }}
+              >
                 Implemented
               </button>
             </div>

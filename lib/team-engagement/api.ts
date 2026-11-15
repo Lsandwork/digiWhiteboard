@@ -120,6 +120,15 @@ import {
   packEngagementOverview
 } from "@/lib/team-engagement/pack-leadership";
 import {
+  archiveEngagementTemplate,
+  duplicateEngagementTemplate,
+  favoriteEngagementTemplate,
+  publishEngagementTemplate,
+  saveEngagementTemplate,
+  syncTemplateCatalog,
+  templateLibraryView
+} from "@/lib/team-engagement/template-library";
+import {
   announcementsForEmployee,
   archiveAnnouncement,
   assignDepartmentManager,
@@ -290,6 +299,8 @@ export async function runLeadershipView(ctx: ServiceContext, view: LeadershipVie
       return ideasManagementView(ctx);
     case "pack_milestones_admin":
       return milestonesView(ctx);
+    case "template_library_admin":
+      return templateLibraryView(ctx, params);
     case "voice_survey_results":
       return voiceSurveyResults(ctx, params);
   }
@@ -397,6 +408,18 @@ export async function runLeadershipAction(ctx: ServiceContext, action: Leadershi
       return publishWouldYouRather(ctx, body);
     case "publish_pack_event":
       return publishPackEvent(ctx, body);
+    case "save_engagement_template":
+      return saveEngagementTemplate(ctx, body);
+    case "duplicate_engagement_template":
+      return duplicateEngagementTemplate(ctx, body);
+    case "favorite_engagement_template":
+      return favoriteEngagementTemplate(ctx, body);
+    case "archive_engagement_template":
+      return archiveEngagementTemplate(ctx, body);
+    case "publish_engagement_template":
+      return publishEngagementTemplate(ctx, body);
+    case "sync_engagement_template_catalog":
+      return { inserted: await syncTemplateCatalog(ctx) };
   }
 }
 

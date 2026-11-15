@@ -24,7 +24,7 @@ import {
   type ViewRule
 } from "@/lib/team-engagement/permissions";
 import type { EngagementPermission } from "@/lib/team-engagement/permissions";
-import type { DepartmentManagerRow, EngagementActor, EngagementDb } from "@/lib/team-engagement/types";
+import type { DepartmentManagerRow, EngagementActor, EngagementDb, EngagementTable } from "@/lib/team-engagement/types";
 
 /** Role matrix edits must not strip Bark Out participation that the static role defaults include. */
 function withBaselineParticipantPermissions(
@@ -42,12 +42,16 @@ function withBaselineParticipantPermissions(
 }
 
 async function engagementStorageReady(db: EngagementDb): Promise<boolean> {
-  try {
-    const status = await db.tableStatus();
-    return Boolean(status.team_engagement_bark_outs && status.team_engagement_settings);
-  } catch {
-    return false;
+  const coreTables: EngagementTable[] = ["team_engagement_bark_outs", "team_engagement_settings"];
+  for (const table of coreTables) {
+    try {
+      await db.select(table, { limit: 1 });
+    } catch (error) {
+      if (error instanceof EngagementError && error.code === "setup_required") return false;
+      return false;
+    }
   }
+  return true;
 }
 
 export type EngagementIdentity = {
@@ -229,8 +233,10 @@ async function loadManagedDepartments(db: EngagementDb, userId: string): Promise
     });
     return { departments: rows.map((row) => row.department_key), storageReady: true };
   } catch (error) {
-    if (error instanceof EngagementError && error.code === "setup_required") return { departments: [], storageReady: false };
-    throw error;
+    if (error instanceof EngagementError) {
+      return { departments: [], storageReady: false };
+    }
+    return { departments: [], storageReady: false };
   }
 }
 
@@ -266,7 +272,7 @@ export async function loadEngagementContext(
       managedDepartments: managed.departments,
       impersonated: Boolean(session.impersonatorEmail)
     });
-    return { ok: true, context: { session, supabase, db, actor, storageReady: storageReady || managed.storageReady } };
+    return { ok: true, context: { session, supabase, db, actor, storageReady } };
   } catch (error) {
     return { ok: false, response: engagementErrorResponse(error) };
   }

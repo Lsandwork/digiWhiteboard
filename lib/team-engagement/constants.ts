@@ -5,6 +5,8 @@ export const PACK_PRIORITY2_MIGRATION = "supabase/migrations/105_pack_priority2.
 export const PACK_PRIORITY3_MIGRATION = "supabase/migrations/107_pack_priority3.sql";
 export const PACK_PHASE4_MIGRATION = "supabase/migrations/109_pack_phase4.sql";
 export const PACK_PHASE4_COMMIT = "supabase/migrations/110_team_engagement_commit_phase4.sql";
+export const TEMPLATE_LIBRARY_MIGRATION = "supabase/migrations/111_team_engagement_templates.sql";
+export const TEMPLATE_LIBRARY_COMMIT = "supabase/migrations/112_team_engagement_commit_templates.sql";
 
 export const PACK_GOAL_TYPES = ["numeric", "completion", "participation", "milestone", "timebound"] as const;
 export type PackGoalType = (typeof PACK_GOAL_TYPES)[number];

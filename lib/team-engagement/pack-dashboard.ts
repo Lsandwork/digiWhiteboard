@@ -200,7 +200,10 @@ export async function packDashboard(ctx: ServiceContext) {
       employeeVoice: pack3Ready
         ? { ready: true }
         : { ready: false, message: `Apply ${PACK_PRIORITY3_MIGRATION}, then publish surveys under Employee Voice (leadership).` },
-      ideas: { ready: settings.features.feedback }
+      ideas: { ready: settings.features.feedback },
+      teamPulse: pack4Ready
+        ? { ready: true }
+        : { ready: false, message: `Apply ${PACK_PHASE4_MIGRATION} and ${PACK_PHASE4_COMMIT} for Team Pulse check-ins.` }
     }
   };
 }

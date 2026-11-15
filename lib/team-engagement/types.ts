@@ -56,7 +56,10 @@ export const ENGAGEMENT_TABLES = [
   "team_engagement_pack_event_rsvps",
   "team_engagement_team_pulse_responses",
   "team_engagement_voice_outcomes",
-  "team_engagement_audit_events"
+  "team_engagement_audit_events",
+  "team_engagement_templates",
+  "team_engagement_template_favorites",
+  "team_engagement_template_publications"
 ] as const;
 export type EngagementTable = (typeof ENGAGEMENT_TABLES)[number];
 

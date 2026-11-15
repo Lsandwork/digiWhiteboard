@@ -2,7 +2,7 @@
 
 import "@/app/styles/team-engagement.css";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchAdminJson } from "@/lib/http/fetch-admin-json";
 import { humanizeUnknownError } from "@/lib/safe-url";
 import {
@@ -13,6 +13,26 @@ import {
   PackMilestonesAdminBody,
   PackOverviewBody
 } from "@/components/admin/team-engagement/pack/PackLeadershipViews";
+import { TemplateLibraryAdminBody } from "@/components/admin/team-engagement/pack/TemplateLibraryAdminBody";
+import {
+  AccessAdminBody,
+  AiPolicyAdminBody,
+  AnalyticsAdminBody,
+  AnnouncementsAdminBody,
+  DepartmentsAdminBody,
+  DevelopmentAdminBody,
+  FeatureControlsAdminBody,
+  FeedbackAdminBody,
+  IntegrationsAdminBody,
+  PermissionsAdminBody,
+  ProgramsAdminBody,
+  ReportsAdminBody,
+  RetentionAdminBody,
+  SecurityAdminBody,
+  SettingsAdminBody,
+  SystemHealthAdminBody,
+  WorkloadAdminBody
+} from "@/components/admin/team-engagement/LeadershipManagementViews";
 
 type NavItem = { id: string; label: string; icon: string; view: string };
 type NavGroup = { id: string; label: string; items: NavItem[] };
@@ -172,42 +192,144 @@ function ModerationBody({
   onAction: (action: string, payload: Record<string, unknown>) => Promise<void>;
 }) {
   const items = (data.items as Record<string, unknown>[]) ?? [];
+  const repeats = (data.repeatViolations as Array<{ name: string; count: number }>) ?? [];
   const [busyId, setBusyId] = useState<string | null>(null);
-  async function act(id: string, action: string) {
+  const [actionError, setActionError] = useState<string | null>(null);
+  async function act(id: string, action: string, payload: Record<string, unknown> = {}) {
     setBusyId(id);
+    setActionError(null);
     try {
-      await onAction(action, { id });
+      await onAction(action, { id, ...payload });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "That action failed.");
     } finally {
       setBusyId(null);
     }
   }
   if (!items.length) {
-    return <EmptyIllustration name="empty-bark-outs" title="Moderation queue is clear" body="New submissions that need a person will land here." />;
+    return (
+      <div className="ro-te-stack">
+        {repeats.length ? (
+          <section className="ro-te-card ro-te-section">
+            <h3 className="ro-te-section__title">Repeat policy outcomes (90 days)</h3>
+            <ul className="ro-te-list">
+              {repeats.map((row) => (
+                <li key={row.name}>
+                  {row.name} <span className="ro-te-muted">· {row.count} outcomes</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+        <EmptyIllustration name="empty-bark-outs" title="Moderation queue is clear" body="New submissions that need a person will land here." />
+      </div>
+    );
   }
   return (
-    <ul className="ro-te-list">
-      {items.map((item) => (
-        <li key={String(item.id)} className="ro-te-list__item ro-te-mod-item">
-          <p>{String(item.message ?? "")}</p>
-          <p className="ro-te-muted">
-            {String(item.authorName)} → {String(item.recipientName)}
-          </p>
-          <div className="ro-te-actions">
-            <button type="button" className="ro-te-btn ro-te-btn--primary" disabled={busyId === String(item.id)} onClick={() => void act(String(item.id), "approve_bark_out")}>
-              Approve
-            </button>
-            <button
-              type="button"
-              className="ro-te-btn ro-te-btn--ghost"
-              disabled={busyId === String(item.id)}
-              onClick={() => void act(String(item.id), "reject_bark_out")}
-            >
-              Reject
-            </button>
-          </div>
-        </li>
-      ))}
-    </ul>
+    <div className="ro-te-stack">
+      {actionError ? <p className="ro-te-error">{actionError}</p> : null}
+      {repeats.length ? (
+        <section className="ro-te-card ro-te-section">
+          <h3 className="ro-te-section__title">Repeat policy outcomes (90 days)</h3>
+          <ul className="ro-te-list">
+            {repeats.map((row) => (
+              <li key={row.name}>
+                {row.name} <span className="ro-te-muted">· {row.count} outcomes</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      <ul className="ro-te-list">
+        {items.map((item) => {
+          const id = String(item.id);
+          const busy = busyId === id;
+          const reports = (item.reports as Array<{ id: string; reason: string; status: string }>) ?? [];
+          const openReports = reports.filter((report) => report.status === "open");
+          return (
+            <li key={id} className="ro-te-list__item ro-te-mod-item">
+              <p>{String(item.message ?? "")}</p>
+              <p className="ro-te-muted">
+                {String(item.authorName)} → {String(item.recipientName)}
+                {item.openReportCount ? ` · ${String(item.openReportCount)} open report(s)` : ""}
+                {item.escalated ? " · Escalated" : ""}
+              </p>
+              {openReports.length ? (
+                <ul className="ro-te-list">
+                  {openReports.map((report) => (
+                    <li key={report.id} className="ro-te-muted">
+                      Report: {report.reason}
+                      <div className="ro-te-actions">
+                        <button
+                          type="button"
+                          className="ro-te-btn ro-te-btn--ghost"
+                          disabled={busy}
+                          onClick={() =>
+                            void act(id, "resolve_report", { reportId: report.id, resolution: "keep", note: "Kept after review." })
+                          }
+                        >
+                          Keep post
+                        </button>
+                        <button
+                          type="button"
+                          className="ro-te-btn ro-te-btn--ghost"
+                          disabled={busy}
+                          onClick={() => {
+                            const note = window.prompt("Removal note (required):", "Removed after a concern report.");
+                            if (!note || note.length < 5) return;
+                            void act(id, "resolve_report", { reportId: report.id, resolution: "remove", note, reason: "other" });
+                          }}
+                        >
+                          Remove post
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <div className="ro-te-actions">
+                {item.canDecide !== false ? (
+                  <>
+                    <button type="button" className="ro-te-btn ro-te-btn--primary" disabled={busy} onClick={() => void act(id, "approve_bark_out")}>
+                      Approve
+                    </button>
+                    <button type="button" className="ro-te-btn ro-te-btn--ghost" disabled={busy} onClick={() => void act(id, "reject_bark_out")}>
+                      Reject
+                    </button>
+                    <button
+                      type="button"
+                      className="ro-te-btn ro-te-btn--ghost"
+                      disabled={busy}
+                      onClick={() => {
+                        const note = window.prompt("Escalation note for Admins (at least 5 characters):");
+                        if (!note || note.length < 5) return;
+                        void act(id, "escalate_bark_out", { note });
+                      }}
+                    >
+                      Escalate
+                    </button>
+                    <button
+                      type="button"
+                      className="ro-te-btn ro-te-btn--ghost"
+                      disabled={busy}
+                      onClick={() => {
+                        const note = window.prompt("Removal note (required):", "Removed by moderator.");
+                        if (!note || note.length < 5) return;
+                        void act(id, "remove_bark_out", { reason: "other", note });
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </>
+                ) : (
+                  <p className="ro-te-muted">{String(item.decideBlockedReason ?? "You cannot decide on this item in your scope.")}</p>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -224,6 +346,7 @@ function viewBody(
   if (view === "fun_zone_admin") return <FunZoneAdminBody data={record} onRefresh={onRefresh} />;
   if (view === "pack_ideas_admin") return <PackIdeasAdminBody data={record} onRefresh={onRefresh} />;
   if (view === "pack_milestones_admin") return <PackMilestonesAdminBody onSync={onRefresh} />;
+  if (view === "template_library_admin") return <TemplateLibraryAdminBody data={record} onRefresh={onRefresh} />;
   if (view === "overview") return <OverviewBody data={record} />;
   if (view === "staff") {
     const items = (record.items as Record<string, unknown>[]) ?? [];
@@ -241,13 +364,23 @@ function viewBody(
   }
   if (view === "bark_outs") return <BarkOutList items={(record.items as Record<string, unknown>[]) ?? []} />;
   if (view === "moderation") return <ModerationBody data={record} onAction={onAction} />;
-  if (view === "analytics") {
-    return record.series ? (
-      <EmptyIllustration name="empty-analytics" title="Engagement analytics" body="Charts use live Bark Out and program data from your selected filters." />
-    ) : (
-      <EmptyIllustration name="empty-analytics" title="No analytics for this filter" body="Try widening the date range or choosing another department." />
-    );
-  }
+  if (view === "analytics") return <AnalyticsAdminBody data={record} />;
+  if (view === "feedback") return <FeedbackAdminBody data={record} onAction={onAction} onRefresh={onRefresh} />;
+  if (view === "announcements") return <AnnouncementsAdminBody data={record} onAction={onAction} onRefresh={onRefresh} />;
+  if (view === "programs") return <ProgramsAdminBody data={record} />;
+  if (view === "development") return <DevelopmentAdminBody data={record} />;
+  if (view === "workload") return <WorkloadAdminBody data={record} />;
+  if (view === "departments") return <DepartmentsAdminBody data={record} />;
+  if (view === "settings") return <SettingsAdminBody data={record} onAction={onAction} onRefresh={onRefresh} />;
+  if (view === "reports") return <ReportsAdminBody data={record} />;
+  if (view === "security") return <SecurityAdminBody data={record} />;
+  if (view === "integrations") return <IntegrationsAdminBody data={record} />;
+  if (view === "system_health") return <SystemHealthAdminBody data={record} />;
+  if (view === "access" || view === "management_access" || view === "admin_management") return <AccessAdminBody data={record} />;
+  if (view === "permissions") return <PermissionsAdminBody data={record} onAction={onAction} onRefresh={onRefresh} />;
+  if (view === "ai_policy") return <AiPolicyAdminBody data={record} onAction={onAction} onRefresh={onRefresh} />;
+  if (view === "retention") return <RetentionAdminBody data={record} onAction={onAction} onRefresh={onRefresh} />;
+  if (view === "features") return <FeatureControlsAdminBody data={record} onAction={onAction} onRefresh={onRefresh} />;
   if (view === "audit") {
     const items = (record.items as Record<string, unknown>[]) ?? [];
     return (
@@ -266,24 +399,31 @@ function viewBody(
     );
   }
   return (
-    <section className="ro-te-card ro-te-section">
-      <p className="ro-te-muted">This section loads live data from Team Engagement. Use the actions in the admin API for changes not shown here yet.</p>
-      <pre className="ro-te-debug">{JSON.stringify(record, null, 2).slice(0, 4000)}</pre>
-    </section>
+    <EmptyIllustration
+      name="empty-staff"
+      title="This screen is not available"
+      body={`The workspace does not recognize view "${view}". Refresh or pick another section from the sidebar.`}
+    />
   );
 }
+
+const VIEWS_WITHOUT_STORAGE = new Set(["template_library_admin", "system_health", "integrations"]);
 
 export default function TeamEngagementPanel() {
   const [context, setContext] = useState<ContextPayload | null>(null);
   const [active, setActive] = useState<NavItem | null>(null);
-  const [viewData, setViewData] = useState<unknown>(null);
+  const [viewCache, setViewCache] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(true);
   const [viewLoading, setViewLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewError, setViewError] = useState<string | null>(null);
+  const navInitialized = useRef(false);
+  const activeIdRef = useRef<string | null>(null);
+  const viewCacheRef = useRef<Record<string, unknown>>({});
 
-  const loadContext = useCallback(async () => {
-    setLoading(true);
+  const loadContext = useCallback(async (opts?: { preserveNav?: boolean }) => {
+    const initialLoad = !navInitialized.current;
+    if (initialLoad) setLoading(true);
     setError(null);
     try {
       const { ok, status, body } = await fetchAdminJson<ContextPayload & { error?: string; code?: string }>(
@@ -297,28 +437,52 @@ export default function TeamEngagementPanel() {
       setContext(body);
       const items = body.nav.flatMap((group) => group.items);
       const pick = items.find((item) => item.id === body.defaultSection) ?? items[0] ?? null;
-      setActive(pick);
+      if (!navInitialized.current) {
+        setActive(pick);
+        activeIdRef.current = pick?.id ?? null;
+        navInitialized.current = true;
+      } else if (opts?.preserveNav && activeIdRef.current) {
+        const still = items.find((item) => item.id === activeIdRef.current) ?? pick;
+        setActive(still);
+        activeIdRef.current = still?.id ?? null;
+      }
     } catch (err) {
       setError(humanizeUnknownError(err, "Team Engagement could not load."));
     } finally {
-      setLoading(false);
+      if (initialLoad) setLoading(false);
     }
   }, []);
 
   const loadView = useCallback(
     async (item: NavItem | null) => {
-      if (!item || !context?.storageReady) return;
-      setViewLoading(true);
+      if (!item) return;
+      if (!context?.storageReady && !VIEWS_WITHOUT_STORAGE.has(item.view)) return;
+      const hadData = Object.prototype.hasOwnProperty.call(viewCacheRef.current, item.view);
+      setViewLoading(!hadData);
       setViewError(null);
       try {
         const { ok, body } = await fetchAdminJson(`/api/admin/team-engagement?view=${encodeURIComponent(item.view)}`);
         if (!ok) {
-          setViewData(null);
+          if (!hadData) {
+            const next = { ...viewCacheRef.current };
+            delete next[item.view];
+            viewCacheRef.current = next;
+            setViewCache(next);
+          }
           setViewError((body as { error?: string }).error ?? "This section could not load.");
           return;
         }
-        setViewData(body);
+        const next = { ...viewCacheRef.current, [item.view]: body };
+        viewCacheRef.current = next;
+        setViewCache(next);
+        setViewError(null);
       } catch (err) {
+        if (!hadData) {
+          const next = { ...viewCacheRef.current };
+          delete next[item.view];
+          viewCacheRef.current = next;
+          setViewCache(next);
+        }
         setViewError(humanizeUnknownError(err, "This section could not load."));
       } finally {
         setViewLoading(false);
@@ -364,20 +528,15 @@ export default function TeamEngagementPanel() {
     );
   }
 
-  if (!context.storageReady) {
-    return (
-      <div className="ro-te-shell">
-        <EmptyIllustration
-          name="access-denied"
-          title="Database setup required"
-          body={`Run ${context.migration} in the Supabase SQL Editor before using Team Engagement.`}
-        />
-      </div>
-    );
-  }
+  const storageBanner = !context.storageReady ? (
+    <div className="ro-te-banner ro-te-banner--warn" style={{ marginBottom: 12 }}>
+      Core Team Engagement storage is not ready. Run {context.migration} in Supabase. Template Library catalog remains available offline.
+    </div>
+  ) : null;
 
   return (
     <div className="ro-te-shell">
+      {storageBanner}
       <header className="ro-te-header">
         <div>
           <h2 className="ro-te-header__title">Manage Team Engagement</h2>
@@ -391,7 +550,7 @@ export default function TeamEngagementPanel() {
             ) : null}
           </p>
         </div>
-        <button type="button" className="ro-te-btn ro-te-btn--ghost" onClick={() => void loadContext()}>
+        <button type="button" className="ro-te-btn ro-te-btn--ghost" onClick={() => void loadContext({ preserveNav: true })}>
           Refresh
         </button>
       </header>
@@ -406,7 +565,10 @@ export default function TeamEngagementPanel() {
                     <button
                       type="button"
                       className={`ro-te-sidebar__link ${active?.id === item.id ? "ro-te-sidebar__link--active" : ""}`}
-                      onClick={() => setActive(item)}
+                      onClick={() => {
+                        activeIdRef.current = item.id;
+                        setActive(item);
+                      }}
                     >
                       <TeIcon name={item.icon} />
                       <span>{item.label}</span>
@@ -419,9 +581,23 @@ export default function TeamEngagementPanel() {
         </nav>
         <main className="ro-te-main">
           <h3 className="ro-te-main__title">{active?.label ?? "Overview"}</h3>
-          {viewLoading ? <p className="ro-te-muted">Loading…</p> : null}
+          {viewLoading && active && !Object.prototype.hasOwnProperty.call(viewCache, active.view) ? (
+            <p className="ro-te-muted">Loading…</p>
+          ) : null}
           {viewError ? <p className="ro-te-error">{viewError}</p> : null}
-          {!viewLoading && !viewError && active ? viewBody(active.view, viewData, postAction, () => void loadView(active)) : null}
+          {active && !viewError && !context.storageReady && !VIEWS_WITHOUT_STORAGE.has(active.view) ? (
+            <EmptyIllustration
+              name="empty-staff"
+              title="Storage not ready"
+              body={`Run supabase/migrations/103_team_engagement.sql through 112_team_engagement_commit_templates.sql in the Supabase SQL Editor, then click Refresh.`}
+            />
+          ) : null}
+          {active &&
+          !viewError &&
+          (context.storageReady || VIEWS_WITHOUT_STORAGE.has(active.view)) &&
+          Object.prototype.hasOwnProperty.call(viewCache, active.view)
+            ? viewBody(active.view, viewCache[active.view], postAction, () => void loadView(active))
+            : null}
         </main>
       </div>
     </div>

@@ -3,7 +3,7 @@
 import "@/app/styles/the-pack.css";
 import "@/app/styles/team-engagement.css";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchAdminJson } from "@/lib/http/fetch-admin-json";
 import { humanizeUnknownError } from "@/lib/safe-url";
 import {
@@ -341,15 +341,27 @@ export default function PackExperience() {
       setMineReceived(body.received ?? []);
       setMineSentPublished(body.sent.filter((row) => row.status === "published") as unknown as BarkOutItem[]);
     }
-  }, [pack?.me.avatarUrl, pack?.me.name, pack?.me.userId]);
+  }, []);
+
+  const packLoadedOnce = useRef(false);
 
   const loadPack = useCallback(async () => {
-    const { ok, body } = await fetchAdminJson<PackPayload & { error?: string }>("/api/admin/bark-outs?view=pack");
+    const { ok, body } = await fetchAdminJson<PackPayload & { error?: string; code?: string }>("/api/admin/bark-outs?view=pack");
     if (!ok) {
-      setPack(null);
-      setError((body as { error?: string }).error ?? "Team Engagement is not available.");
+      const code = (body as { code?: string }).code;
+      const message =
+        code === "setup_required"
+          ? "Team Engagement storage is not set up yet. Apply migration 103 on Supabase, then refresh."
+          : code === "storage_error"
+            ? "Team Engagement could not reach its storage. Check Supabase connectivity and migrations, then refresh."
+            : (body as { error?: string }).error ?? "Team Engagement is not available.";
+      if (!packLoadedOnce.current) {
+        setPack(null);
+      }
+      setError(message);
       return;
     }
+    packLoadedOnce.current = true;
     setPack(body);
     setError(null);
   }, []);
@@ -389,8 +401,7 @@ export default function PackExperience() {
   useEffect(() => {
     void loadPack();
     void loadMine();
-    void loadTeamPulse();
-  }, [loadPack, loadMine, loadTeamPulse]);
+  }, [loadPack, loadMine]);
 
   useEffect(() => {
     if (section === "bark_outs") void loadFeed();
@@ -485,7 +496,7 @@ export default function PackExperience() {
     });
     if (!ok) setError((body as { error?: string }).error ?? "Could not confirm.");
     else {
-      await Promise.all([loadPack(), loadMine(), loadFeed()]);
+      await Promise.all([loadPack(), loadMine(), section === "bark_outs" ? loadFeed() : Promise.resolve()]);
     }
   }
 
@@ -497,7 +508,7 @@ export default function PackExperience() {
     });
     if (!ok) setError((body as { error?: string }).error ?? "Could not withdraw.");
     else {
-      await Promise.all([loadPack(), loadMine(), loadFeed()]);
+      await Promise.all([loadPack(), loadMine(), section === "bark_outs" ? loadFeed() : Promise.resolve()]);
     }
   }
 
@@ -515,7 +526,7 @@ export default function PackExperience() {
       if (!ok) throw new Error((body as { error?: string }).error ?? "Could not send Bark Out.");
       setModalOpen(false);
       setMessage("");
-      await Promise.all([loadPack(), loadFeed(), loadMine()]);
+      await Promise.all([loadPack(), loadMine(), section === "bark_outs" ? loadFeed() : Promise.resolve()]);
     } catch (err) {
       setError(humanizeUnknownError(err, "Could not send Bark Out."));
     } finally {
@@ -535,7 +546,7 @@ export default function PackExperience() {
   if (!pack) {
     return (
       <div className="pack">
-        <div className="pack-skel" style={{ height: 200 }} />
+        <div className="pack-skel pack-skel--animate" style={{ height: 200 }} />
       </div>
     );
   }
@@ -1373,7 +1384,10 @@ export default function PackExperience() {
         teamPulse === null ? (
           <p className="pack-muted">Loading Team Pulse…</p>
         ) : !teamPulse.ready ? (
-          <SectionEmpty title="Team Pulse" body="Apply migration 109 on Supabase to enable weekly team check-ins." />
+          <SectionEmpty
+            title="Team Pulse"
+            body={pack.sectionStatus.teamPulse?.message ?? "Apply Pack Phase 4 migrations to enable weekly pulse check-ins."}
+          />
         ) : (
           <section className="pack-card">
             <h2 className="pack-card__title">Team Pulse</h2>
@@ -1416,7 +1430,7 @@ export default function PackExperience() {
                 </label>
                 <label className="pack-field">
                   Optional note
-                  <textarea name="pulse-note" maxLength={400} rows={2} />
+                  <textarea name="pulse-note" maxLength={400} rows={3} placeholder="Anything management should know?" />
                 </label>
                 <button type="submit" className="pack-btn pack-btn--primary">
                   Submit check-in

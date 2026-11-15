@@ -139,10 +139,14 @@ export function createSupabaseEngagementDb(supabase: SupabaseClient): Engagement
     async tableStatus() {
       const entries = await Promise.all(
         ENGAGEMENT_TABLES.map(async (table) => {
-          const { error } = await supabase.from(table).select("*", { head: true, count: "exact" }).limit(1);
-          if (!error) return [table, true] as const;
-          if (isMissingRelationError(error)) return [table, false] as const;
-          throw mapDbError(error);
+          try {
+            const { error } = await supabase.from(table).select("*", { head: true, count: "exact" }).limit(1);
+            if (!error) return [table, true] as const;
+            if (isMissingRelationError(error)) return [table, false] as const;
+            return [table, false] as const;
+          } catch {
+            return [table, false] as const;
+          }
         })
       );
       return Object.fromEntries(entries) as Record<EngagementTable, boolean>;

@@ -655,9 +655,16 @@
 .pack-skel {
   height: 120px;
   border-radius: var(--pack-radius);
-  background: linear-gradient(90deg, #eef5f9, #f8fbfd, #eef5f9);
-  background-size: 200% 100%;
-  animation: pack-skel 1.2s ease infinite;
+  background: #eef5f9;
+  border: 1px solid #dce8ef;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pack-skel--animate {
+    background: linear-gradient(90deg, #eef5f9, #f8fbfd, #eef5f9);
+    background-size: 200% 100%;
+    animation: pack-skel 1.6s ease-in-out 2;
+  }
 }
 
 @keyframes pack-skel {
