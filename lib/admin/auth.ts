@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { timingSafeEqual } from "crypto";
-import { getServiceSupabase } from "@/lib/supabase/server";
+import { tryGetServiceSupabase } from "@/lib/supabase/server";
 import { findAdminUsersForLogin, verifyAdminUserPassword, type AdminUserRecord } from "@/lib/admin/users";
 import { DEMO_PASSWORD, findDemoAccount } from "@/lib/demo/constants";
 import { isDemoIdentity, isDemoModeEnabled } from "@/lib/demo/policy";
@@ -43,11 +43,11 @@ function safeEqual(a: string, b: string) {
 }
 
 /** Bound DB calls so a stalled query cannot block env/demo login. */
-const AUTH_QUERY_TIMEOUT_MS = 2_500;
+const AUTH_QUERY_TIMEOUT_MS = 5_000;
 const ENV_ATTACH_TIMEOUT_MS = 800;
 
 function authSupabase(timeoutMs = AUTH_QUERY_TIMEOUT_MS) {
-  return getServiceSupabase({ timeoutMs });
+  return tryGetServiceSupabase({ timeoutMs });
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -115,7 +115,22 @@ function pickLoginUser(users: AdminUserRecord[], normalized: string) {
 
 async function lookupLoginUsers(emails: string[], timeoutMs = AUTH_QUERY_TIMEOUT_MS) {
   const supabase = authSupabase(timeoutMs);
+  if (!supabase) {
+    throw new Error("Supabase client unavailable");
+  }
   return withTimeout(findAdminUsersForLogin(supabase, emails), timeoutMs, "admin user lookup");
+}
+
+async function superAdminEnvFallback(username: string, password: string): Promise<AdminAuthResult | null> {
+  const normalized = username.trim().toLowerCase();
+  if (!isSuperAdminLoginAlias(normalized)) return null;
+  if (!(await envPasswordMatches(password))) return null;
+  return {
+    ok: true,
+    email: SUPER_ADMIN_EMAIL,
+    role: "owner_admin",
+    source: "env"
+  };
 }
 
 export async function verifyAdminCredentials(username: string, password: string): Promise<AdminAuthResult> {
@@ -168,6 +183,8 @@ export async function verifyAdminCredentials(username: string, password: string)
       return resultFromDbUser(dbUser, "database");
     }
   } catch (error) {
+    const envFallback = await superAdminEnvFallback(normalized, password);
+    if (envFallback) return envFallback;
     if (isAuthTimeout(error)) {
       return { ok: false, unavailable: true, email: normalized, source: "database" };
     }

@@ -9,7 +9,10 @@ const usersSource = readFileSync(join(process.cwd(), "lib/admin/users.ts"), "utf
 assert.match(authSource, /const envValid = isSuperAdminLoginAlias\(normalized\) \? await envPasswordMatches\(password\) : false;/);
 assert.match(authSource, /\/\/ Env `admin` login must succeed even when Supabase is down or slow\./);
 assert.match(authSource, /ENV_ATTACH_TIMEOUT_MS = 800/);
-assert.match(authSource, /AUTH_QUERY_TIMEOUT_MS = 2_500/);
+assert.match(authSource, /AUTH_QUERY_TIMEOUT_MS = 5_000/);
+assert.match(authSource, /tryGetServiceSupabase/);
+assert.match(authSource, /superAdminEnvFallback/);
+assert.match(loginSource, /tryGetServiceSupabase/);
 assert.doesNotMatch(authSource, /loadAdminSettings/);
 assert.doesNotMatch(authSource, /allow_env_admin_login/);
 

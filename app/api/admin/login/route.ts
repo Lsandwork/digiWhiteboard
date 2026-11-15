@@ -13,17 +13,13 @@ import {
   setAdminSessionCookie
 } from "@/lib/admin/session";
 import { touchAdminUserLogin } from "@/lib/admin/users";
-import { getServiceSupabase } from "@/lib/supabase/server";
+import { tryGetServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
 
 function throttleSupabase() {
-  try {
-    return getServiceSupabase({ timeoutMs: 1_000 });
-  } catch {
-    return null;
-  }
+  return tryGetServiceSupabase({ timeoutMs: 1_000 });
 }
 
 export async function POST(request: Request) {
@@ -65,7 +61,10 @@ export async function POST(request: Request) {
     const adminUserId = auth.adminUserId;
     if (adminUserId) {
       after(() => {
-        void touchAdminUserLogin(getServiceSupabase({ timeoutMs: 4_000 }), adminUserId, auth.email).catch(() => undefined);
+        const supabase = tryGetServiceSupabase({ timeoutMs: 4_000 });
+        if (supabase) {
+          void touchAdminUserLogin(supabase, adminUserId, auth.email).catch(() => undefined);
+        }
       });
     }
 
