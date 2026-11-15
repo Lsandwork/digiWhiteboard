@@ -5,7 +5,7 @@ import { forbiddenError, validationError } from "@/lib/team-engagement/errors";
 import { createAnnouncement } from "@/lib/team-engagement/records";
 import { saveFunPoll, saveFunQuestion } from "@/lib/team-engagement/pack-features";
 import { savePackGoal } from "@/lib/team-engagement/pack-goals";
-import { multilineText, nowIso, requireStorage, text, type ServiceContext } from "@/lib/team-engagement/context";
+import { assertEngagementWriteReady, multilineText, nowIso, requireStorage, text, type ServiceContext } from "@/lib/team-engagement/context";
 import {
   applyTemplateFields,
   assertTemplateResolvable,
@@ -423,10 +423,10 @@ export async function archiveEngagementTemplate(ctx: ServiceContext, input: { te
 }
 
 export async function publishEngagementTemplate(ctx: ServiceContext, input: Record<string, unknown>) {
-  requireStorage(ctx);
   if (!ctx.actor.tier) throw forbiddenError();
   const template = input.templateId ? await getTemplateById(ctx, String(input.templateId)) : null;
   if (!template) throw validationError("Choose a template to publish.");
+  await assertEngagementWriteReady(ctx, template.kind);
 
   const fields = parseFields(input.fields);
   const asDraft = input.publishMode === "draft" || input.asDraft === true;

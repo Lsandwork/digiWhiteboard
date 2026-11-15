@@ -3,6 +3,7 @@ import type { DepartmentKey, RoleKey } from "@/lib/admin/permissions";
 import { departmentLabel, type AuditCategory, type FeatureKey } from "@/lib/team-engagement/constants";
 import type { EngagementDirectory } from "@/lib/team-engagement/directory";
 import { EngagementError, forbiddenError, notFoundError, setupRequiredError } from "@/lib/team-engagement/errors";
+import { funZoneSetupMessage, funZoneStorageReady } from "@/lib/team-engagement/pack-features";
 import type { ModerationAi } from "@/lib/team-engagement/moderation";
 import { canAccessEmployeeRecord, scopeIncludesDepartments, type DepartmentScope } from "@/lib/team-engagement/permissions";
 import type { EngagementSettings } from "@/lib/team-engagement/settings";
@@ -94,6 +95,31 @@ export function once<T>(load: () => Promise<T>): () => Promise<T> {
 
 export function requireStorage(ctx: Pick<ServiceContext, "storageReady">) {
   if (!ctx.storageReady) throw setupRequiredError();
+}
+
+const FUN_ZONE_PUBLISH_KINDS = new Set(["poll", "question_week", "fun_activity"]);
+
+/** Confirms core (and optional Fun Zone) storage before template publish and similar writes. */
+export async function assertEngagementWriteReady(
+  ctx: Pick<ServiceContext, "db" | "storageReady">,
+  kind?: string
+) {
+  if (!ctx.storageReady) {
+    for (const table of ["team_engagement_bark_outs", "team_engagement_settings"] as const) {
+      try {
+        await ctx.db.select(table, { limit: 1 });
+      } catch (error) {
+        if (error instanceof EngagementError) throw error;
+        throw setupRequiredError();
+      }
+    }
+  }
+  if (kind && FUN_ZONE_PUBLISH_KINDS.has(kind)) {
+    const zone = await funZoneStorageReady(ctx as ServiceContext);
+    if (!zone.ready) {
+      throw new EngagementError(503, "setup_required", funZoneSetupMessage());
+    }
+  }
 }
 
 export async function requireFeature(ctx: ServiceContext, feature: FeatureKey | undefined) {
