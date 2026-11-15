@@ -251,7 +251,9 @@ export async function buildGingrRouteDiagnostics(options: {
   const primaryDateList = configured
     ? (await client.listReservationsByDate(date)).filter((r) => matchesDogQuery(r, dogQuery))
     : [];
-  const allEnriched = configured ? await loadGingrReservationsForRouteDate(client, date) : [];
+  const allEnriched = configured
+    ? await loadGingrReservationsForRouteDate(client, date, { mode: "diagnostics" })
+    : [];
   const fullEnrichment = allEnriched.filter((r) => matchesDogQuery(r, dogQuery));
 
   const normalized = configured

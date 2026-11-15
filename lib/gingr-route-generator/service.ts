@@ -82,7 +82,7 @@ export async function loadGingrRouteSchedule(options: {
       throw new Error("GINGR_API_KEY is not configured.");
     }
     const [reservations, fitdog] = await Promise.all([
-      loadGingrReservationsForRouteDate(client, date),
+      loadGingrReservationsForRouteDate(client, date, { mode: "refresh" }),
       loadFitdogSignupDogs(date)
     ]);
     const gingr = buildGingrRouteSchedulePayload(date, reservations, {

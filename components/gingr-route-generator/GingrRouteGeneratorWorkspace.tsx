@@ -68,7 +68,6 @@ export function GingrRouteGeneratorWorkspace({
   const inFlightRef = useRef(false);
 
   const load = useCallback(async (date: string, refresh: boolean) => {
-    if (inFlightRef.current && refresh) return;
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
