@@ -206,6 +206,10 @@ export async function saveVoiceOutcome(ctx: ServiceContext, input: Record<string
 }
 
 export async function funZonePhase4View(ctx: ServiceContext) {
+  if (!ctx.storageReady) {
+    return { ready: false as const, wouldYouRather: null, events: [] as [] };
+  }
+  try {
   const ready = await packPhase4Ready(ctx);
   const now = nowIso(ctx);
   let wouldYouRather: null | {
@@ -289,6 +293,9 @@ export async function funZonePhase4View(ctx: ServiceContext) {
   }
 
   return { ready: Object.values(ready).every(Boolean), wouldYouRather, events };
+  } catch {
+    return { ready: false as const, wouldYouRather: null, events: [] as [] };
+  }
 }
 
 export async function voteWouldYouRather(ctx: ServiceContext, input: { questionId?: unknown; choice?: unknown }) {

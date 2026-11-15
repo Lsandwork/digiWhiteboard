@@ -88,6 +88,7 @@ import {
   deleteBarkOutComment,
   editBarkOutComment,
   featureSpotlight,
+  funZoneSetupMessage,
   funZoneView,
   listBarkOutComments,
   milestonesView,
@@ -517,7 +518,16 @@ export async function runParticipantView(ctx: ServiceContext, view: ParticipantV
     case "milestones":
       return milestonesView(ctx);
     case "fun_zone": {
-      const [core, phase4] = await Promise.all([funZoneView(ctx), funZonePhase4View(ctx)]);
+      const [core, phase4] = await Promise.all([
+        funZoneView(ctx).catch(() => ({
+          ready: false as const,
+          question: null,
+          poll: null,
+          trivia: null,
+          setupMessage: funZoneSetupMessage()
+        })),
+        funZonePhase4View(ctx).catch(() => ({ ready: false as const, wouldYouRather: null, events: [] as [] }))
+      ]);
       return { ...core, phase4 };
     }
     case "comments":

@@ -46,7 +46,10 @@ export function isMissingRelationError(error: DbErrorLike | null | undefined) {
     code === "42P01" ||
     code === "PGRST202" ||
     code === "PGRST205" ||
+    code === "PGRST204" ||
     message.includes("schema cache") ||
+    message.includes("could not find the function") ||
+    message.includes("team_engagement_commit") ||
     (message.includes("relation") && message.includes("does not exist"))
   );
 }
@@ -63,5 +66,15 @@ export function mapDbError(error: DbErrorLike): EngagementError {
     return validationError("Some of the details are not valid. Check the form and try again.");
   }
   if (code === "42501") return new EngagementError(403, "forbidden", "That change is not allowed.");
+  if (
+    code === "42703" ||
+    (message.toLowerCase().includes("column") && message.toLowerCase().includes("does not exist"))
+  ) {
+    return new EngagementError(
+      503,
+      "setup_required",
+      "Team Engagement schema is out of date. Redeploy the latest RuffOps build and reload the Supabase API schema (Settings → API → Reload)."
+    );
+  }
   return new EngagementError(500, "storage_error", "Team Engagement could not reach its storage. Try again shortly.");
 }

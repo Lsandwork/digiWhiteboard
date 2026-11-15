@@ -3,10 +3,23 @@ import { employeeFeed, myBarkOuts } from "@/lib/team-engagement/bark-outs";
 import { announcementsForEmployee } from "@/lib/team-engagement/records";
 import type { BarkOutView } from "@/lib/team-engagement/bark-outs";
 import type { ServiceContext } from "@/lib/team-engagement/context";
-import { commentCounts, milestonesView, packTablesReady, resolvePackSpotlight, funZoneView } from "@/lib/team-engagement/pack-features";
+import {
+  commentCounts,
+  funZoneSetupMessage,
+  funZoneView,
+  milestonesView,
+  packTablesReady,
+  resolvePackSpotlight
+} from "@/lib/team-engagement/pack-features";
 import type { DbFilter } from "@/lib/team-engagement/types";
 import { barkOutPostingState } from "@/lib/team-engagement/bark-out-posting";
-import { PACK_PHASE4_COMMIT, PACK_PHASE4_MIGRATION, PACK_PRIORITY2_MIGRATION, PACK_PRIORITY3_MIGRATION } from "@/lib/team-engagement/constants";
+import {
+  PACK_PHASE4_COMMIT,
+  PACK_PHASE4_MIGRATION,
+  PACK_PRIORITY2_COMMIT,
+  PACK_PRIORITY2_MIGRATION,
+  PACK_PRIORITY3_MIGRATION
+} from "@/lib/team-engagement/constants";
 import { packPhase4Ready } from "@/lib/team-engagement/pack-phase4";
 import { packGoalsEmployeeView } from "@/lib/team-engagement/pack-goals";
 import { employeeVoiceCatalog } from "@/lib/team-engagement/employee-voice";
@@ -104,7 +117,7 @@ export async function packDashboard(ctx: ServiceContext) {
 
   const [milestones, funZone, packReady, goalsCatalog, voiceCatalog] = await Promise.all([
     milestonesView(ctx),
-    funZoneView(ctx),
+    funZoneView(ctx).catch(() => ({ ready: false as const, question: null, poll: null, trivia: null, setupMessage: funZoneSetupMessage() })),
     packTablesReady(ctx),
     packGoalsEmployeeView(ctx).catch(() => ({ ready: false as const, active: [], completed: [] })),
     employeeVoiceCatalog(ctx).catch(() => ({ ready: false as const, items: [] }))
@@ -196,7 +209,13 @@ export async function packDashboard(ctx: ServiceContext) {
         : { ready: false, message: `Apply ${PACK_PRIORITY3_MIGRATION}, then publish goals from Manage Team Engagement → Pack Goals.` },
       funZone: funZone.ready
         ? { ready: true }
-        : { ready: false, message: `Fun Zone opens after ${PACK_PRIORITY2_MIGRATION} is applied.` },
+        : {
+            ready: false,
+            message:
+              "setupMessage" in funZone && typeof funZone.setupMessage === "string"
+                ? funZone.setupMessage
+                : `Fun Zone opens after ${PACK_PRIORITY2_MIGRATION} and ${PACK_PRIORITY2_COMMIT} are applied.`
+          },
       employeeVoice: pack3Ready
         ? { ready: true }
         : { ready: false, message: `Apply ${PACK_PRIORITY3_MIGRATION}, then publish surveys under Employee Voice (leadership).` },

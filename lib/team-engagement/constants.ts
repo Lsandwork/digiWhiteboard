@@ -2,6 +2,7 @@ import type { DepartmentKey } from "@/lib/admin/permissions";
 
 export const TEAM_ENGAGEMENT_MIGRATION = "supabase/migrations/103_team_engagement.sql";
 export const PACK_PRIORITY2_MIGRATION = "supabase/migrations/105_pack_priority2.sql";
+export const PACK_PRIORITY2_COMMIT = "supabase/migrations/106_team_engagement_commit_pack_tables.sql";
 export const PACK_PRIORITY3_MIGRATION = "supabase/migrations/107_pack_priority3.sql";
 export const PACK_PHASE4_MIGRATION = "supabase/migrations/109_pack_phase4.sql";
 export const PACK_PHASE4_COMMIT = "supabase/migrations/110_team_engagement_commit_phase4.sql";
