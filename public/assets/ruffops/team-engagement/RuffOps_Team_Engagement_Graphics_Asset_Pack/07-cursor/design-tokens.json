@@ -1,0 +1,32 @@
+{
+  "colors": {
+    "navy": "#0c3d5c",
+    "blueDeep": "#08456e",
+    "blue": "#0b6fad",
+    "sky": "#e8f4fc",
+    "skyBright": "#9ecfe6",
+    "white": "#ffffff",
+    "text": "#1d3a4a",
+    "muted": "#5b7280",
+    "gold": "#c4922e",
+    "goldLight": "#fff9ed",
+    "orange": "#e97832",
+    "green": "#2d8f5a",
+    "border": "#d4e8f2"
+  },
+  "radius": {
+    "card": "16px",
+    "pill": "999px",
+    "input": "10px"
+  },
+  "shadow": {
+    "card": "0 8px 28px rgba(12, 61, 92, 0.08)",
+    "hero": "0 12px 40px rgba(8, 69, 110, 0.22)",
+    "cta": "0 6px 16px rgba(11, 111, 173, 0.35)"
+  },
+  "typography": {
+    "heroTitle": "clamp(2rem, 3.5vw, 2.75rem)",
+    "sectionTitle": "1rem",
+    "body": "14px"
+  }
+}

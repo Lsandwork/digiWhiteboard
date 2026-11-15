@@ -412,16 +412,18 @@ const VIEWS_WITHOUT_STORAGE = new Set(["template_library_admin", "system_health"
 export default function TeamEngagementPanel() {
   const [context, setContext] = useState<ContextPayload | null>(null);
   const [active, setActive] = useState<NavItem | null>(null);
-  const [viewData, setViewData] = useState<unknown>(null);
+  const [viewCache, setViewCache] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(true);
   const [viewLoading, setViewLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewError, setViewError] = useState<string | null>(null);
   const navInitialized = useRef(false);
   const activeIdRef = useRef<string | null>(null);
+  const viewCacheRef = useRef<Record<string, unknown>>({});
 
   const loadContext = useCallback(async (opts?: { preserveNav?: boolean }) => {
-    setLoading(true);
+    const initialLoad = !navInitialized.current;
+    if (initialLoad) setLoading(true);
     setError(null);
     try {
       const { ok, status, body } = await fetchAdminJson<ContextPayload & { error?: string; code?: string }>(
@@ -447,7 +449,7 @@ export default function TeamEngagementPanel() {
     } catch (err) {
       setError(humanizeUnknownError(err, "Team Engagement could not load."));
     } finally {
-      setLoading(false);
+      if (initialLoad) setLoading(false);
     }
   }, []);
 
@@ -455,17 +457,32 @@ export default function TeamEngagementPanel() {
     async (item: NavItem | null) => {
       if (!item) return;
       if (!context?.storageReady && !VIEWS_WITHOUT_STORAGE.has(item.view)) return;
-      setViewLoading(true);
+      const hadData = Object.prototype.hasOwnProperty.call(viewCacheRef.current, item.view);
+      setViewLoading(!hadData);
       setViewError(null);
       try {
         const { ok, body } = await fetchAdminJson(`/api/admin/team-engagement?view=${encodeURIComponent(item.view)}`);
         if (!ok) {
-          setViewData(null);
+          if (!hadData) {
+            const next = { ...viewCacheRef.current };
+            delete next[item.view];
+            viewCacheRef.current = next;
+            setViewCache(next);
+          }
           setViewError((body as { error?: string }).error ?? "This section could not load.");
           return;
         }
-        setViewData(body);
+        const next = { ...viewCacheRef.current, [item.view]: body };
+        viewCacheRef.current = next;
+        setViewCache(next);
+        setViewError(null);
       } catch (err) {
+        if (!hadData) {
+          const next = { ...viewCacheRef.current };
+          delete next[item.view];
+          viewCacheRef.current = next;
+          setViewCache(next);
+        }
         setViewError(humanizeUnknownError(err, "This section could not load."));
       } finally {
         setViewLoading(false);
@@ -564,20 +581,22 @@ export default function TeamEngagementPanel() {
         </nav>
         <main className="ro-te-main">
           <h3 className="ro-te-main__title">{active?.label ?? "Overview"}</h3>
-          {viewLoading ? <p className="ro-te-muted">Loading…</p> : null}
+          {viewLoading && active && !Object.prototype.hasOwnProperty.call(viewCache, active.view) ? (
+            <p className="ro-te-muted">Loading…</p>
+          ) : null}
           {viewError ? <p className="ro-te-error">{viewError}</p> : null}
-          {!viewLoading && !viewError && active && !context.storageReady && !VIEWS_WITHOUT_STORAGE.has(active.view) ? (
+          {active && !viewError && !context.storageReady && !VIEWS_WITHOUT_STORAGE.has(active.view) ? (
             <EmptyIllustration
               name="empty-staff"
               title="Storage not ready"
               body={`Run supabase/migrations/103_team_engagement.sql through 112_team_engagement_commit_templates.sql in the Supabase SQL Editor, then click Refresh.`}
             />
           ) : null}
-          {!viewLoading &&
+          {active &&
           !viewError &&
-          active &&
-          (context.storageReady || VIEWS_WITHOUT_STORAGE.has(active.view))
-            ? viewBody(active.view, viewData, postAction, () => void loadView(active))
+          (context.storageReady || VIEWS_WITHOUT_STORAGE.has(active.view)) &&
+          Object.prototype.hasOwnProperty.call(viewCache, active.view)
+            ? viewBody(active.view, viewCache[active.view], postAction, () => void loadView(active))
             : null}
         </main>
       </div>
