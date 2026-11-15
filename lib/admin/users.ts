@@ -362,6 +362,14 @@ function isMissingRelationMessage(message: string) {
   );
 }
 
+function isMissingColumnError(error: { code?: string; message?: string }) {
+  const message = error.message ?? "";
+  if (error.code === "42703" || error.code === "PGRST204") return true;
+  return /column .* does not exist/i.test(message) || /could not find the ['"]?\w+['"]? column/i.test(message);
+}
+
+const ADMIN_LOGIN_USER_COLUMNS_MINIMAL = "id, email, role, status, password_hash";
+
 /** True only when the admin_users table/relation is actually missing — not unique or check violations. */
 function isMissingAdminUsersTable(error: { code?: string; message?: string } | null) {
   if (!error) return false;
@@ -464,17 +472,32 @@ export async function findAdminUsersForLogin(supabase: SupabaseClient, emails: s
   const normalized = [...new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean))];
   if (!normalized.length) return [] as AdminUserRecord[];
 
-  const { data, error } = await supabase
-    .from("admin_users")
-    .select(ADMIN_LOGIN_USER_COLUMNS)
-    .in("email", normalized);
+  const primary = await supabase.from("admin_users").select(ADMIN_LOGIN_USER_COLUMNS).in("email", normalized);
+  let error = primary.error;
+  let data = primary.data;
   if (error) {
     if (isMissingAdminUsersTable(error)) {
       return findAdminUsersByEmails(supabase, normalized);
     }
-    throwAdminUserError(error);
+    if (isMissingColumnError(error)) {
+      const retry = await supabase.from("admin_users").select(ADMIN_LOGIN_USER_COLUMNS_MINIMAL).in("email", normalized);
+      data = retry.data as typeof primary.data;
+      error = retry.error;
+    }
+    if (error) {
+      if (isMissingAdminUsersTable(error)) {
+        return findAdminUsersByEmails(supabase, normalized);
+      }
+      throwAdminUserError(error);
+    }
   }
-  return (data ?? []) as AdminUserRecord[];
+  const rows = (data ?? []) as Array<Partial<AdminUserRecord> & Pick<AdminUserRecord, "id" | "email" | "role" | "status" | "password_hash">>;
+  return rows.map(
+    (row): AdminUserRecord => ({
+      ...(row as AdminUserRecord),
+      force_password_change: row.force_password_change ?? false
+    })
+  );
 }
 
 export async function listAdminUsers(supabase: SupabaseClient): Promise<AdminUserPublic[]> {
@@ -521,7 +544,13 @@ export async function hashAdminPassword(password: string) {
 }
 
 export async function verifyAdminUserPassword(user: AdminUserRecord, password: string) {
-  return bcrypt.compare(password, user.password_hash);
+  const hash = user.password_hash?.trim();
+  if (!hash) return false;
+  try {
+    return await bcrypt.compare(password, hash);
+  } catch {
+    return false;
+  }
 }
 
 export async function createAdminUser(

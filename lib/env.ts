@@ -1,4 +1,5 @@
 import { getPublicSiteUrl } from "@/lib/site-url";
+import { getSupabaseServerConfigSummary, resolveSupabaseProjectUrl } from "@/lib/supabase/server";
 
 export function getGingrWebhookSignatureKey() {
   return process.env.GINGR_WEBHOOK_SIGNATURE_KEY ?? process.env.GINGR_WEBHOOK_SECRET;
@@ -9,10 +10,12 @@ export function getSiteUrl() {
 }
 
 export function getBoardEnvCheck() {
+  const supabase = getSupabaseServerConfigSummary();
   return {
-    hasSupabaseUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
-    hasSupabaseAnon: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-    hasServiceRole: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    hasSupabaseUrl: Boolean(resolveSupabaseProjectUrl()),
+    hasSupabaseAnon: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()),
+    hasServiceRole: supabase.hasServiceRoleKey,
+    supabaseServerReady: supabase.hasProjectUrl && supabase.hasServiceRoleKey,
     hasGingrWebhookKey: Boolean(getGingrWebhookSignatureKey()),
     hasGingrSyncSecret: Boolean(process.env.GINGR_SYNC_SECRET),
     hasGingrApiKey: Boolean(process.env.GINGR_API_KEY),

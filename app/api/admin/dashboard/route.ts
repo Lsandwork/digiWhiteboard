@@ -14,7 +14,8 @@ import { HUNG_TABLES, isHungTableInCooldown } from "@/lib/hung-table-guard";
 import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
 import { defaultLobbySettings } from "@/lib/lobby/settings";
 import { defaultStaffSettings } from "@/lib/staff/settings";
-import { getServiceSupabase } from "@/lib/supabase/server";
+import { getServiceSupabase, tryGetServiceSupabase } from "@/lib/supabase/server";
+import type { AdminSession } from "@/lib/admin/session";
 import { getOrLoadTtlCache, withTimeoutOrThrow } from "@/lib/server-ttl-cache";
 import { DEMO_EMAIL } from "@/lib/demo/constants";
 import { isDemoSession } from "@/lib/demo/session";
@@ -31,6 +32,37 @@ const DEFAULT_SETTINGS_BUNDLE = {
   lobby: defaultLobbySettings,
   staff: defaultStaffSettings
 };
+
+function degradedDashboardJson(
+  request: Request,
+  session: AdminSession | null | undefined,
+  board: AdminBoardType
+) {
+  const fallbackAccess = session?.adminUserId
+    ? accessFromLegacyRole(session.adminUserId, session.email, session.role)
+    : null;
+  const siteUrl = publicOrigin(request);
+  return {
+    board,
+    username: session?.email ?? "admin",
+    fullName: null,
+    session: session ? { ...session, access: fallbackAccess } : null,
+    admin_settings: DEFAULT_ADMIN_SETTINGS,
+    lobby_settings: defaultLobbySettings,
+    staff_settings: defaultStaffSettings,
+    promotions: [],
+    active_checkouts: 0,
+    lobby_checkouts_count: 0,
+    sync_status: "degraded" as const,
+    last_synced_at: null,
+    data_source: "Session (Supabase unavailable)",
+    webhook_url: `${siteUrl}/api/gingr/webhook`,
+    events: [],
+    failed_events: [],
+    staff_dogs: [],
+    env: getBoardEnvCheck()
+  };
+}
 
 function parseBoardType(value: string | null): AdminBoardType {
   if (value === "staff") return "staff";
@@ -78,7 +110,10 @@ export async function GET(request: Request) {
       isHungTableInCooldown(HUNG_TABLES.liveTransitionDogs) ||
       isHungTableInCooldown(HUNG_TABLES.gingrWebhookEvents);
     const skipAccessWork = skipSettingsAndAccess(tab);
-    const supabase = getServiceSupabase({ timeoutMs: DASHBOARD_QUERY_TIMEOUT_MS });
+    const supabase = tryGetServiceSupabase({ timeoutMs: DASHBOARD_QUERY_TIMEOUT_MS });
+    if (!supabase) {
+      return NextResponse.json(degradedDashboardJson(request, session, board));
+    }
 
     after(() => {
       void migrateLegacyUserAccess(supabase).catch(() => undefined);
@@ -209,6 +244,11 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("[admin-dashboard] GET failed:", error);
+    const session = getAdminSessionFromRequest(request);
+    if (session) {
+      const url = new URL(request.url);
+      return NextResponse.json(degradedDashboardJson(request, session, parseBoardType(url.searchParams.get("board"))));
+    }
     return NextResponse.json(
       { error: "Unable to load admin dashboard. Reload and try again." },
       { status: 500 }
