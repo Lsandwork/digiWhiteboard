@@ -43,15 +43,17 @@ function withBaselineParticipantPermissions(
 
 async function engagementStorageReady(db: EngagementDb): Promise<boolean> {
   const coreTables: EngagementTable[] = ["team_engagement_bark_outs", "team_engagement_settings"];
+  let missingCore = false;
   for (const table of coreTables) {
     try {
       await db.select(table, { limit: 1 });
     } catch (error) {
-      if (error instanceof EngagementError && error.code === "setup_required") return false;
-      return false;
+      if (error instanceof EngagementError && error.code === "setup_required") {
+        missingCore = true;
+      }
     }
   }
-  return true;
+  return !missingCore;
 }
 
 export type EngagementIdentity = {

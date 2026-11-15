@@ -97,24 +97,33 @@ export function requireStorage(ctx: Pick<ServiceContext, "storageReady">) {
   if (!ctx.storageReady) throw setupRequiredError();
 }
 
-const FUN_ZONE_PUBLISH_KINDS = new Set(["poll", "question_week", "fun_activity"]);
+const FUN_ZONE_PUBLISH_KINDS = new Set(["poll", "question_week", "fun_activity", "trivia"]);
+
+function needsFunZonePublishCheck(kind?: string, tab?: string) {
+  if (tab === "fun_zone") return true;
+  return Boolean(kind && FUN_ZONE_PUBLISH_KINDS.has(kind));
+}
 
 /** Confirms core (and optional Fun Zone) storage before template publish and similar writes. */
 export async function assertEngagementWriteReady(
   ctx: Pick<ServiceContext, "db" | "storageReady">,
-  kind?: string
+  kind?: string,
+  tab?: string
 ) {
-  if (!ctx.storageReady) {
+  let coreOk = ctx.storageReady;
+  if (!coreOk) {
+    coreOk = true;
     for (const table of ["team_engagement_bark_outs", "team_engagement_settings"] as const) {
       try {
         await ctx.db.select(table, { limit: 1 });
       } catch (error) {
         if (error instanceof EngagementError) throw error;
-        throw setupRequiredError();
+        coreOk = false;
       }
     }
+    if (!coreOk) throw setupRequiredError();
   }
-  if (kind && FUN_ZONE_PUBLISH_KINDS.has(kind)) {
+  if (needsFunZonePublishCheck(kind, tab)) {
     const zone = await funZoneStorageReady(ctx as ServiceContext);
     if (!zone.ready) {
       throw new EngagementError(503, "setup_required", funZoneSetupMessage());
