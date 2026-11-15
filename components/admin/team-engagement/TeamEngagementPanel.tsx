@@ -13,6 +13,7 @@ import {
   PackMilestonesAdminBody,
   PackOverviewBody
 } from "@/components/admin/team-engagement/pack/PackLeadershipViews";
+import { TemplateLibraryAdminBody } from "@/components/admin/team-engagement/pack/TemplateLibraryAdminBody";
 
 type NavItem = { id: string; label: string; icon: string; view: string };
 type NavGroup = { id: string; label: string; items: NavItem[] };
@@ -224,6 +225,7 @@ function viewBody(
   if (view === "fun_zone_admin") return <FunZoneAdminBody data={record} onRefresh={onRefresh} />;
   if (view === "pack_ideas_admin") return <PackIdeasAdminBody data={record} onRefresh={onRefresh} />;
   if (view === "pack_milestones_admin") return <PackMilestonesAdminBody onSync={onRefresh} />;
+  if (view === "template_library_admin") return <TemplateLibraryAdminBody data={record} onRefresh={onRefresh} />;
   if (view === "overview") return <OverviewBody data={record} />;
   if (view === "staff") {
     const items = (record.items as Record<string, unknown>[]) ?? [];

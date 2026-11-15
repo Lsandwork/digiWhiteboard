@@ -162,6 +162,7 @@ export const LEADERSHIP_VIEW_RULES = {
   fun_zone_admin: { permission: "engagement.manage_team" },
   pack_ideas_admin: { permission: "engagement.manage_team" },
   pack_milestones_admin: { permission: "engagement.manage_team" },
+  template_library_admin: { permission: "engagement.manage_team" },
   voice_survey_results: { permission: "engagement.manage_team" }
 } as const satisfies Record<string, ViewRule>;
 export type LeadershipView = keyof typeof LEADERSHIP_VIEW_RULES;
@@ -220,7 +221,13 @@ export const LEADERSHIP_ACTION_RULES = {
   publish_voice_survey: { permission: "engagement.manage_team" },
   save_voice_outcome: { permission: "engagement.manage_team" },
   publish_would_you_rather: { permission: "engagement.manage_team" },
-  publish_pack_event: { permission: "engagement.manage_team" }
+  publish_pack_event: { permission: "engagement.manage_team" },
+  save_engagement_template: { permission: "engagement.manage_team" },
+  duplicate_engagement_template: { permission: "engagement.manage_team" },
+  favorite_engagement_template: { permission: "engagement.manage_team" },
+  archive_engagement_template: { permission: "engagement.manage_team" },
+  publish_engagement_template: { permission: "engagement.manage_team" },
+  sync_engagement_template_catalog: { permission: "engagement.manage_settings" }
 } as const satisfies Record<string, ActionRule>;
 export type LeadershipAction = keyof typeof LEADERSHIP_ACTION_RULES;
 
@@ -309,7 +316,8 @@ export type EngagementSectionId =
   | "employee_voice_admin"
   | "fun_zone_admin"
   | "pack_ideas_admin"
-  | "pack_milestones_admin";
+  | "pack_milestones_admin"
+  | "template_library_admin";
 
 export type EngagementNavItem = {
   id: EngagementSectionId;
@@ -354,7 +362,8 @@ const MANAGEMENT_NAV: EngagementNavGroup[] = [
       item("employee_voice_admin", "Employee Voice", "feedback", "employee_voice_admin"),
       item("fun_zone_admin", "Fun Zone", "check", "fun_zone_admin"),
       item("pack_ideas_admin", "Ideas for the Pack", "feedback", "pack_ideas_admin"),
-      item("pack_milestones_admin", "Milestones", "calendar-shift", "pack_milestones_admin")
+      item("pack_milestones_admin", "Milestones", "calendar-shift", "pack_milestones_admin"),
+      item("template_library_admin", "Template Library", "programs", "template_library_admin")
     ]
   }
 ];
@@ -389,7 +398,8 @@ const ADMIN_NAV: EngagementNavGroup[] = [
       item("employee_voice_admin", "Employee Voice", "feedback", "employee_voice_admin"),
       item("fun_zone_admin", "Fun Zone", "check", "fun_zone_admin"),
       item("pack_ideas_admin", "Ideas for the Pack", "feedback", "pack_ideas_admin"),
-      item("pack_milestones_admin", "Milestones", "calendar-shift", "pack_milestones_admin")
+      item("pack_milestones_admin", "Milestones", "calendar-shift", "pack_milestones_admin"),
+      item("template_library_admin", "Template Library", "programs", "template_library_admin")
     ]
   }
 ];
@@ -439,7 +449,8 @@ const SUPER_ADMIN_NAV: EngagementNavGroup[] = [
       item("employee_voice_admin", "Employee Voice", "feedback", "employee_voice_admin"),
       item("fun_zone_admin", "Fun Zone", "check", "fun_zone_admin"),
       item("pack_ideas_admin", "Ideas for the Pack", "feedback", "pack_ideas_admin"),
-      item("pack_milestones_admin", "Milestones", "calendar-shift", "pack_milestones_admin")
+      item("pack_milestones_admin", "Milestones", "calendar-shift", "pack_milestones_admin"),
+      item("template_library_admin", "Template Library", "programs", "template_library_admin")
     ]
   }
 ];
