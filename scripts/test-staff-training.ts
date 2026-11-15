@@ -7,10 +7,12 @@ function tab(role: string, tab: string) {
   return canAccessAdminTab(access, tab, role, "staff");
 }
 
-assert.equal(tab("front_desk_coordinator", "staff_training"), true);
-assert.equal(tab("overnight", "staff_training"), true);
+assert.equal(tab("front_desk_coordinator", "staff_training"), false);
+assert.equal(tab("overnight", "staff_training"), false);
+assert.equal(tab("assistant_manager", "staff_training"), false);
 assert.equal(tab("daycare", "staff_training"), false);
 assert.equal(tab("manager_admin", "staff_training"), true);
+assert.equal(tab("owner_admin", "staff_training"), true);
 
 const fd = courseForRole("front_desk_coordinator");
 const on = courseForRole("overnight");

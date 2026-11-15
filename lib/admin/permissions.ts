@@ -1751,12 +1751,9 @@ export function canAccessAdminTab(
 
   if (tab === "staff_training") {
     if (board !== "staff" || options?.isDemo) return false;
-    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
-    if (isFullAdminLegacyRole(legacyRole) || isAdminOrManagementLegacyRole(legacyRole)) return true;
-    if (legacyRole === "front_desk_coordinator" || legacyRole === "overnight") {
-      return hasPermission(effective, "view_staff_training");
-    }
-    return hasPermission(effective, "view_staff_training_reports");
+    // Temporarily limited to full admins — restore coordinator/overnight/management
+    // access when Staff Training is ready for staff again.
+    return isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access);
   }
 
   // Retired entry tools — deny before the full-admin early return so they leave admin/management nav.
