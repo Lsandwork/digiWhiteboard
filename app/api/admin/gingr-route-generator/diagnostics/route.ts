@@ -11,7 +11,7 @@ import { buildGingrRouteDiagnostics } from "@/lib/gingr-route-generator/diagnost
 import { todayPacificDateKey } from "@/lib/gingr-route-generator/service";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 async function requireGingrDiagnosticsAccess(request: Request) {
   if (!isAdminRequest(request)) return { error: unauthorizedAdminResponse() };

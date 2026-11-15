@@ -136,11 +136,14 @@ export function createGingrClient(overrides?: GingrClientConfig) {
       return normalizeGingrReservationList(payload);
     },
     async listReservationsByDate(date: string) {
-      return this.listReservationsPaged({
-        start_date: date,
-        end_date: date,
-        checked_in: "false"
-      });
+      return this.listReservationsPaged(
+        {
+          start_date: date,
+          end_date: date,
+          checked_in: "false"
+        },
+        4
+      );
     },
     /** Checked-in reservations — often carry fuller nested service / addon rows. */
     async listCheckedInReservations() {
@@ -188,7 +191,7 @@ export function createGingrClient(overrides?: GingrClientConfig) {
         location_id: config.locationId
       };
       try {
-        return await this.listReservationsPaged(fields, 4);
+        return await this.listReservationsPaged(fields, 2);
       } catch {
         return [] as GingrReservation[];
       }
