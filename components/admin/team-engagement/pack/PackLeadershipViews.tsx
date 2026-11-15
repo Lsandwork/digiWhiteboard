@@ -354,8 +354,8 @@ function QuestionOfTheDayAdmin({ onRefresh }: { onRefresh: () => void }) {
       <h3 className="ro-te-section__title">Question of the day</h3>
       <p className="ro-te-muted" style={{ marginBottom: 8, fontSize: 13 }}>
         {choiceMode
-          ? "With answer choices, Pack shows this as a multiple-choice poll. Leave answers empty for written responses on the Question of the day card."
-          : "Team members answer in Pack with short written responses, or add answer choices below for a multiple-choice question."}
+          ? "With answer choices, Pack shows multiple choice on the Question of the day card."
+          : "Team members answer in Pack with short written responses, or add answer choices below for multiple choice."}
       </p>
       <label className="ro-te-field">
         Question
@@ -411,15 +411,14 @@ function QuestionOfTheDayAdmin({ onRefresh }: { onRefresh: () => void }) {
         onClick={() => {
           setBusy(true);
           const trimmedPrompt = prompt.trim();
-          const publish = hasChoiceAnswers
-            ? post("save_fun_poll", { prompt: trimmedPrompt, options: labels }).then(async ({ body }) => {
-                const id = (body as { id?: string }).id;
-                if (id) await post("publish_fun_poll", { id });
-              })
-            : post("save_fun_question", { prompt: trimmedPrompt, cadence: "daily" }).then(async ({ body }) => {
-                const id = (body as { id?: string }).id;
-                if (id) await post("publish_fun_question", { id });
-              });
+          const publish = post("save_fun_question", {
+            prompt: trimmedPrompt,
+            cadence: "daily",
+            ...(hasChoiceAnswers ? { options: labels } : {})
+          }).then(async ({ body }) => {
+            const id = (body as { id?: string }).id;
+            if (id) await post("publish_fun_question", { id });
+          });
           void publish
             .then(() => {
               setPrompt("");

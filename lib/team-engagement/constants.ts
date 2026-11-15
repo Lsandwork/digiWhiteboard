@@ -8,6 +8,8 @@ export const PACK_PHASE4_MIGRATION = "supabase/migrations/109_pack_phase4.sql";
 export const PACK_PHASE4_COMMIT = "supabase/migrations/110_team_engagement_commit_phase4.sql";
 export const TEMPLATE_LIBRARY_MIGRATION = "supabase/migrations/111_team_engagement_templates.sql";
 export const TEMPLATE_LIBRARY_COMMIT = "supabase/migrations/112_team_engagement_commit_templates.sql";
+export const FUN_QUESTION_CHOICES_MIGRATION = "supabase/migrations/114_team_engagement_fun_question_choices.sql";
+export const FUN_QUESTION_CHOICES_COMMIT = "supabase/migrations/115_team_engagement_commit_fun_question_choices.sql";
 
 export const PACK_GOAL_TYPES = ["numeric", "completion", "participation", "milestone", "timebound"] as const;
 export type PackGoalType = (typeof PACK_GOAL_TYPES)[number];
