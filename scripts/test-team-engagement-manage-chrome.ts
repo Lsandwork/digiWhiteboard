@@ -30,6 +30,8 @@ function main() {
 
   assert.match(panel, /ro-te-main--premium/, "Manage views use premium main layout");
   assert.match(panel, /ProgramsAdminBody data=\{record\} onAction=\{onAction\}/, "Programs view receives actions");
+  assert.ok(!panel.includes("window.prompt"), "Moderation must not use window.prompt");
+  assert.ok(!pack.includes("window.prompt"), "Pack admin must not use window.prompt");
 
   console.log("team-engagement-manage-chrome: ok");
 }

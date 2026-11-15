@@ -14,6 +14,7 @@ import {
   PackOverviewBody
 } from "@/components/admin/team-engagement/pack/PackLeadershipViews";
 import { TemplateLibraryAdminBody } from "@/components/admin/team-engagement/pack/TemplateLibraryAdminBody";
+import { EngagementPremiumSection } from "@/components/admin/team-engagement/EngagementAdminChrome";
 import {
   AccessAdminBody,
   AiPolicyAdminBody,
@@ -195,6 +196,9 @@ function ModerationBody({
   const repeats = (data.repeatViolations as Array<{ name: string; count: number }>) ?? [];
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [escalateNotes, setEscalateNotes] = useState<Record<string, string>>({});
+  const [removeNotes, setRemoveNotes] = useState<Record<string, string>>({});
+  const [reportRemoveNotes, setReportRemoveNotes] = useState<Record<string, string>>({});
   async function act(id: string, action: string, payload: Record<string, unknown> = {}) {
     setBusyId(id);
     setActionError(null);
@@ -229,8 +233,7 @@ function ModerationBody({
     <div className="ro-te-stack">
       {actionError ? <p className="ro-te-error">{actionError}</p> : null}
       {repeats.length ? (
-        <section className="ro-te-card ro-te-section">
-          <h3 className="ro-te-section__title">Repeat policy outcomes (90 days)</h3>
+        <EngagementPremiumSection title="Repeat policy outcomes (90 days)">
           <ul className="ro-te-list">
             {repeats.map((row) => (
               <li key={row.name}>
@@ -238,8 +241,12 @@ function ModerationBody({
               </li>
             ))}
           </ul>
-        </section>
+        </EngagementPremiumSection>
       ) : null}
+      <EngagementPremiumSection
+        title="Moderation queue"
+        description="Approvals, escalations, and removals sync to Bark Outs and employee feeds. Notes are required for removals and escalations."
+      >
       <ul className="ro-te-list">
         {items.map((item) => {
           const id = String(item.id);
@@ -270,18 +277,28 @@ function ModerationBody({
                         >
                           Keep post
                         </button>
-                        <button
-                          type="button"
-                          className="ro-te-btn ro-te-btn--ghost"
-                          disabled={busy}
-                          onClick={() => {
-                            const note = window.prompt("Removal note (required):", "Removed after a concern report.");
-                            if (!note || note.length < 5) return;
-                            void act(id, "resolve_report", { reportId: report.id, resolution: "remove", note, reason: "other" });
-                          }}
-                        >
-                          Remove post
-                        </button>
+                        <div className="ro-te-stack" style={{ marginTop: 6, gap: 6 }}>
+                          <input
+                            className="ro-te-input"
+                            placeholder="Removal note (required)"
+                            value={reportRemoveNotes[report.id] ?? ""}
+                            disabled={busy}
+                            onChange={(event) =>
+                              setReportRemoveNotes((prev) => ({ ...prev, [report.id]: event.target.value }))
+                            }
+                          />
+                          <button
+                            type="button"
+                            className="ro-te-btn ro-te-btn--ghost"
+                            disabled={busy || (reportRemoveNotes[report.id] ?? "").trim().length < 5}
+                            onClick={() => {
+                              const note = (reportRemoveNotes[report.id] ?? "").trim();
+                              void act(id, "resolve_report", { reportId: report.id, resolution: "remove", note, reason: "other" });
+                            }}
+                          >
+                            Remove post
+                          </button>
+                        </div>
                       </div>
                     </li>
                   ))}
@@ -296,39 +313,56 @@ function ModerationBody({
                     <button type="button" className="ro-te-btn ro-te-btn--ghost" disabled={busy} onClick={() => void act(id, "reject_bark_out")}>
                       Reject
                     </button>
-                    <button
-                      type="button"
-                      className="ro-te-btn ro-te-btn--ghost"
-                      disabled={busy}
-                      onClick={() => {
-                        const note = window.prompt("Escalation note for Admins (at least 5 characters):");
-                        if (!note || note.length < 5) return;
-                        void act(id, "escalate_bark_out", { note });
-                      }}
-                    >
-                      Escalate
-                    </button>
-                    <button
-                      type="button"
-                      className="ro-te-btn ro-te-btn--ghost"
-                      disabled={busy}
-                      onClick={() => {
-                        const note = window.prompt("Removal note (required):", "Removed by moderator.");
-                        if (!note || note.length < 5) return;
-                        void act(id, "remove_bark_out", { reason: "other", note });
-                      }}
-                    >
-                      Remove
-                    </button>
                   </>
                 ) : (
                   <p className="ro-te-muted">{String(item.decideBlockedReason ?? "You cannot decide on this item in your scope.")}</p>
                 )}
               </div>
+              {item.canDecide !== false ? (
+                <div className="ro-te-stack" style={{ marginTop: 8, gap: 10 }}>
+                  <label className="ro-te-field">
+                    Escalation note for Admins
+                    <input
+                      value={escalateNotes[id] ?? ""}
+                      disabled={busy}
+                      placeholder="Why this needs Admin review (min 5 characters)"
+                      onChange={(event) => setEscalateNotes((prev) => ({ ...prev, [id]: event.target.value }))}
+                    />
+                    <button
+                      type="button"
+                      className="ro-te-btn ro-te-btn--ghost"
+                      style={{ marginTop: 6, alignSelf: "flex-start" }}
+                      disabled={busy || (escalateNotes[id] ?? "").trim().length < 5}
+                      onClick={() => void act(id, "escalate_bark_out", { note: (escalateNotes[id] ?? "").trim() })}
+                    >
+                      Escalate
+                    </button>
+                  </label>
+                  <label className="ro-te-field">
+                    Removal note
+                    <input
+                      value={removeNotes[id] ?? ""}
+                      disabled={busy}
+                      placeholder="Why this post is removed (min 5 characters)"
+                      onChange={(event) => setRemoveNotes((prev) => ({ ...prev, [id]: event.target.value }))}
+                    />
+                    <button
+                      type="button"
+                      className="ro-te-btn ro-te-btn--ghost"
+                      style={{ marginTop: 6, alignSelf: "flex-start" }}
+                      disabled={busy || (removeNotes[id] ?? "").trim().length < 5}
+                      onClick={() => void act(id, "remove_bark_out", { reason: "other", note: (removeNotes[id] ?? "").trim() })}
+                    >
+                      Remove
+                    </button>
+                  </label>
+                </div>
+              ) : null}
             </li>
           );
         })}
       </ul>
+      </EngagementPremiumSection>
     </div>
   );
 }
