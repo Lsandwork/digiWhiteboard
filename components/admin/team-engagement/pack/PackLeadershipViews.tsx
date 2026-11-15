@@ -307,7 +307,26 @@ export function FunZoneAdminBody({ data, onRefresh }: { data: Record<string, unk
     }
   }
   if (data.ready === false) {
-    return <p className="ro-te-muted">Fun Zone tables are not ready. Apply Pack migrations 105–106 first.</p>;
+    return (
+      <section className="ro-te-card ro-te-section">
+        <h3 className="ro-te-section__title">Fun Zone storage</h3>
+        <p className="ro-te-muted">
+          {typeof data.setupMessage === "string"
+            ? data.setupMessage
+            : "Run supabase/migrations/105_pack_priority2.sql and 106_team_engagement_commit_pack_tables.sql in Supabase (after 103), then refresh."}
+        </p>
+        {Array.isArray(data.missingTables) && data.missingTables.length ? (
+          <details style={{ marginTop: 8 }}>
+            <summary className="ro-te-muted">Missing tables</summary>
+            <ul className="ro-te-list" style={{ fontSize: 13 }}>
+              {(data.missingTables as string[]).map((table) => (
+                <li key={table}>{table}</li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
+      </section>
+    );
   }
   return (
     <div className="ro-te-stack">

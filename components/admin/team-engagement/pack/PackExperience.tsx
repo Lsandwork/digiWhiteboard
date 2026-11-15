@@ -305,7 +305,9 @@ export default function PackExperience() {
   const [category, setCategory] = useState("");
   const [message, setMessage] = useState("");
   const [ideas, setIdeas] = useState<FeedbackItem[] | null>(null);
-  const [funZone, setFunZone] = useState<PackPayload["funZonePreview"] | null>(null);
+  const [funZone, setFunZone] = useState<
+    (PackPayload["funZonePreview"] & { setupMessage?: string; phase4?: unknown }) | null
+  >(null);
   const [packGoals, setPackGoals] = useState<PackGoalsState | null>(null);
   const [voiceSurveys, setVoiceSurveys] = useState<
     Array<{ id: string; title: string; introduction: string | null; completed: boolean; questions: Array<{ id: string; prompt: string; questionType: string; options: unknown[] }> }>
@@ -413,9 +415,23 @@ export default function PackExperience() {
   }, []);
 
   const loadFunZone = useCallback(async () => {
-    const { ok, body } = await fetchAdminJson<PackPayload["funZonePreview"]>("/api/admin/bark-outs?view=fun_zone");
-    if (ok) setFunZone(body);
-  }, []);
+    const { ok, body } = await fetchAdminJson<
+      PackPayload["funZonePreview"] & { setupMessage?: string; phase4?: unknown }
+    >("/api/admin/bark-outs?view=fun_zone");
+    if (ok) {
+      setFunZone(body);
+      return;
+    }
+    const fallback = pack?.funZonePreview ?? { ready: false, question: null, poll: null, trivia: null };
+    const code = (body as { code?: string }).code;
+    const setupMessage =
+      code === "setup_required"
+        ? "Run Supabase migrations 103, then 105 and 106 for Fun Zone."
+        : code === "storage_error"
+          ? "Fun Zone storage is not reachable. Confirm migrations 105–106 and refresh."
+          : (body as { error?: string }).error ?? pack?.sectionStatus.funZone?.message ?? "Fun Zone is not available yet.";
+    setFunZone({ ...fallback, ready: false, setupMessage });
+  }, [pack?.funZonePreview, pack?.sectionStatus.funZone?.message]);
 
   async function voteWouldYou(questionId: string, choice: "a" | "b") {
     const { ok } = await fetchAdminJson("/api/admin/bark-outs", {
@@ -1288,7 +1304,14 @@ export default function PackExperience() {
             })()}
           </div>
         ) : (
-          <SectionEmpty title="Fun Zone" body={pack.sectionStatus.funZone?.message ?? "Questions and polls are on the way."} />
+          <SectionEmpty
+            title="Fun Zone"
+            body={
+              (funZone as { setupMessage?: string } | null)?.setupMessage ??
+              pack.sectionStatus.funZone?.message ??
+              "Run Supabase migrations 105 and 106 (after 103), then refresh. Leadership publishes questions and polls from Manage Team Engagement → Fun Zone."
+            }
+          />
         )
       ) : null}
       {section === "voice" ? (

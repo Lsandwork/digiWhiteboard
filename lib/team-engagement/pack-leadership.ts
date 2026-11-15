@@ -1,7 +1,13 @@
 import { listFeedback } from "@/lib/team-engagement/records";
 import { packGoalsEmployeeView, listPackGoalsLeadership } from "@/lib/team-engagement/pack-goals";
 import { listVoiceSurveysLeadership } from "@/lib/team-engagement/employee-voice";
-import { funZoneView, milestonesView, packTablesReady } from "@/lib/team-engagement/pack-features";
+import {
+  funZoneSetupMessage,
+  funZoneStorageReady,
+  funZoneView,
+  milestonesView,
+  packTablesReady
+} from "@/lib/team-engagement/pack-features";
 import { requireStorage, type ServiceContext } from "@/lib/team-engagement/context";
 import { forbiddenError } from "@/lib/team-engagement/errors";
 import type { EngagementTable } from "@/lib/team-engagement/types";
@@ -9,14 +15,24 @@ import type { EngagementTable } from "@/lib/team-engagement/types";
 export async function funZoneManagementView(ctx: ServiceContext) {
   requireStorage(ctx);
   if (!ctx.actor.tier) throw forbiddenError();
-  const ready = await packTablesReady(ctx);
-  if (!ready.team_engagement_fun_questions) return { ready: false as const, drafts: [] as unknown[] };
+  const zoneReady = await funZoneStorageReady(ctx);
+  if (!zoneReady.ready) {
+    return {
+      ready: false as const,
+      setupMessage: funZoneSetupMessage(),
+      missingTables: zoneReady.missing,
+      questions: [] as unknown[],
+      polls: [] as unknown[],
+      trivia: [] as unknown[]
+    };
+  }
 
   const tables: EngagementTable[] = [
     "team_engagement_fun_questions",
     "team_engagement_fun_polls",
     "team_engagement_fun_trivia"
   ];
+  try {
   const [questions, polls, trivia] = await Promise.all(
     tables.map((table) =>
       ctx.db.select<Record<string, unknown>>(table, {
@@ -46,6 +62,16 @@ export async function funZoneManagementView(ctx: ServiceContext) {
       publishAt: row.publish_at
     }))
   };
+  } catch {
+    return {
+      ready: false as const,
+      setupMessage: funZoneSetupMessage(),
+      missingTables: zoneReady.missing,
+      questions: [],
+      polls: [],
+      trivia: []
+    };
+  }
 }
 
 export async function ideasManagementView(ctx: ServiceContext) {

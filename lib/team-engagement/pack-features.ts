@@ -7,6 +7,7 @@ import {
   SPOTLIGHT_CATEGORY_LABELS,
   type SpotlightCategory
 } from "@/lib/team-engagement/constants";
+import { PACK_PRIORITY2_COMMIT, PACK_PRIORITY2_MIGRATION } from "@/lib/team-engagement/constants";
 import {
   multilineText,
   nowIso,
@@ -27,6 +28,36 @@ export const PACK_OPTIONAL_TABLES = [
   "team_engagement_fun_trivia",
   "team_engagement_spotlights"
 ] as const;
+
+/** Every table Fun Zone reads (Pack + Manage must agree on this list). */
+export const FUN_ZONE_READ_TABLES = [
+  "team_engagement_fun_questions",
+  "team_engagement_fun_question_responses",
+  "team_engagement_fun_polls",
+  "team_engagement_fun_poll_options",
+  "team_engagement_fun_poll_votes",
+  "team_engagement_fun_trivia",
+  "team_engagement_fun_trivia_answers"
+] as const;
+
+export function funZoneSetupMessage() {
+  return `Run ${PACK_PRIORITY2_MIGRATION} and ${PACK_PRIORITY2_COMMIT} in Supabase (after migration 103), then refresh.`;
+}
+
+export async function funZoneStorageReady(ctx: ServiceContext) {
+  const status = await ctx.db.tableStatus().catch(() => null);
+  if (!status) return { ready: false as const, missing: [...FUN_ZONE_READ_TABLES] };
+  const missing = FUN_ZONE_READ_TABLES.filter((table) => !status[table]);
+  return { ready: missing.length === 0, missing };
+}
+
+export const EMPTY_FUN_ZONE_VIEW = {
+  ready: false as const,
+  question: null,
+  poll: null,
+  trivia: null,
+  setupMessage: funZoneSetupMessage()
+};
 
 type PackOptionalTable = (typeof PACK_OPTIONAL_TABLES)[number];
 
@@ -412,12 +443,15 @@ function activityActive(row: { status: string; publish_at: string | null; close_
 }
 
 export async function funZoneView(ctx: ServiceContext) {
-  requireStorage(ctx);
-  const ready = await packTablesReady(ctx);
-  const now = nowIso(ctx);
-  if (!ready.team_engagement_fun_questions || !ready.team_engagement_fun_polls) {
-    return { ready: false as const, question: null, poll: null, trivia: null };
+  if (!ctx.storageReady) {
+    return { ...EMPTY_FUN_ZONE_VIEW, setupMessage: "Apply migration 103 for core Team Engagement storage, then run the Pack Priority 2 migrations." };
   }
+  const zoneReady = await funZoneStorageReady(ctx);
+  const now = nowIso(ctx);
+  if (!zoneReady.ready) {
+    return { ready: false as const, question: null, poll: null, trivia: null, setupMessage: funZoneSetupMessage() };
+  }
+  try {
   const [{ rows: questions }, { rows: polls }, triviaReady] = await Promise.all([
     ctx.db.select<FunQuestionRow>("team_engagement_fun_questions", {
       filters: [{ column: "status", op: "in", value: ["active", "scheduled"] }],
@@ -525,6 +559,16 @@ export async function funZoneView(ctx: ServiceContext) {
   }
 
   return { ready: true as const, question: questionPayload, poll: pollPayload, trivia: triviaPayload };
+  } catch (error) {
+    if (error instanceof EngagementError) {
+      const setupMessage =
+        error.code === "setup_required"
+          ? funZoneSetupMessage()
+          : "Fun Zone could not load from storage. Run migrations 105 and 106 in Supabase, then refresh.";
+      return { ready: false as const, question: null, poll: null, trivia: null, setupMessage };
+    }
+    throw error;
+  }
 }
 
 export async function answerFunQuestion(ctx: ServiceContext, input: { questionId?: unknown; body?: unknown }) {

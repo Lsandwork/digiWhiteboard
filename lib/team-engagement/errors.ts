@@ -46,7 +46,10 @@ export function isMissingRelationError(error: DbErrorLike | null | undefined) {
     code === "42P01" ||
     code === "PGRST202" ||
     code === "PGRST205" ||
+    code === "PGRST204" ||
     message.includes("schema cache") ||
+    message.includes("could not find the function") ||
+    message.includes("team_engagement_commit") ||
     (message.includes("relation") && message.includes("does not exist"))
   );
 }
