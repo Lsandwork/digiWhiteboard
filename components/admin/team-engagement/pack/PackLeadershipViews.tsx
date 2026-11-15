@@ -748,38 +748,62 @@ function PackEventAdmin({ onRefresh }: { onRefresh: () => void }) {
 
 export function PackIdeasAdminBody({ data, onRefresh }: { data: Record<string, unknown>; onRefresh: () => void }) {
   const recent = (data.recent as Array<Record<string, unknown>>) ?? [];
+  const [resolutionById, setResolutionById] = useState<Record<string, string>>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
   return (
-    <section className="ro-te-card ro-te-section">
-      <h3 className="ro-te-section__title">Ideas for the Pack</h3>
+    <EngagementPremiumSection
+      title="Ideas for the Pack"
+      description="Status updates sync to employee-facing feedback and Pack idea surfaces."
+    >
       <p className="ro-te-muted">{data.openCount as number} open submissions</p>
       <ul className="ro-te-list">
-        {recent.map((row) => (
-          <li key={String(row.id)} className="ro-te-list__item">
-            <strong>{String(row.subject)}</strong>
-            <span className="ro-te-muted">
-              {" "}
-              · {FEEDBACK_STATUS_LABELS[row.status as FeedbackStatus] ?? String(row.status)} · {String(row.submitterName)}
-            </span>
-            <div className="ro-te-actions">
-              <button type="button" className="ro-te-btn ro-te-btn--ghost" onClick={() => void post("update_feedback", { id: row.id, status: "under_review" }).then(onRefresh)}>
-                Under review
-              </button>
+        {recent.map((row) => {
+          const id = String(row.id);
+          const resolution = resolutionById[id] ?? "We are putting this into practice.";
+          const busy = busyId === id;
+          return (
+            <li key={id} className="ro-te-list__item">
+              <strong>{String(row.subject)}</strong>
+              <span className="ro-te-muted">
+                {" "}
+                · {FEEDBACK_STATUS_LABELS[row.status as FeedbackStatus] ?? String(row.status)} · {String(row.submitterName)}
+              </span>
+              <p style={{ whiteSpace: "pre-wrap", marginTop: 6 }}>{String(row.message ?? row.body ?? "")}</p>
+              <div className="ro-te-actions">
+                <button
+                  type="button"
+                  className="ro-te-btn ro-te-btn--ghost"
+                  disabled={busy}
+                  onClick={() => {
+                    setBusyId(id);
+                    void post("update_feedback", { id, status: "under_review" }).then(onRefresh).finally(() => setBusyId(null));
+                  }}
+                >
+                  Under review
+                </button>
+              </div>
+              <label className="ro-te-field" style={{ marginTop: 8 }}>
+                Resolution (shown to teammate)
+                <textarea rows={2} value={resolution} disabled={busy} onChange={(event) => setResolutionById((prev) => ({ ...prev, [id]: event.target.value }))} />
+              </label>
               <button
                 type="button"
                 className="ro-te-btn ro-te-btn--primary"
+                disabled={busy || resolution.trim().length < 5}
                 onClick={() => {
-                  const resolution = window.prompt("What did the team do with this idea?", "We are putting this into practice.");
-                  if (!resolution || resolution.length < 5) return;
-                  void post("update_feedback", { id: row.id, status: "implemented", resolution }).then(onRefresh);
+                  setBusyId(id);
+                  void post("update_feedback", { id, status: "implemented", resolution: resolution.trim() })
+                    .then(onRefresh)
+                    .finally(() => setBusyId(null));
                 }}
               >
-                Implemented
+                Mark implemented
               </button>
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
-    </section>
+    </EngagementPremiumSection>
   );
 }
 
