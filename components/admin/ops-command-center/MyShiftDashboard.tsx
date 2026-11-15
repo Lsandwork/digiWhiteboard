@@ -37,6 +37,30 @@ function formatTime(now: Date) {
   }).format(now);
 }
 
+function formatPacificLoginTime(value: string | null | undefined) {
+  if (!value) return "—";
+  const at = new Date(value);
+  if (Number.isNaN(at.getTime())) return "—";
+  return at.toLocaleTimeString("en-US", {
+    timeZone: "America/Los_Angeles",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function formatBusinessDateLabel(dateKey: string | null | undefined) {
+  if (!dateKey) return "";
+  const [y, m, d] = dateKey.split("-").map(Number);
+  if (!y || !m || !d) return dateKey;
+  const stamp = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    weekday: "short",
+    month: "short",
+    day: "numeric"
+  }).format(stamp);
+}
+
 function relativeFrom(value: string | null | undefined) {
   if (!value) return "";
   const at = new Date(value).getTime();
@@ -215,6 +239,8 @@ export function MyShiftDashboard({
     : [homeDepartment];
   const pulse = data.facilityPulse;
   const team = data.teamOnShift || [];
+  const teamBusinessDate = data.teamOnShiftBusinessDate || "";
+  const viewerFirstLogin = data.viewerShiftLogin?.firstLoginAt ?? null;
   const visibleTeam = team.slice(0, 5);
   const extraTeam = Math.max(0, team.length - 5);
   const tasks: OpsWorkItem[] = (data.myTasks || []).map((task) => ({
@@ -380,7 +406,11 @@ export function MyShiftDashboard({
                   <Clock size={16} aria-hidden />
                   <div>
                     <strong>Signed in</strong>
-                    <div>Shift hours are not stored in RuffOps</div>
+                    <div>
+                      {viewerFirstLogin
+                        ? `Today at ${formatPacificLoginTime(viewerFirstLogin)} (Pacific)`
+                        : "Log in today to appear on Team on Shift"}
+                    </div>
                   </div>
                 </div>
                 <div className="myshift-shift__row">
@@ -523,6 +553,11 @@ export function MyShiftDashboard({
               <h3>
                 <img src={MY_SHIFT_ASSETS.panel.team} alt="" />
                 Team on Shift
+                {teamBusinessDate ? (
+                  <span className="myshift-sub" style={{ display: "block", fontWeight: 400, marginTop: 4 }}>
+                    {formatBusinessDateLabel(teamBusinessDate)} · Pacific
+                  </span>
+                ) : null}
               </h3>
               <button type="button" className="myshift-link" onClick={() => go("staff_directory")}>
                 View Team →
@@ -531,15 +566,20 @@ export function MyShiftDashboard({
             {visibleTeam.length ? (
               <div className="myshift-team">
                 {visibleTeam.map((member) => {
-                  const photo = myShiftPortraitForName(member.name);
+                  const photo = member.avatarUrl || myShiftPortraitForName(member.name);
                   return (
                     <div key={member.id} className="myshift-person">
                       <div className="myshift-avatar">
                         {photo ? <img src={photo} alt="" /> : initials(member.name)}
-                        <span className="dot" aria-label="Active in directory" />
+                        <span className="dot" aria-label="Logged in today" />
                       </div>
                       <div className="n">{member.name.split(" ")[0]}</div>
-                      <div className="d">{member.department}</div>
+                      <div className="d">{member.role || member.department}</div>
+                      {member.firstLoginAt ? (
+                        <div className="d" style={{ fontSize: "0.72rem", opacity: 0.85 }}>
+                          In at {formatPacificLoginTime(member.firstLoginAt)}
+                        </div>
+                      ) : null}
                     </div>
                   );
                 })}
@@ -551,7 +591,7 @@ export function MyShiftDashboard({
                 ) : null}
               </div>
             ) : (
-              <p className="myshift-empty">No active directory members loaded.</p>
+              <p className="myshift-empty">No one has signed in to RuffOps yet today. The list updates as staff log in.</p>
             )}
           </section>
 

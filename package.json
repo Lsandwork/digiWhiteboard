@@ -85,6 +85,7 @@
     "inventory:platform": "tsx scripts/inventory-platform.ts",
     "test:bulk-shift-entries": "tsx scripts/test-bulk-shift-entries.ts",
     "test:team-lead-my-shift": "tsx scripts/test-team-lead-my-shift.ts && tsx scripts/test-ops-command-center-work-item-actions.ts && tsx scripts/test-ops-command-center-live-feed.ts",
+    "test:team-on-shift": "tsx scripts/test-team-on-shift.ts && tsx scripts/test-my-shift-dashboard.ts",
     "test:groomer-my-shift": "tsx scripts/test-groomer-my-shift.ts",
     "test:system-health": "tsx scripts/test-system-health-debugging.ts && tsx scripts/test-hung-table-guard.ts",
     "ruffops:debug": "tsx scripts/ruffops-debug.ts",

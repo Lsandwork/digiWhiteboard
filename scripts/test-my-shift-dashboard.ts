@@ -27,6 +27,8 @@ assert.match(dash, /heroDog/);
 assert.doesNotMatch(dash, /\b24\b Dogs Today/);
 assert.match(snapshot, /facilityPulse/);
 assert.match(snapshot, /teamOnShift/);
+assert.match(snapshot, /loadTeamOnShiftCards/);
+assert.match(dash, /signed in to RuffOps yet today/);
 assert.match(snapshot, /loadLiveFloor/);
 assert.match(css, /#020b1b/);
 assert.match(css, /#079bff/);
