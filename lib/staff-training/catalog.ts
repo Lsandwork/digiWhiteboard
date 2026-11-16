@@ -384,14 +384,15 @@ const STAFF_TRAINING_COURSE_DEFS: TrainingCourseDef[] = [
   }
 ];
 
-/** Screen how-tos live in public/training. Spoken narration stays pending until a person records it. */
+/** Screen how-tos and muxed narration live in public/training (see scripts/staff-training-build-voiceover.ts). */
 export const STAFF_TRAINING_COURSES: TrainingCourseDef[] = STAFF_TRAINING_COURSE_DEFS.map((course) => ({
   ...course,
   lessons: course.lessons.map((lesson) => ({
     ...lesson,
     videoSrc: `/training/${course.slug}/${lesson.slug}.mp4`,
     captionsVtt: `/training/${course.slug}/${lesson.slug}.vtt`,
-    videoStatus: "ready" as const
+    videoStatus: "ready" as const,
+    narrationStatus: "recorded" as const
   }))
 }));
 

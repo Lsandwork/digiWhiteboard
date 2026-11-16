@@ -55,7 +55,7 @@ export async function GET(request: Request) {
     progress,
     canViewReports: gate.canViewReports,
     narrationNotice:
-      "How-to screen recordings are ready for every lesson. Spoken narration is still waiting on a live human recording — do not use AI text-to-speech for the official voice."
+      "Each lesson includes a spoken track aligned to the official Fitdog script plus matching captions. Replace public/training/<course>/<lesson>.narration.m4a and re-run scripts/staff-training-build-voiceover.ts if you need a new trainer voice."
   });
 }
 
