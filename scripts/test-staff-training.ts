@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { STAFF_TRAINING_COURSES, courseForRole, estimatedCourseMinutes } from "../lib/staff-training/catalog";
 import { canAccessAdminTab, accessFromLegacyRole } from "../lib/admin/permissions";
@@ -20,8 +21,8 @@ const on = courseForRole("overnight");
 assert.ok(fd && fd.lessons.length >= 8);
 assert.ok(on && on.lessons.length >= 6);
 assert.ok(fd.lessons.every((l) => l.narrationScript.length > 40));
-assert.ok(on.lessons.every((l) => l.narrationStatus === "pending_human"));
-assert.ok(fd.lessons.every((l) => l.narrationStatus === "pending_human"));
+assert.ok(on.lessons.every((l) => l.narrationStatus === "recorded"));
+assert.ok(fd.lessons.every((l) => l.narrationStatus === "recorded"));
 for (const course of STAFF_TRAINING_COURSES) {
   for (const lesson of course.lessons) {
     assert.equal(lesson.videoStatus, "ready", `${course.slug}/${lesson.slug} video`);
@@ -29,6 +30,14 @@ for (const course of STAFF_TRAINING_COURSES) {
     assert.ok(lesson.captionsVtt?.endsWith(`/${lesson.slug}.vtt`));
     assert.ok(fs.existsSync(`public${lesson.videoSrc}`), lesson.videoSrc);
     assert.ok(fs.existsSync(`public${lesson.captionsVtt}`), lesson.captionsVtt);
+    const narrationM4a = `public/training/${course.slug}/${lesson.slug}.narration.m4a`;
+    assert.ok(fs.existsSync(narrationM4a), narrationM4a);
+    const probes = execFileSync(
+      "ffprobe",
+      ["-v", "error", "-select_streams", "a", "-show_entries", "stream=codec_type", "-of", "csv=p=0", `public${lesson.videoSrc}`],
+      { encoding: "utf8" }
+    ).trim();
+    assert.equal(probes, "audio", `expected audio in ${lesson.videoSrc}, got ${probes || "(none)"}`);
   }
 }
 assert.equal(fd.lessons.some((l) => l.verificationNotes?.length), true);

@@ -241,7 +241,13 @@ export function StaffTrainingPanel({ onOpenTab }: StaffTrainingPanelProps) {
                     <Clapperboard className="inline h-3.5 w-3.5 mr-1" aria-hidden />
                     Screen capture: {lesson.videoStatus === "ready" ? "ready" : "pending production"}
                   </span>
-                  <span className="staff-training-pill staff-training-pill--warn">
+                  <span
+                    className={
+                      lesson.narrationStatus === "recorded"
+                        ? "staff-training-pill staff-training-pill--ok"
+                        : "staff-training-pill staff-training-pill--warn"
+                    }
+                  >
                     <Mic className="inline h-3.5 w-3.5 mr-1" aria-hidden />
                     Narration: {lesson.narrationStatus === "recorded" ? "recorded" : "pending human recording"}
                   </span>
