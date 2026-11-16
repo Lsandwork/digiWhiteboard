@@ -31,6 +31,15 @@ type TemplateLibraryPayload = {
   items: TemplateItem[];
 };
 
+const AUDIENCE_AWARE_KINDS = new Set([
+  "announcement",
+  "culture_message",
+  "campaign",
+  "milestone",
+  "insight",
+  "status_message"
+]);
+
 function tabLabel(tabs: TemplateLibraryPayload["tabs"], id: string) {
   return tabs.find((tab) => tab.id === id)?.label ?? id;
 }
@@ -226,6 +235,11 @@ export function TemplateLibraryAdminBody({
                 <strong>Instructions</strong>
                 <p>{selected.instructionsTemplate}</p>
               </div>
+            ) : null}
+            {AUDIENCE_AWARE_KINDS.has(selected.kind) ? (
+              <p className="ro-te-muted" style={{ fontSize: 13 }}>
+                Department-scoped managers publish to their departments automatically. Organization-wide leaders reach everyone unless you add audience controls later.
+              </p>
             ) : null}
             <div className="ro-te-preview-card">
               <h4>{title}</h4>
