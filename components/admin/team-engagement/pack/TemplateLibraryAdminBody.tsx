@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { fetchAdminJson } from "@/lib/http/fetch-admin-json";
+import { EngagementPageIntro, EngagementPremiumSection, EngagementToolbar } from "@/components/admin/team-engagement/EngagementAdminChrome";
 
 type TemplateItem = {
   id: string;
@@ -116,6 +117,10 @@ export function TemplateLibraryAdminBody({
 
   return (
     <div className="ro-te-stack">
+      <EngagementPageIntro
+        title="Engagement template library"
+        lede="Preview, customize, and publish templates into Bark Outs, Pack, and other Team Engagement tabs."
+      />
       {!payload.ready ? (
         <div className="ro-te-banner ro-te-banner--warn">
           Template storage is not applied yet. You can browse the built-in catalog below; apply <code>{payload.migration}</code> and{" "}
@@ -123,7 +128,8 @@ export function TemplateLibraryAdminBody({
         </div>
       ) : null}
 
-      <div className="ro-te-toolbar">
+      <EngagementPremiumSection title="Browse templates">
+      <EngagementToolbar>
         <input
           className="ro-te-input"
           placeholder="Search templates…"
@@ -144,7 +150,7 @@ export function TemplateLibraryAdminBody({
           Favorites only
         </label>
         <span className="ro-te-muted">{filtered.length} of {payload.total ?? 0} templates</span>
-      </div>
+      </EngagementToolbar>
 
       <div className="ro-te-template-grid">
         {filtered.map((item) => (
@@ -185,6 +191,7 @@ export function TemplateLibraryAdminBody({
           </article>
         ))}
       </div>
+      </EngagementPremiumSection>
 
       {selected ? (
         <dialog open className="ro-te-modal">

@@ -33,6 +33,11 @@ function main() {
   assert.ok(!panel.includes("window.prompt"), "Moderation must not use window.prompt");
   assert.ok(!pack.includes("window.prompt"), "Pack admin must not use window.prompt");
 
+  assert.match(leadership, /employeeUserId/, "Development admin must support creating records");
+  assert.match(leadership, /Add development record/, "Development create section");
+  assert.match(pack, /EngagementPremiumSection/, "Pack admin uses premium sections");
+  assert.match(pack, /archive_pack_goal/, "Pack goals support archive");
+
   console.log("team-engagement-manage-chrome: ok");
 }
 

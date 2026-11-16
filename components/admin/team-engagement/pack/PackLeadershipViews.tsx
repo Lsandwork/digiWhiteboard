@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { fetchAdminJson } from "@/lib/http/fetch-admin-json";
 import {
   EngagementDataTable,
+  EngagementPageIntro,
   EngagementPremiumSection,
   EngagementStatusPill,
   EngagementToolbar
@@ -66,6 +67,15 @@ export function PackOverviewBody({ data, onRefresh }: { data: Record<string, unk
   const ideas = data.ideas as { open?: number } | undefined;
   return (
     <div className="ro-te-stack">
+      <EngagementPageIntro
+        title="Pack leadership overview"
+        lede="High-level counts for goals, milestones, and ideas — use the sidebar to publish content that appears in the employee Pack experience."
+        actions={
+          <button type="button" className="ro-te-btn ro-te-btn--ghost" onClick={onRefresh}>
+            Refresh
+          </button>
+        }
+      />
       <div className="ro-te-stat-grid">
         <div className="ro-te-card ro-te-stat">
           <div className="ro-te-muted">Active Pack goals</div>
@@ -80,9 +90,6 @@ export function PackOverviewBody({ data, onRefresh }: { data: Record<string, unk
           <div className="ro-te-stat__value">{ideas?.open ?? 0}</div>
         </div>
       </div>
-      <button type="button" className="ro-te-btn ro-te-btn--ghost" onClick={onRefresh}>
-        Refresh overview
-      </button>
     </div>
   );
 }
@@ -92,6 +99,15 @@ export function PackGoalsAdminBody({ data, onRefresh }: { data: Record<string, u
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((goal) => `${goal.title ?? ""} ${goal.description ?? ""}`.toLowerCase().includes(q));
+  }, [items, query]);
+
   async function createGoal() {
     setBusy(true);
     try {
@@ -105,8 +121,7 @@ export function PackGoalsAdminBody({ data, onRefresh }: { data: Record<string, u
   }
   return (
     <div className="ro-te-stack">
-      <section className="ro-te-card ro-te-section">
-        <h3 className="ro-te-section__title">Create Pack goal</h3>
+      <EngagementPremiumSection title="Create Pack goal" description="Draft goals publish to the Pack goals card for all staff.">
         <label className="ro-te-field">
           Title
           <input value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -115,38 +130,95 @@ export function PackGoalsAdminBody({ data, onRefresh }: { data: Record<string, u
           Description
           <textarea value={description} rows={3} onChange={(e) => setDescription(e.target.value)} />
         </label>
-        <button type="button" className="ro-te-btn ro-te-btn--primary" disabled={busy} onClick={() => void createGoal()}>
+        <button type="button" className="ro-te-btn ro-te-btn--primary" disabled={busy || title.trim().length < 3} onClick={() => void createGoal()}>
           Save draft
         </button>
-      </section>
-      <section className="ro-te-card ro-te-section">
-        <h3 className="ro-te-section__title">Goals</h3>
-        {items.length === 0 ? <p className="ro-te-muted">No goals yet.</p> : null}
-        <ul className="ro-te-list">
-          {items.map((goal) => (
-            <li key={String(goal.id)} className="ro-te-list__item">
-              <strong>{String(goal.title)}</strong>
-              <span className="ro-te-muted"> · {String(goal.status)} · {goal.progressPercent as number}%</span>
-              <div className="ro-te-actions">
-                {goal.status === "draft" ? (
-                  <button type="button" className="ro-te-btn ro-te-btn--primary" onClick={() => void post("publish_pack_goal", { id: goal.id }).then(onRefresh)}>
-                    Publish
-                  </button>
-                ) : null}
-                {goal.status === "active" ? (
-                  <button
-                    type="button"
-                    className="ro-te-btn ro-te-btn--ghost"
-                    onClick={() => void post("update_pack_goal_progress", { id: goal.id, currentValue: goal.targetValue, complete: true }).then(onRefresh)}
-                  >
-                    Mark complete
-                  </button>
-                ) : null}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
+      </EngagementPremiumSection>
+      <EngagementPremiumSection title="Goals library">
+        <EngagementToolbar>
+          <input
+            className="ro-te-input"
+            placeholder="Search goals…"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            aria-label="Search Pack goals"
+          />
+        </EngagementToolbar>
+        <EngagementDataTable
+          emptyTitle="No Pack goals"
+          emptyBody="Create a draft goal above, then publish it for staff."
+          columns={[
+            { key: "title", label: "Goal" },
+            { key: "status", label: "Status" },
+            { key: "progress", label: "Progress" },
+            { key: "actions", label: "" }
+          ]}
+          rows={filtered.map((goal) => {
+            const id = String(goal.id);
+            const status = String(goal.status ?? "draft");
+            const rowBusy = busyId === id;
+            return {
+              id,
+              cells: {
+                title: (
+                  <div>
+                    <strong>{String(goal.title)}</strong>
+                    {goal.description ? <div className="ro-ai-answer" style={{ marginTop: 4 }}>{String(goal.description)}</div> : null}
+                  </div>
+                ),
+                status: <EngagementStatusPill status={status} />,
+                progress: `${Number(goal.progressPercent ?? 0)}%`,
+                actions: (
+                  <div className="ro-te-actions" style={{ margin: 0, flexWrap: "wrap" }}>
+                    {status === "draft" ? (
+                      <button
+                        type="button"
+                        className="ro-te-btn ro-te-btn--primary"
+                        disabled={rowBusy}
+                        onClick={() => {
+                          setBusyId(id);
+                          void post("publish_pack_goal", { id }).then(onRefresh).finally(() => setBusyId(null));
+                        }}
+                      >
+                        Publish
+                      </button>
+                    ) : null}
+                    {status === "active" ? (
+                      <button
+                        type="button"
+                        className="ro-te-btn ro-te-btn--ghost"
+                        disabled={rowBusy}
+                        onClick={() => {
+                          setBusyId(id);
+                          void post("update_pack_goal_progress", { id, currentValue: goal.targetValue, complete: true })
+                            .then(onRefresh)
+                            .finally(() => setBusyId(null));
+                        }}
+                      >
+                        Mark complete
+                      </button>
+                    ) : null}
+                    {status !== "archived" ? (
+                      <button
+                        type="button"
+                        className="ro-te-btn ro-te-btn--ghost"
+                        disabled={rowBusy}
+                        onClick={() => {
+                          if (!window.confirm("Archive this goal? It will stop showing in Pack.")) return;
+                          setBusyId(id);
+                          void post("archive_pack_goal", { id }).then(onRefresh).finally(() => setBusyId(null));
+                        }}
+                      >
+                        Archive
+                      </button>
+                    ) : null}
+                  </div>
+                )
+              }
+            };
+          })}
+        />
+      </EngagementPremiumSection>
     </div>
   );
 }
@@ -187,9 +259,10 @@ export function EmployeeVoiceAdminBody({ data, onRefresh }: { data: Record<strin
   }
   return (
     <div className="ro-te-stack">
-      <section className="ro-te-card ro-te-section">
-        <h3 className="ro-te-section__title">Create anonymous survey</h3>
-        <p className="ro-te-muted">Responses are stored without employee identifiers. Aggregate reporting uses minimum response thresholds.</p>
+      <EngagementPremiumSection
+        title="Create anonymous survey"
+        description="Responses are stored without employee identifiers. Aggregate reporting uses minimum response thresholds."
+      >
         <label className="ro-te-field">
           Survey title
           <input value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -197,9 +270,8 @@ export function EmployeeVoiceAdminBody({ data, onRefresh }: { data: Record<strin
         <button type="button" className="ro-te-btn ro-te-btn--primary" disabled={busy} onClick={() => void createSurvey()}>
           Create & publish
         </button>
-      </section>
-      <section className="ro-te-card ro-te-section">
-        <h3 className="ro-te-section__title">Surveys</h3>
+      </EngagementPremiumSection>
+      <EngagementPremiumSection title="Surveys">
         <ul className="ro-te-list">
           {items.map((row) => (
             <li key={String(row.id)} className="ro-te-list__item">
@@ -212,10 +284,9 @@ export function EmployeeVoiceAdminBody({ data, onRefresh }: { data: Record<strin
             </li>
           ))}
         </ul>
-      </section>
+      </EngagementPremiumSection>
       {resultsFor ? (
-        <section className="ro-te-card ro-te-section">
-          <h3 className="ro-te-section__title">Aggregate results</h3>
+        <EngagementPremiumSection title="Aggregate results">
           {results === null ? <p className="ro-te-muted">Loading…</p> : null}
           {results?.error ? <p className="ro-te-muted">{String(results.error)}</p> : null}
           {Array.isArray(results?.questions) ? (
@@ -245,13 +316,14 @@ export function EmployeeVoiceAdminBody({ data, onRefresh }: { data: Record<strin
           <button type="button" className="ro-te-btn ro-te-btn--ghost" style={{ marginTop: 8 }} onClick={() => setResultsFor(null)}>
             Close
           </button>
-        </section>
+        </EngagementPremiumSection>
       ) : null}
-      <section className="ro-te-card ro-te-section">
-        <h3 className="ro-te-section__title">You said, we did</h3>
-        <p className="ro-te-muted">Publish a follow-up employees can read on the Voice tab after surveys close.</p>
+      <EngagementPremiumSection
+        title="You said, we did"
+        description="Publish a follow-up employees can read on the Voice tab after surveys close."
+      >
         <VoiceOutcomeForm onRefresh={onRefresh} />
-      </section>
+      </EngagementPremiumSection>
     </div>
   );
 }
@@ -435,8 +507,7 @@ export function FunZoneAdminBody({ data, onRefresh }: { data: Record<string, unk
   const trivia = (data.trivia as Array<Record<string, unknown>>) ?? [];
   if (data.ready === false) {
     return (
-      <section className="ro-te-card ro-te-section">
-        <h3 className="ro-te-section__title">Fun Zone storage</h3>
+      <EngagementPremiumSection title="Fun Zone storage">
         <p className="ro-te-muted">
           {typeof data.setupMessage === "string"
             ? data.setupMessage
@@ -452,7 +523,7 @@ export function FunZoneAdminBody({ data, onRefresh }: { data: Record<string, unk
             </ul>
           </details>
         ) : null}
-      </section>
+      </EngagementPremiumSection>
     );
   }
   return (
@@ -485,13 +556,14 @@ function QuestionOfTheDayAdmin({ onRefresh }: { onRefresh: () => void }) {
   }
 
   return (
-    <section className="ro-te-card ro-te-section">
-      <h3 className="ro-te-section__title">Question of the day</h3>
-      <p className="ro-te-muted" style={{ marginBottom: 8, fontSize: 13 }}>
-        {choiceMode
+    <EngagementPremiumSection
+      title="Question of the day"
+      description={
+        choiceMode
           ? "With answer choices, Pack shows multiple choice on the Question of the day card."
-          : "Team members answer in Pack with short written responses, or add answer choices below for multiple choice."}
-      </p>
+          : "Team members answer in Pack with short written responses, or add answer choices below for multiple choice."
+      }
+    >
       <label className="ro-te-field">
         Question
         <textarea
@@ -565,7 +637,7 @@ function QuestionOfTheDayAdmin({ onRefresh }: { onRefresh: () => void }) {
       >
         Publish question
       </button>
-    </section>
+    </EngagementPremiumSection>
   );
 }
 
@@ -602,11 +674,10 @@ function FunZonePollPublisher({ onRefresh }: { onRefresh: () => void }) {
   }
 
   return (
-    <section className="ro-te-card ro-te-section">
-      <h3 className="ro-te-section__title">Pack poll</h3>
-      <p className="ro-te-muted" style={{ marginBottom: 8, fontSize: 13 }}>
-        Add the question and at least two answer choices. Shown as the Pack poll (multiple choice).
-      </p>
+    <EngagementPremiumSection
+      title="Pack poll"
+      description="Add the question and at least two answer choices. Shown as the Pack poll (multiple choice)."
+    >
       <label className="ro-te-field">
         Poll question
         <input value={pollPrompt} placeholder="Poll question" onChange={(e) => setPollPrompt(e.target.value)} />
@@ -657,7 +728,7 @@ function FunZonePollPublisher({ onRefresh }: { onRefresh: () => void }) {
       >
         Publish poll
       </button>
-    </section>
+    </EngagementPremiumSection>
   );
 }
 
@@ -666,8 +737,7 @@ function WouldYouRatherAdmin({ onRefresh }: { onRefresh: () => void }) {
   const [b, setB] = useState("");
   const [busy, setBusy] = useState(false);
   return (
-    <section className="ro-te-card ro-te-section">
-      <h3 className="ro-te-section__title">Would you rather?</h3>
+    <EngagementPremiumSection title="Would you rather?">
       <label className="ro-te-field">
         Option A
         <input value={a} onChange={(e) => setA(e.target.value)} />
@@ -693,7 +763,7 @@ function WouldYouRatherAdmin({ onRefresh }: { onRefresh: () => void }) {
       >
         Publish question
       </button>
-    </section>
+    </EngagementPremiumSection>
   );
 }
 
@@ -704,8 +774,7 @@ function PackEventAdmin({ onRefresh }: { onRefresh: () => void }) {
   const [startsAt, setStartsAt] = useState("");
   const [busy, setBusy] = useState(false);
   return (
-    <section className="ro-te-card ro-te-section">
-      <h3 className="ro-te-section__title">Team event</h3>
+    <EngagementPremiumSection title="Team event" description="Published events appear on the Pack Fun Zone calendar.">
       <label className="ro-te-field">
         Title
         <input value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -742,7 +811,7 @@ function PackEventAdmin({ onRefresh }: { onRefresh: () => void }) {
       >
         Publish event
       </button>
-    </section>
+    </EngagementPremiumSection>
   );
 }
 
@@ -810,9 +879,10 @@ export function PackIdeasAdminBody({ data, onRefresh }: { data: Record<string, u
 export function PackMilestonesAdminBody({ onSync }: { onSync: () => void }) {
   const [busy, setBusy] = useState(false);
   return (
-    <section className="ro-te-card ro-te-section">
-      <h3 className="ro-te-section__title">Milestone automation</h3>
-      <p className="ro-te-muted">Sync anniversaries and opted-in birthdays from staff_directory hire dates. Schedule via /api/cron/pack-milestones.</p>
+    <EngagementPremiumSection
+      title="Milestone automation"
+      description="Sync anniversaries and opted-in birthdays from staff_directory hire dates. Schedule via /api/cron/pack-milestones."
+    >
       <button
         type="button"
         className="ro-te-btn ro-te-btn--primary"
@@ -827,6 +897,6 @@ export function PackMilestonesAdminBody({ onSync }: { onSync: () => void }) {
       >
         Run sync now
       </button>
-    </section>
+    </EngagementPremiumSection>
   );
 }

@@ -14,7 +14,7 @@ import {
   PackOverviewBody
 } from "@/components/admin/team-engagement/pack/PackLeadershipViews";
 import { TemplateLibraryAdminBody } from "@/components/admin/team-engagement/pack/TemplateLibraryAdminBody";
-import { EngagementPremiumSection } from "@/components/admin/team-engagement/EngagementAdminChrome";
+import { EngagementPageIntro, EngagementPremiumSection } from "@/components/admin/team-engagement/EngagementAdminChrome";
 import {
   AccessAdminBody,
   AiPolicyAdminBody,
@@ -105,6 +105,7 @@ function OverviewBody({ data }: { data: Record<string, unknown> }) {
   const recent = (data.recentBarkOuts as Array<{ recipientName: string; authorName: string; categoryLabel: string; message: string }>) ?? [];
   return (
     <div className="ro-te-stack">
+      <EngagementPageIntro title="Team Engagement overview" lede="Headcount, recognition, moderation, and the latest Bark Outs in your scope." />
       <div className="ro-te-stat-grid">
         <StatCard label="Team headcount" value={headcount?.total ?? "—"} />
         <StatCard label="Recognitions (30 days)" value={recognition?.published ?? 0} />
@@ -115,8 +116,7 @@ function OverviewBody({ data }: { data: Record<string, unknown> }) {
           </>
         ) : null}
       </div>
-      <section className="ro-te-card ro-te-section">
-        <h3 className="ro-te-section__title">Recent Bark Outs</h3>
+      <EngagementPremiumSection title="Recent Bark Outs">
         {recent.length === 0 ? (
           <EmptyIllustration name="empty-bark-outs" title="No Bark Outs yet" body="When teammates recognize each other, the latest posts show up here." />
         ) : (
@@ -131,7 +131,7 @@ function OverviewBody({ data }: { data: Record<string, unknown> }) {
             ))}
           </ul>
         )}
-      </section>
+      </EngagementPremiumSection>
     </div>
   );
 }
@@ -214,8 +214,7 @@ function ModerationBody({
     return (
       <div className="ro-te-stack">
         {repeats.length ? (
-          <section className="ro-te-card ro-te-section">
-            <h3 className="ro-te-section__title">Repeat policy outcomes (90 days)</h3>
+          <EngagementPremiumSection title="Repeat policy outcomes (90 days)">
             <ul className="ro-te-list">
               {repeats.map((row) => (
                 <li key={row.name}>
@@ -223,7 +222,7 @@ function ModerationBody({
                 </li>
               ))}
             </ul>
-          </section>
+          </EngagementPremiumSection>
         ) : null}
         <EmptyIllustration name="empty-bark-outs" title="Moderation queue is clear" body="New submissions that need a person will land here." />
       </div>
