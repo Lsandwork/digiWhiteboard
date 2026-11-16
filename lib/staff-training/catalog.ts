@@ -55,7 +55,7 @@ const onQuizFinal: TrainingQuizQuestion[] = [
   }
 ];
 
-export const STAFF_TRAINING_COURSES: TrainingCourseDef[] = [
+const STAFF_TRAINING_COURSE_DEFS: TrainingCourseDef[] = [
   {
     slug: "front_desk",
     title: "Front Desk Coordinator Training",
@@ -383,6 +383,17 @@ export const STAFF_TRAINING_COURSES: TrainingCourseDef[] = [
     ]
   }
 ];
+
+/** Screen how-tos live in public/training. Spoken narration stays pending until a person records it. */
+export const STAFF_TRAINING_COURSES: TrainingCourseDef[] = STAFF_TRAINING_COURSE_DEFS.map((course) => ({
+  ...course,
+  lessons: course.lessons.map((lesson) => ({
+    ...lesson,
+    videoSrc: `/training/${course.slug}/${lesson.slug}.mp4`,
+    captionsVtt: `/training/${course.slug}/${lesson.slug}.vtt`,
+    videoStatus: "ready" as const
+  }))
+}));
 
 export function courseForRole(role: string): TrainingCourseDef | null {
   return STAFF_TRAINING_COURSES.find((course) => course.audienceRoleKeys.includes(role)) ?? null;

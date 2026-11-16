@@ -55,7 +55,7 @@ export async function GET(request: Request) {
     progress,
     canViewReports: gate.canViewReports,
     narrationNotice:
-      "Final videos require human-recorded narration and approved screen captures. Scripts and guided steps are production-ready; do not use AI text-to-speech for official training."
+      "How-to screen recordings are ready for every lesson. Spoken narration is still waiting on a live human recording — do not use AI text-to-speech for the official voice."
   });
 }
 

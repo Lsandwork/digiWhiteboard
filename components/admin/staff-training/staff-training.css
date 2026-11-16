@@ -49,6 +49,7 @@
   text-align: left;
   border: 1px solid var(--admin-border, #e2e8f0);
   background: #fff;
+  color: #0f172a;
   border-radius: 8px;
   padding: 0.6rem 0.75rem;
   cursor: pointer;
@@ -70,6 +71,12 @@
   border-radius: 12px;
   padding: 1rem 1.25rem 1.25rem;
   background: #fff;
+  color: #0f172a;
+}
+
+.staff-training-player .admin-section-title,
+.staff-training-player .admin-muted {
+  color: #334155;
 }
 
 .staff-training-status-row {
@@ -88,6 +95,10 @@
 
 .staff-training-pill--warn {
   background: #fef3c7;
+}
+
+.staff-training-pill--ok {
+  background: #dcfce7;
 }
 
 .staff-training-video-shell {
