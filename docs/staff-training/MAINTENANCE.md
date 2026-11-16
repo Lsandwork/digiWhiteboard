@@ -20,7 +20,7 @@
 ## Human narration
 
 - Official scripts live in `lib/staff-training/scripts/*`.
-- Generate or refresh muxed lesson video: `npx tsx scripts/staff-training-build-voiceover.ts` (reads scripts, writes `*.narration.m4a`, muxes into `*.mp4`). Screen-only masters are kept as `*.screen-only.mp4`.
+- Generate or refresh narration: `npx tsx scripts/staff-training-build-voiceover.ts` (reads scripts, writes `*.narration.m4a`, republishes screen capture to `*.mp4` from `*.screen-only.mp4`). The admin player plays video + narration together in the browser.
 - To swap in a trainer’s studio take: replace `public/training/<course>/<lesson>.narration.m4a` and re-run the script above.
 - Catalog sets `narrationStatus: "recorded"` when build output is committed.
 

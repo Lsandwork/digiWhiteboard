@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, BookOpen, CheckCircle2, Clapperboard, Mic } from "lucide-react";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import type { AdminTab } from "@/lib/admin/types";
@@ -74,6 +74,43 @@ export function StaffTrainingPanel({ onOpenTab }: StaffTrainingPanelProps) {
     () => course?.lessons.find((l) => l.slug === lessonSlug) ?? null,
     [course, lessonSlug]
   );
+
+  const mediaKey = course && lesson ? `${course.slug}-${lesson.slug}` : "";
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const narrationRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    const a = narrationRef.current;
+    if (!v) return;
+    v.pause();
+    v.currentTime = 0;
+    if (a) {
+      a.pause();
+      a.currentTime = 0;
+    }
+  }, [mediaKey]);
+
+  const syncNarrationTimeFromVideo = useCallback(() => {
+    const v = videoRef.current;
+    const a = narrationRef.current;
+    if (!v || !a) return;
+    if (Math.abs(a.currentTime - v.currentTime) > 0.2) {
+      a.currentTime = v.currentTime;
+    }
+  }, []);
+
+  const onVideoPlay = useCallback(() => {
+    const v = videoRef.current;
+    const a = narrationRef.current;
+    if (!a) return;
+    if (v) a.currentTime = v.currentTime;
+    void a.play().catch(() => undefined);
+  }, []);
+
+  const onVideoPause = useCallback(() => {
+    narrationRef.current?.pause();
+  }, []);
 
   const lessonProgress = lesson && course && payload ? progressFor(payload.progress, course.slug, lesson.slug) : null;
 
@@ -261,20 +298,42 @@ export function StaffTrainingPanel({ onOpenTab }: StaffTrainingPanelProps) {
 
                 <div className="staff-training-video-shell">
                   {lesson.videoSrc ? (
-                    <video
-                      controls
-                      playsInline
-                      preload="metadata"
-                      src={lesson.videoSrc}
-                      onTimeUpdate={(e) => {
-                        const el = e.currentTarget;
-                        if (Math.floor(el.currentTime) % 15 === 0 && el.currentTime > 0) {
-                          void postAction("save_position", { videoPositionSeconds: el.currentTime }).catch(() => undefined);
-                        }
-                      }}
-                    >
-                      {lesson.captionsVtt ? <track kind="captions" src={lesson.captionsVtt} label="English" default /> : null}
-                    </video>
+                    <>
+                      {lesson.narrationAudioSrc ? (
+                        <audio
+                          key={`narration-${mediaKey}`}
+                          ref={narrationRef}
+                          src={lesson.narrationAudioSrc}
+                          preload="metadata"
+                          className="staff-training-narration-audio"
+                          aria-hidden
+                        />
+                      ) : null}
+                      <video
+                        key={`video-${mediaKey}`}
+                        ref={videoRef}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        src={lesson.videoSrc}
+                        onPlay={onVideoPlay}
+                        onPause={onVideoPause}
+                        onSeeked={syncNarrationTimeFromVideo}
+                        onSeeking={syncNarrationTimeFromVideo}
+                        onRateChange={(e) => {
+                          const a = narrationRef.current;
+                          if (a) a.playbackRate = e.currentTarget.playbackRate;
+                        }}
+                        onTimeUpdate={(e) => {
+                          const el = e.currentTarget;
+                          if (Math.floor(el.currentTime) % 15 === 0 && el.currentTime > 0) {
+                            void postAction("save_position", { videoPositionSeconds: el.currentTime }).catch(() => undefined);
+                          }
+                        }}
+                      >
+                        {lesson.captionsVtt ? <track kind="captions" src={lesson.captionsVtt} label="English" default /> : null}
+                      </video>
+                    </>
                   ) : (
                     <div className="p-6 text-center text-sm max-w-md">
                       <p className="mb-2 font-medium">Video slot reserved</p>

@@ -29,6 +29,8 @@ export type TrainingLessonDef = {
   order: number;
   durationMinutes: number;
   videoSrc: string | null;
+  /** Spoken track (muxed separately from screen capture for reliable browser playback). */
+  narrationAudioSrc?: string | null;
   captionsVtt: string | null;
   videoStatus: TrainingVideoStatus;
   narrationStatus: TrainingNarrationStatus;

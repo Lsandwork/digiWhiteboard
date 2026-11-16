@@ -27,17 +27,31 @@ for (const course of STAFF_TRAINING_COURSES) {
   for (const lesson of course.lessons) {
     assert.equal(lesson.videoStatus, "ready", `${course.slug}/${lesson.slug} video`);
     assert.ok(lesson.videoSrc?.endsWith(`/${lesson.slug}.mp4`));
+    assert.ok(lesson.narrationAudioSrc?.endsWith(`/${lesson.slug}.narration.m4a`));
     assert.ok(lesson.captionsVtt?.endsWith(`/${lesson.slug}.vtt`));
     assert.ok(fs.existsSync(`public${lesson.videoSrc}`), lesson.videoSrc);
+    assert.ok(fs.existsSync(`public${lesson.narrationAudioSrc}`), lesson.narrationAudioSrc);
     assert.ok(fs.existsSync(`public${lesson.captionsVtt}`), lesson.captionsVtt);
-    const narrationM4a = `public/training/${course.slug}/${lesson.slug}.narration.m4a`;
-    assert.ok(fs.existsSync(narrationM4a), narrationM4a);
-    const probes = execFileSync(
+    const screenBackup = `public/training/${course.slug}/${lesson.slug}.screen-only.mp4`;
+    assert.ok(fs.existsSync(screenBackup), screenBackup);
+    const videoProbe = execFileSync(
+      "ffprobe",
+      ["-v", "error", "-select_streams", "v", "-show_entries", "stream=codec_type", "-of", "csv=p=0", `public${lesson.videoSrc}`],
+      { encoding: "utf8" }
+    ).trim();
+    assert.equal(videoProbe, "video", `expected video in ${lesson.videoSrc}`);
+    const muxedAudio = execFileSync(
       "ffprobe",
       ["-v", "error", "-select_streams", "a", "-show_entries", "stream=codec_type", "-of", "csv=p=0", `public${lesson.videoSrc}`],
       { encoding: "utf8" }
     ).trim();
-    assert.equal(probes, "audio", `expected audio in ${lesson.videoSrc}, got ${probes || "(none)"}`);
+    assert.equal(muxedAudio, "", `lesson mp4 must be screen-only (no muxed audio): ${lesson.videoSrc}`);
+    const narrationAudio = execFileSync(
+      "ffprobe",
+      ["-v", "error", "-select_streams", "a", "-show_entries", "stream=codec_type", "-of", "csv=p=0", `public${lesson.narrationAudioSrc}`],
+      { encoding: "utf8" }
+    ).trim();
+    assert.equal(narrationAudio, "audio", `expected narration audio in ${lesson.narrationAudioSrc}`);
   }
 }
 assert.equal(fd.lessons.some((l) => l.verificationNotes?.length), true);
