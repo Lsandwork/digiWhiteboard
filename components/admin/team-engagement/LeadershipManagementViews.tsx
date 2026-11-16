@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AnalyticsIntelligenceDashboard from "@/components/admin/team-engagement/AnalyticsIntelligenceDashboard";
+import { fetchAdminJson } from "@/lib/http/fetch-admin-json";
 import {
   EngagementDataTable,
   EngagementPremiumSection,
@@ -609,6 +610,40 @@ export function DevelopmentAdminBody({
   const [editStatus, setEditStatus] = useState<string>(DEVELOPMENT_STATUSES[1]);
   const [editDetails, setEditDetails] = useState("");
   const [busy, setBusy] = useState(false);
+  const [roster, setRoster] = useState<Array<{ userId: string; name: string; departmentLabel?: string }>>([]);
+  const [employeePick, setEmployeePick] = useState("");
+  const [employeeQuery, setEmployeeQuery] = useState("");
+  const [newRecordType, setNewRecordType] = useState<string>(DEVELOPMENT_RECORD_TYPES[0]);
+  const [newTitle, setNewTitle] = useState("");
+  const [newDetails, setNewDetails] = useState("");
+  const [createBusy, setCreateBusy] = useState(false);
+
+  useEffect(() => {
+    if (!onAction) return;
+    void fetchAdminJson<{ items?: Array<Record<string, unknown>> }>("/api/admin/team-engagement?view=staff&status=active").then(
+      ({ ok, body }) => {
+        if (!ok || !Array.isArray(body.items)) return;
+        setRoster(
+          body.items.map((row) => ({
+            userId: String(row.userId),
+            name: String(row.name),
+            departmentLabel: typeof row.departmentLabel === "string" ? row.departmentLabel : undefined
+          }))
+        );
+      }
+    );
+  }, [onAction]);
+
+  const rosterMatches = useMemo(() => {
+    const q = employeeQuery.trim().toLowerCase();
+    if (!q) return roster.slice(0, 80);
+    return roster
+      .filter((person) => {
+        const hay = `${person.name} ${person.departmentLabel ?? ""}`.toLowerCase();
+        return hay.includes(q);
+      })
+      .slice(0, 80);
+  }, [employeeQuery, roster]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -622,7 +657,79 @@ export function DevelopmentAdminBody({
   }, [items, query, statusFilter]);
 
   return (
-    <EngagementPremiumSection title="Employee development" description="Growth records sync to leadership views and employee development surfaces when shared.">
+    <div className="ro-te-stack">
+      {onAction ? (
+        <EngagementPremiumSection
+          title="Add development record"
+          description="Choose a teammate in your scope. New records default to in progress and leadership-only visibility."
+        >
+          <EngagementToolbar>
+            <input
+              className="ro-te-input"
+              placeholder="Filter teammates…"
+              value={employeeQuery}
+              onChange={(event) => setEmployeeQuery(event.target.value)}
+              aria-label="Filter teammates"
+            />
+          </EngagementToolbar>
+          <label className="ro-te-field">
+            Teammate
+            <select className="ro-te-select" value={employeePick} disabled={createBusy} onChange={(event) => setEmployeePick(event.target.value)}>
+              <option value="">Select teammate…</option>
+              {rosterMatches.map((person) => (
+                <option key={person.userId} value={person.userId}>
+                  {person.name}
+                  {person.departmentLabel ? ` · ${person.departmentLabel}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="ro-te-field">
+            Record type
+            <select className="ro-te-select" value={newRecordType} disabled={createBusy} onChange={(event) => setNewRecordType(event.target.value)}>
+              {DEVELOPMENT_RECORD_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {DEVELOPMENT_RECORD_TYPE_LABELS[type]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="ro-te-field">
+            Title
+            <input value={newTitle} disabled={createBusy} onChange={(event) => setNewTitle(event.target.value)} placeholder="Complete leash skills refresher" />
+          </label>
+          <label className="ro-te-field">
+            Details (optional)
+            <textarea rows={2} value={newDetails} disabled={createBusy} onChange={(event) => setNewDetails(event.target.value)} />
+          </label>
+          <button
+            type="button"
+            className="ro-te-btn ro-te-btn--primary"
+            disabled={createBusy || !employeePick || newTitle.trim().length < 2}
+            onClick={() => {
+              setCreateBusy(true);
+              void onAction("save_development_record", {
+                employeeUserId: employeePick,
+                recordType: newRecordType,
+                status: "in_progress",
+                title: newTitle.trim(),
+                details: newDetails.trim() || undefined,
+                visibility: "leadership"
+              })
+                .then(() => {
+                  setEmployeePick("");
+                  setNewTitle("");
+                  setNewDetails("");
+                  onRefresh?.();
+                })
+                .finally(() => setCreateBusy(false));
+            }}
+          >
+            {createBusy ? "Saving…" : "Create record"}
+          </button>
+        </EngagementPremiumSection>
+      ) : null}
+      <EngagementPremiumSection title="Development records" description="Growth records sync to leadership views and employee development surfaces when shared.">
       <EngagementToolbar>
         <input
           className="ro-te-input"
@@ -733,21 +840,24 @@ export function DevelopmentAdminBody({
           };
         })}
       />
-    </EngagementPremiumSection>
+      </EngagementPremiumSection>
+    </div>
   );
 }
 
 export function WorkloadAdminBody({ data }: { data: Record<string, unknown> }) {
   if (data.available === false) {
     return (
-      <p className="ro-te-muted">{String(data.note ?? data.missing ?? "Workload data is not available right now.")}</p>
+      <EngagementPremiumSection title="Workload">
+        <p className="ro-te-muted">{String(data.note ?? data.missing ?? "Workload data is not available right now.")}</p>
+      </EngagementPremiumSection>
     );
   }
   const people = (data.people as Array<Record<string, unknown>>) ?? [];
   const summary = (data.summary as Array<Record<string, unknown>>) ?? [];
   return (
     <div className="ro-te-stack">
-      <p className="ro-te-callout">{String(data.note ?? "Open assignments are a snapshot, not a performance score.")}</p>
+      <EngagementPremiumSection title="Workload snapshot" description={String(data.note ?? "Open assignments are a snapshot, not a performance score.")}>
       {summary.length ? (
         <div className="ro-te-stat-grid">
           {summary.map((row, index) => (
@@ -758,6 +868,7 @@ export function WorkloadAdminBody({ data }: { data: Record<string, unknown> }) {
           ))}
         </div>
       ) : null}
+      </EngagementPremiumSection>
       <ListSection title="By teammate" empty={people.length ? undefined : "No workload rows for this filter."}>
         <ul className="ro-te-list">
           {people.map((row, index) => (
@@ -909,7 +1020,7 @@ export function SettingsAdminBody({
   const [busy, setBusy] = useState(false);
   return (
     <div className="ro-te-stack">
-      <ListSection title="Bark Out categories">
+      <EngagementPremiumSection title="Bark Out categories">
         <ul className="ro-te-list">
           {categories.map((cat) => (
             <li key={cat.key}>
@@ -918,9 +1029,8 @@ export function SettingsAdminBody({
             </li>
           ))}
         </ul>
-      </ListSection>
-      <section className="ro-te-card ro-te-section">
-        <h3 className="ro-te-section__title">Participation limits</h3>
+      </EngagementPremiumSection>
+      <EngagementPremiumSection title="Participation limits">
         <label className="ro-te-field">
           Daily Bark Outs per teammate
           <input type="number" min={1} max={50} value={dailyLimit} onChange={(e) => setDailyLimit(e.target.value)} />
@@ -955,11 +1065,9 @@ export function SettingsAdminBody({
             Save limits
           </button>
         ) : null}
-      </section>
+      </EngagementPremiumSection>
       {features ? (
-        <section className="ro-te-card ro-te-section">
-          <h3 className="ro-te-section__title">Feature toggles (read-only here)</h3>
-          <p className="ro-te-muted">Super Admins can change Pack feature controls under Security → Feature Controls.</p>
+        <EngagementPremiumSection title="Feature toggles (read-only here)" description="Super Admins can change Pack feature controls under Security → Feature Controls.">
           <ul className="ro-te-list">
             {Object.entries(features).map(([key, enabled]) => (
               <li key={key}>
@@ -967,7 +1075,7 @@ export function SettingsAdminBody({
               </li>
             ))}
           </ul>
-        </section>
+        </EngagementPremiumSection>
       ) : null}
     </div>
   );
@@ -1229,8 +1337,7 @@ export function AiPolicyAdminBody({
   const lastTest = data.lastTest as { at?: string; result?: string } | null | undefined;
   const statement = String(data.statement ?? "");
   return (
-    <section className="ro-te-card ro-te-section">
-      <h3 className="ro-te-section__title">AI moderation policy</h3>
+    <EngagementPremiumSection title="AI moderation policy">
       <p className="ro-te-muted">{statement || "Bark Outs that automated rules cannot clear still route to human moderators."}</p>
       <p className="ro-te-muted">Status: {String(data.status ?? (data.configured ? "configured" : "not_configured"))}</p>
       {lastTest?.at ? (
@@ -1252,7 +1359,7 @@ export function AiPolicyAdminBody({
           Test Gemini connection
         </button>
       ) : null}
-    </section>
+    </EngagementPremiumSection>
   );
 }
 
@@ -1283,9 +1390,10 @@ export function RetentionAdminBody({
         </div>
       ) : null}
       {onAction ? (
-        <section className="ro-te-card ro-te-section">
-          <h3 className="ro-te-section__title">Run retention purge</h3>
-          <p className="ro-te-muted">Super Admins only. Deletes aged rejected, withdrawn, removed Bark Outs, closed feedback, and old audit entries per policy.</p>
+        <EngagementPremiumSection
+          title="Run retention purge"
+          description="Super Admins only. Deletes aged rejected, withdrawn, removed Bark Outs, closed feedback, and old audit entries per policy."
+        >
           <label className="ro-te-field">
             Reason
             <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Annual cleanup" />
@@ -1307,7 +1415,7 @@ export function RetentionAdminBody({
           >
             Run purge now
           </button>
-        </section>
+        </EngagementPremiumSection>
       ) : null}
     </div>
   );
