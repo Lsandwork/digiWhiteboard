@@ -2,10 +2,20 @@ import { randomUUID } from "crypto";
 import { ENGAGEMENT_TEMPLATE_CATALOG } from "@/lib/team-engagement/template-catalog.generated";
 import { assertCommunityText } from "@/lib/team-engagement/community-content";
 import { EngagementError, forbiddenError, validationError } from "@/lib/team-engagement/errors";
+import { isEngagementDepartment } from "@/lib/team-engagement/constants";
+import { publishVoiceSurvey, saveVoiceSurvey } from "@/lib/team-engagement/employee-voice";
 import { createAnnouncement } from "@/lib/team-engagement/records";
 import { publishFunPoll, publishFunQuestion, saveFunPoll, saveFunQuestion } from "@/lib/team-engagement/pack-features";
 import { publishPackGoal, savePackGoal } from "@/lib/team-engagement/pack-goals";
-import { assertEngagementWriteReady, multilineText, nowIso, requireStorage, text, type ServiceContext } from "@/lib/team-engagement/context";
+import {
+  assertEngagementWriteReady,
+  multilineText,
+  nowIso,
+  requireStorage,
+  scopeFilterDepartments,
+  text,
+  type ServiceContext
+} from "@/lib/team-engagement/context";
 import {
   applyTemplateFields,
   assertTemplateResolvable,
@@ -438,6 +448,82 @@ export async function archiveEngagementTemplate(ctx: ServiceContext, input: { te
   return { archived: true };
 }
 
+const ANNOUNCEMENT_TEMPLATE_KINDS = new Set<EngagementTemplateKind>([
+  "announcement",
+  "culture_message",
+  "campaign",
+  "milestone",
+  "insight",
+  "status_message"
+]);
+
+const VOICE_TEMPLATE_KINDS = new Set<EngagementTemplateKind>(["voice_question", "voice_survey", "pulse_survey"]);
+
+/** Explicit audience from the publish form, or all departments in the actor's scope when they are department-scoped. */
+function resolveTemplateAudienceDepartments(ctx: ServiceContext, explicit: string[]): string[] {
+  const chosen = [...new Set(explicit.filter(isEngagementDepartment))];
+  if (chosen.length) return chosen;
+  const scoped = scopeFilterDepartments(ctx.actor);
+  return scoped ? [...scoped] : [];
+}
+
+function voiceQuestionsFromTemplate(template: EngagementTemplateRow, message: string) {
+  const payloadQuestions = Array.isArray(template.payload?.questions)
+    ? template.payload.questions.filter((value): value is string => typeof value === "string" && value.trim().length >= 3)
+    : [];
+  if (payloadQuestions.length) {
+    return payloadQuestions.map((prompt) => ({
+      prompt: prompt.trim(),
+      questionType: template.kind === "pulse_survey" ? "rating" : "text",
+      required: true
+    }));
+  }
+  if (template.kind === "voice_question") {
+    return [{ prompt: message, questionType: "text", required: true }];
+  }
+  const lines = message
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => line.length >= 3);
+  const prompts = lines.length ? lines : [message];
+  return prompts.map((prompt) => ({
+    prompt,
+    questionType: template.kind === "pulse_survey" ? "rating" : "text",
+    required: true
+  }));
+}
+
+async function publishTemplateAnnouncement(
+  ctx: ServiceContext,
+  input: { title: string; body: string; audienceDepartments: string[] }
+) {
+  const created = await createAnnouncement(ctx, input);
+  return { id: created.announcement.id, announcement: created.announcement };
+}
+
+async function publishTemplateVoiceSurvey(
+  ctx: ServiceContext,
+  input: {
+    title: string;
+    message: string;
+    instructions: string | null;
+    template: EngagementTemplateRow;
+    audienceDepartments: string[];
+  }
+) {
+  const questions = voiceQuestionsFromTemplate(input.template, input.message);
+  if (!questions.length) throw validationError("Add at least one survey question.");
+  const saved = await saveVoiceSurvey(ctx, {
+    title: input.title,
+    introduction: input.instructions ?? input.message.slice(0, 1200),
+    anonymityMode: "anonymous",
+    departments: input.audienceDepartments,
+    questions
+  });
+  await publishVoiceSurvey(ctx, { id: saved.id });
+  return { id: saved.id };
+}
+
 export async function publishEngagementTemplate(ctx: ServiceContext, input: Record<string, unknown>) {
   if (!ctx.actor.tier) throw forbiddenError();
   const template = input.templateId ? await getTemplateById(ctx, String(input.templateId)) : null;
@@ -462,9 +548,12 @@ export async function publishEngagementTemplate(ctx: ServiceContext, input: Reco
   assertCommunityText(message, template.kind === "bark_out" ? "bark_out" : "voice");
   if (instructions) assertCommunityText(instructions, "voice");
 
-  const audienceDepartments = Array.isArray(input.audienceDepartments)
-    ? input.audienceDepartments.filter((value): value is string => typeof value === "string")
-    : [];
+  const audienceDepartments = resolveTemplateAudienceDepartments(
+    ctx,
+    Array.isArray(input.audienceDepartments)
+      ? input.audienceDepartments.filter((value): value is string => typeof value === "string")
+      : []
+  );
 
   const scheduledFor = typeof input.scheduledFor === "string" ? input.scheduledFor : null;
   const expiresAt = typeof input.expiresAt === "string" ? input.expiresAt : null;
@@ -478,7 +567,10 @@ export async function publishEngagementTemplate(ctx: ServiceContext, input: Reco
       case "announcement":
       case "culture_message":
       case "campaign":
-        target = await createAnnouncement(ctx, { title, body: message, audienceDepartments });
+      case "milestone":
+      case "insight":
+      case "status_message":
+        target = await publishTemplateAnnouncement(ctx, { title, body: message, audienceDepartments });
         break;
       case "poll": {
         const options = Array.isArray(template.payload?.options) ? template.payload?.options : [];
@@ -531,7 +623,33 @@ export async function publishEngagementTemplate(ctx: ServiceContext, input: Reco
           category: template.payload?.ideaCategory ?? "other"
         };
         break;
+      case "trivia": {
+        const options = Array.isArray(template.payload?.options)
+          ? template.payload.options.filter((value): value is string => typeof value === "string")
+          : ["6", "7", "8", "9"];
+        const saved = await saveFunPoll(ctx, { prompt: message, options });
+        target = await publishFunPoll(ctx, {
+          id: saved.id,
+          publishAt: scheduledFor,
+          closeAt: expiresAt
+        });
+        break;
+      }
+      case "voice_question":
+      case "voice_survey":
+      case "pulse_survey":
+        target = await publishTemplateVoiceSurvey(ctx, {
+          title,
+          message,
+          instructions,
+          template,
+          audienceDepartments
+        });
+        break;
       default:
+        if (ANNOUNCEMENT_TEMPLATE_KINDS.has(template.kind) || VOICE_TEMPLATE_KINDS.has(template.kind)) {
+          throw validationError("This template type is not wired for publishing yet.");
+        }
         target = { recorded: true, kind: template.kind };
     }
   }
