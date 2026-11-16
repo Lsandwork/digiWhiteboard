@@ -14,6 +14,15 @@ export const FUN_QUESTION_CHOICES_COMMIT = "supabase/migrations/115_team_engagem
 export const PACK_GOAL_TYPES = ["numeric", "completion", "participation", "milestone", "timebound"] as const;
 export type PackGoalType = (typeof PACK_GOAL_TYPES)[number];
 
+/** Template catalog categories → DB `goal_type` (see migration 107 check constraint). */
+export const PACK_GOAL_TYPE_ALIASES: Record<string, PackGoalType> = {
+  recognition: "participation",
+  teamwork: "participation",
+  learning: "completion",
+  workplace: "milestone",
+  wellbeing: "timebound"
+};
+
 export const PACK_GOAL_STATUSES = ["draft", "active", "completed", "archived"] as const;
 export type PackGoalStatus = (typeof PACK_GOAL_STATUSES)[number];
 

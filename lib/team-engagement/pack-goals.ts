@@ -1,5 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { ENGAGEMENT_DEPARTMENTS, PACK_GOAL_STATUSES, PACK_GOAL_TYPES, type PackGoalStatus, type PackGoalType } from "@/lib/team-engagement/constants";
+import {
+  ENGAGEMENT_DEPARTMENTS,
+  PACK_GOAL_STATUSES,
+  PACK_GOAL_TYPE_ALIASES,
+  PACK_GOAL_TYPES,
+  type PackGoalStatus,
+  type PackGoalType
+} from "@/lib/team-engagement/constants";
 import { auditOp, multilineText, nowIso, oneOf, optionalText, requireStorage, requireUuid, text, type ServiceContext } from "@/lib/team-engagement/context";
 import { EngagementError, forbiddenError, notFoundError, validationError } from "@/lib/team-engagement/errors";
 import { scopeIncludesDepartments } from "@/lib/team-engagement/permissions";
@@ -42,6 +49,19 @@ function goalVisibleToEmployee(ctx: ServiceContext, row: GoalRow) {
   if (row.status !== "active" && row.status !== "completed") return false;
   if (!row.departments.length) return true;
   return scopeIncludesDepartments(ctx.actor.scope, row.departments) || ctx.actor.departments.some((d) => row.departments.includes(d));
+}
+
+/** Accepts DB goal types and template-library categories (teamwork, learning, …). */
+export function normalizePackGoalType(raw: unknown): PackGoalType {
+  const value = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+  if ((PACK_GOAL_TYPES as readonly string[]).includes(value)) {
+    return value as PackGoalType;
+  }
+  const alias = PACK_GOAL_TYPE_ALIASES[value];
+  if (alias) return alias;
+  return "participation";
 }
 
 function mapGoal(row: GoalRow) {
@@ -103,7 +123,7 @@ export async function savePackGoal(ctx: ServiceContext, input: Record<string, un
   const description = multilineText(input.description, 2000);
   if (title.length < 3) throw validationError("Add a goal title.");
   if (description.length < 10) throw validationError("Describe the goal in a few sentences.");
-  const goalType = oneOf(input.goalType, PACK_GOAL_TYPES, "goal type") as PackGoalType;
+  const goalType = normalizePackGoalType(input.goalType);
   const targetValue =
     input.targetValue === null || input.targetValue === undefined || input.targetValue === ""
       ? null

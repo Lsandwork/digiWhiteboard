@@ -507,7 +507,7 @@ export async function publishEngagementTemplate(ctx: ServiceContext, input: Reco
         const saved = await savePackGoal(ctx, {
           title,
           description: message,
-          goalType: template.payload?.goalType ?? "teamwork",
+          goalType: template.payload?.goalType ?? template.category ?? "participation",
           targetValue: template.payload?.targetValue,
           successCriteria: template.payload?.measurementMethod
         });
