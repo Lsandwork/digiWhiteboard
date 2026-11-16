@@ -1,0 +1,13 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:04.227
+Body Checks is the overnight dog roster from Gingr.
+
+2
+00:00:04.227 --> 00:00:08.453
+Search a name, then select that dog before an inspection.
+
+3
+00:00:08.453 --> 00:00:12.680
+If the list is empty, check sync before assuming there are zero dogs.

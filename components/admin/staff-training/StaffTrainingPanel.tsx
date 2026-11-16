@@ -231,7 +231,13 @@ export function StaffTrainingPanel({ onOpenTab }: StaffTrainingPanelProps) {
                 <p className="admin-muted text-sm mb-2">{lesson.summary}</p>
 
                 <div className="staff-training-status-row">
-                  <span className="staff-training-pill staff-training-pill--warn">
+                  <span
+                    className={
+                      lesson.videoStatus === "ready"
+                        ? "staff-training-pill staff-training-pill--ok"
+                        : "staff-training-pill staff-training-pill--warn"
+                    }
+                  >
                     <Clapperboard className="inline h-3.5 w-3.5 mr-1" aria-hidden />
                     Screen capture: {lesson.videoStatus === "ready" ? "ready" : "pending production"}
                   </span>

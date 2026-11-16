@@ -91,6 +91,7 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionLabel: "Front Desk Coordinator",
     primary: [
       { tab: "my_shift" },
+      { tab: "staff_training", label: "Training" },
       { tab: "ops_command_center", label: "Ops Command Center" },
       { tab: "crossover_communication" },
       { tab: "owner_follow_up" },
@@ -207,6 +208,7 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionLabel: "Overnight",
     primary: [
       { tab: "my_shift" },
+      { tab: "staff_training", label: "Training" },
       { tab: "crossover_communication" },
       { tab: "body_checks" },
       { tab: "team_engagement", label: "Team Engagement" },
